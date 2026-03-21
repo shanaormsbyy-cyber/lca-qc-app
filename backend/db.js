@@ -4,6 +4,9 @@ const fs = require('fs');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'lca.db');
 
+// Ensure the directory exists (needed on Railway with mounted volumes)
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+
 // node-sqlite3-wasm leaves a stale lock dir on Windows when a process exits.
 // Remove it before opening so we don't get "database is locked" on restart.
 const LOCK_PATH = DB_PATH + '.lock';
