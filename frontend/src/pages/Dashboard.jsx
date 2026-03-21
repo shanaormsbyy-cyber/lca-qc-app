@@ -138,30 +138,60 @@ export default function Dashboard() {
         <button className="btn btn-secondary" onClick={() => navigate('/training')}>+ New Training</button>
       </div>
 
-      {/* Overdue alerts */}
+      {/* Overdue alerts — two cards side by side */}
       {(overdueStaff > 0 || dueSoonStaff > 0 || overdueProps > 0 || dueSoonProps > 0) && (
-        <div className="card mb-6">
-          <div className="card-header">
-            <span className="card-title">Overdue & Due Soon</span>
-            <div className="flex gap-2">
-              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/staff')}>Staff →</button>
-              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/properties')}>Properties →</button>
+        <div className="flex gap-4 mb-6" style={{ alignItems: 'flex-start' }}>
+          {/* Staff card */}
+          {(overdueStaff > 0 || dueSoonStaff > 0) && (
+            <div className="card" style={{ flex: 1, marginBottom: 0 }}>
+              <div className="card-header">
+                <span className="card-title">Staff QC Due</span>
+                <button className="btn btn-sm btn-ghost" onClick={() => navigate('/staff')}>View all →</button>
+              </div>
+              <div style={{ textAlign: 'center', padding: '12px 0 16px' }}>
+                <div style={{ fontSize: 56, fontWeight: 800, lineHeight: 1, color: overdueStaff > 0 ? 'var(--red)' : 'var(--amber)' }}>{overdueStaff + dueSoonStaff}</div>
+                <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 4 }}>
+                  {overdueStaff > 0 && <span style={{ color: 'var(--red)' }}>{overdueStaff} overdue</span>}
+                  {overdueStaff > 0 && dueSoonStaff > 0 && <span style={{ color: 'var(--t3)' }}> · </span>}
+                  {dueSoonStaff > 0 && <span style={{ color: 'var(--amber)' }}>{dueSoonStaff} due soon</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {due?.staff.filter(s => s.status !== 'ok').map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+                    <span style={{ fontWeight: 600 }}>{s.name}</span>
+                    <DueBadge status={s.status} daysLeft={s.days_left} />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {due?.staff.filter(s => s.status !== 'ok').slice(0, 3).map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
-                <span style={{ fontWeight: 600 }}>{s.name}</span>
-                <DueBadge status={s.status} daysLeft={s.days_left} />
+          )}
+
+          {/* Properties card */}
+          {(overdueProps > 0 || dueSoonProps > 0) && (
+            <div className="card" style={{ flex: 1, marginBottom: 0 }}>
+              <div className="card-header">
+                <span className="card-title">Properties QC Due</span>
+                <button className="btn btn-sm btn-ghost" onClick={() => navigate('/properties')}>View all →</button>
               </div>
-            ))}
-            {due?.properties.filter(p => p.status !== 'ok').slice(0, 3).map(p => (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
-                <span style={{ fontWeight: 600 }}>{p.name}</span>
-                <DueBadge status={p.status} daysLeft={p.days_left} />
+              <div style={{ textAlign: 'center', padding: '12px 0 16px' }}>
+                <div style={{ fontSize: 56, fontWeight: 800, lineHeight: 1, color: overdueProps > 0 ? 'var(--red)' : 'var(--amber)' }}>{overdueProps + dueSoonProps}</div>
+                <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 4 }}>
+                  {overdueProps > 0 && <span style={{ color: 'var(--red)' }}>{overdueProps} overdue</span>}
+                  {overdueProps > 0 && dueSoonProps > 0 && <span style={{ color: 'var(--t3)' }}> · </span>}
+                  {dueSoonProps > 0 && <span style={{ color: 'var(--amber)' }}>{dueSoonProps} due soon</span>}
+                </div>
               </div>
-            ))}
-          </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {due?.properties.filter(p => p.status !== 'ok').map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
+                    <span style={{ fontWeight: 600 }}>{p.name}</span>
+                    <DueBadge status={p.status} daysLeft={p.days_left} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
