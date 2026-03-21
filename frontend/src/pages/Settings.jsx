@@ -4,7 +4,7 @@ import api from '../api';
 export default function Settings() {
   const [properties, setProperties] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [propForm, setPropForm] = useState({ name: '', address: '', airbnb_id: '' });
+  const [propForm, setPropForm] = useState({ name: '' });
   const [editingProp, setEditingProp] = useState(null);
   const [showPropModal, setShowPropModal] = useState(false);
   const [newMgr, setNewMgr] = useState({ username: '', password: '', name: '' });
@@ -17,8 +17,8 @@ export default function Settings() {
 
   useEffect(() => { load(); }, []);
 
-  const openAddProp = () => { setEditingProp(null); setPropForm({ name: '', address: '', airbnb_id: '' }); setShowPropModal(true); };
-  const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name, address: p.address || '', airbnb_id: p.airbnb_id || '' }); setShowPropModal(true); };
+  const openAddProp = () => { setEditingProp(null); setPropForm({ name: '' }); setShowPropModal(true); };
+  const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name }); setShowPropModal(true); };
 
   const saveProp = async () => {
     if (!propForm.name) return;
@@ -70,13 +70,11 @@ export default function Settings() {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Address</th><th>Airbnb ID</th><th></th></tr></thead>
+            <thead><tr><th>Property Name</th><th></th></tr></thead>
             <tbody>
               {properties.map(p => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.name}</td>
-                  <td style={{ color: 'var(--t2)' }}>{p.address || '—'}</td>
-                  <td style={{ color: 'var(--t2)', fontSize: 12 }}>{p.airbnb_id || '—'}</td>
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-sm btn-ghost" onClick={() => openEditProp(p)}>Edit</button>
@@ -142,14 +140,6 @@ export default function Settings() {
             <div className="form-group">
               <label className="form-label">Property Name</label>
               <input className="form-input" value={propForm.name} onChange={e => setPropForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Address</label>
-              <input className="form-input" value={propForm.address} onChange={e => setPropForm(f => ({ ...f, address: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Airbnb Listing ID</label>
-              <input className="form-input" value={propForm.airbnb_id} onChange={e => setPropForm(f => ({ ...f, airbnb_id: e.target.value }))} placeholder="e.g. AIRBNB-HV001" />
             </div>
             <div className="flex gap-3">
               <button className="btn btn-primary" onClick={saveProp}>Save</button>
