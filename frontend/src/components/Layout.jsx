@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,12 +15,25 @@ const NAV = [
 export default function Layout() {
   const { manager, logout } = useAuth();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+  const close = () => setOpen(false);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          onClick={close}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)', zIndex: 99,
+          }}
+        />
+      )}
+
+      <aside className={`sidebar${open ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
           <div className="brand">LCA</div>
           <div className="sub">Cleaning Services</div>
@@ -31,6 +44,7 @@ export default function Layout() {
               key={n.to}
               to={n.to}
               end={n.end}
+              onClick={close}
               className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
             >
               <span className="nav-icon">{n.icon}</span>
@@ -45,7 +59,16 @@ export default function Layout() {
           <button className="btn-logout" onClick={handleLogout}>Logout</button>
         </div>
       </aside>
+
       <main className="main-area">
+        {/* Mobile top bar */}
+        <div className="mobile-topbar">
+          <button className="hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
+            <span /><span /><span />
+          </button>
+          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--cyan)' }}>LCA</div>
+          <div style={{ width: 40 }} />
+        </div>
         <Outlet />
       </main>
     </div>
