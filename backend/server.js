@@ -36,6 +36,24 @@ for (const name of koshProperties) {
 }
 if (migratedCount > 0) console.log(`Migrated ${migratedCount} KOSH properties into database.`);
 
+// Auto-migrate staff members (insert any missing ones)
+const lcaStaff = [
+  'Arabella Tuck','Aroha Wise','Cassandra Hiwarau','Elijah Lasi','Gabby Elliott',
+  'Hine Peautolu','Jacqueline Kirker','James Jenkins','Jesse Palmer','Maria Florez',
+  'Micayla Hughes','Milly Charlton','Paula Stacey','Tarlya Carey','Tarmz Brown',
+  'Tea Manuel','Tegan Watson-King','Tirihana Tahatika','Vienna Pahi','Wiki King',
+];
+const insertStaff = db.prepare('INSERT INTO staff (name, role, start_date) VALUES (?, ?, ?)');
+const existingStaff = new Set(db.prepare('SELECT name FROM staff').all().map(r => r.name));
+let migratedStaff = 0;
+for (const name of lcaStaff) {
+  if (!existingStaff.has(name)) {
+    insertStaff.run(name, 'Cleaner', '');
+    migratedStaff++;
+  }
+}
+if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
