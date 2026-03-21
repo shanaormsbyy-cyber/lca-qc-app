@@ -7,7 +7,8 @@
     "dev": "concurrently \"node backend/server.js\" \"cd frontend && npm run dev\"",
     "build": "cd frontend && npm install && npm run build",
     "start": "node backend/server.js",
-    "seed": "node backend/seed.js"
+    "seed": "node backend/seed.js",
+    "add-properties": "node backend/add-properties.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
