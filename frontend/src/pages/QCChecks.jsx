@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
@@ -79,6 +79,7 @@ export default function QCChecks() {
   const { manager } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState('checks');
   const [checks, setChecks] = useState([]);
   const [checklists, setChecklists] = useState([]);
@@ -101,21 +102,22 @@ export default function QCChecks() {
     setChecks(c.data); setChecklists(cl.data); setStaff(s.data); setProperties(p.data); setManagers(m.data);
   }).finally(() => setLoading(false));
 
+  useEffect(() => { load(); }, []);
+
   useEffect(() => {
-    load().then(() => {
-      if (location.state?.openNew) {
-        const pre = location.state.preselect || {};
-        setCheckForm(f => ({
-          ...f,
-          staff_id: String(pre.staff_id || ''),
-          property_id: String(pre.property_id || ''),
-          assigned_to_id: String(manager.id),
-        }));
-        setShowNewCheck(true);
-        window.history.replaceState({}, '');
-      }
-    });
-  }, []);
+    if (!loading && searchParams.get('openNew')) {
+      const staffId = searchParams.get('staff_id') || '';
+      const propertyId = searchParams.get('property_id') || '';
+      setCheckForm(f => ({
+        ...f,
+        staff_id: staffId,
+        property_id: propertyId,
+        assigned_to_id: String(manager.id),
+      }));
+      setShowNewCheck(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [loading]);
 
   const saveCL = async data => {
     if (editingCL && editingCL !== 'new') await api.put(`/qc/checklists/${editingCL.id}`, data);

@@ -162,7 +162,7 @@ export default function Dashboard() {
                     <span style={{ fontWeight: 600 }}>{s.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <DueBadge status={s.status} daysLeft={s.days_left} />
-                      <button className="btn btn-sm btn-primary" onClick={() => navigate('/qc', { state: { openNew: true, preselect: { staff_id: s.id } } })}>Start</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => navigate(`/qc?openNew=1&staff_id=${s.id}`)}>Start</button>
                     </div>
                   </div>
                 ))}
@@ -191,7 +191,7 @@ export default function Dashboard() {
                     <span style={{ fontWeight: 600 }}>{p.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <DueBadge status={p.status} daysLeft={p.days_left} />
-                      <button className="btn btn-sm btn-primary" onClick={() => navigate('/qc', { state: { openNew: true, preselect: { property_id: p.id } } })}>Start</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => navigate(`/qc?openNew=1&property_id=${p.id}`)}>Start</button>
                     </div>
                   </div>
                 ))}
