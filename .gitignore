@@ -1,0 +1,7 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/lca.db
+backend/lca.db.lock
+*.lock
+.env
