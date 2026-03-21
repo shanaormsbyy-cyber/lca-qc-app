@@ -22,8 +22,30 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM staff WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  const id = req.params.id;
+  db.exec('BEGIN');
+  try {
+    // Delete QC check items for all QC checks belonging to this staff member
+    const qcChecks = db.prepare('SELECT id FROM qc_checks WHERE staff_id=?').all(id);
+    for (const c of qcChecks) {
+      db.prepare('DELETE FROM qc_check_items WHERE check_id=?').run(c.id);
+    }
+    db.prepare('DELETE FROM qc_checks WHERE staff_id=?').run(id);
+
+    // Delete training session items for all training sessions belonging to this staff member
+    const trainSessions = db.prepare('SELECT id FROM training_sessions WHERE trainee_id=?').all(id);
+    for (const s of trainSessions) {
+      db.prepare('DELETE FROM training_session_items WHERE session_id=?').run(s.id);
+    }
+    db.prepare('DELETE FROM training_sessions WHERE trainee_id=?').run(id);
+
+    db.prepare('DELETE FROM staff WHERE id=?').run(id);
+    db.exec('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

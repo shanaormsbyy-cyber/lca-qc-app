@@ -10,20 +10,35 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, airbnb_id } = req.body;
-  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)').run(name, address, airbnb_id);
+  const { name } = req.body;
+  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)').run(name, '', '');
   res.json({ id: result.lastInsertRowid });
 });
 
 router.put('/:id', (req, res) => {
-  const { name, address, airbnb_id } = req.body;
-  db.prepare('UPDATE properties SET name=?, address=?, airbnb_id=? WHERE id=?').run(name, address, airbnb_id, req.params.id);
+  const { name } = req.body;
+  db.prepare('UPDATE properties SET name=? WHERE id=?').run(name, req.params.id);
   res.json({ ok: true });
 });
 
 router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM properties WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  const id = req.params.id;
+  db.exec('BEGIN');
+  try {
+    // Delete QC check items for all QC checks belonging to this property
+    const qcChecks = db.prepare('SELECT id FROM qc_checks WHERE property_id=?').all(id);
+    for (const c of qcChecks) {
+      db.prepare('DELETE FROM qc_check_items WHERE check_id=?').run(c.id);
+    }
+    db.prepare('DELETE FROM qc_checks WHERE property_id=?').run(id);
+
+    db.prepare('DELETE FROM properties WHERE id=?').run(id);
+    db.exec('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
