@@ -2,7 +2,9 @@ const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'lca.db');
+const DB_PATH = process.env.NODE_ENV === 'production'
+  ? '/app/data/lca.db'
+  : path.join(__dirname, 'lca.db');
 
 // Ensure the directory exists (needed on Railway with mounted volumes)
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
