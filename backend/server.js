@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const os = require('os');
+const bcrypt = require('bcryptjs');
 const db = require('./db');
 
 // Auto-seed if this is a fresh database
@@ -39,7 +40,7 @@ if (migratedCount > 0) console.log(`Migrated ${migratedCount} KOSH properties in
 // Auto-migrate staff members (insert any missing ones)
 const lcaStaff = [
   'Arabella Tuck','Aroha Wise','Cassandra Hiwarau','Elijah Lasi','Gabby Elliott',
-  'Hine Peautolu','Jacqueline Kirker','James Jenkins','Jesse Palmer','Maria Florez',
+  'Hine Peautolu','James Jenkins','Jesse Palmer','Maria Florez',
   'Micayla Hughes','Milly Charlton','Paula Stacey','Tarlya Carey','Tarmz Brown',
   'Tea Manuel','Tegan Watson-King','Tirihana Tahatika','Vienna Pahi','Wiki King',
 ];
@@ -53,6 +54,14 @@ for (const name of lcaStaff) {
   }
 }
 if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
+
+// Auto-migrate Jacqueline Kirker as a manager
+const existingManagers = new Set(db.prepare('SELECT username FROM managers').all().map(r => r.username));
+if (!existingManagers.has('jacqueline')) {
+  const hash = bcrypt.hashSync('lca123', 10);
+  db.prepare('INSERT INTO managers (username, password_hash, name) VALUES (?, ?, ?)').run('jacqueline', hash, 'Jacqueline Kirker');
+  console.log('Added manager: Jacqueline Kirker (username: jacqueline, password: lca123)');
+}
 
 const app = express();
 app.use(cors());
