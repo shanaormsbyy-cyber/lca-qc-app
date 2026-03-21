@@ -160,7 +160,10 @@ export default function Dashboard() {
                 {due?.staff.filter(s => s.status !== 'ok').map(s => (
                   <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
                     <span style={{ fontWeight: 600 }}>{s.name}</span>
-                    <DueBadge status={s.status} daysLeft={s.days_left} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <DueBadge status={s.status} daysLeft={s.days_left} />
+                      <button className="btn btn-sm btn-primary" onClick={() => navigate('/qc', { state: { openNew: true, preselect: { staff_id: s.id } } })}>Start</button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -186,7 +189,10 @@ export default function Dashboard() {
                 {due?.properties.filter(p => p.status !== 'ok').map(p => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)' }}>
                     <span style={{ fontWeight: 600 }}>{p.name}</span>
-                    <DueBadge status={p.status} daysLeft={p.days_left} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <DueBadge status={p.status} daysLeft={p.days_left} />
+                      <button className="btn btn-sm btn-primary" onClick={() => navigate('/qc', { state: { openNew: true, preselect: { property_id: p.id } } })}>Start</button>
+                    </div>
                   </div>
                 ))}
               </div>
