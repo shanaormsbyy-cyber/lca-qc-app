@@ -2,7 +2,7 @@ const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'lca.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'lca.db');
 
 // node-sqlite3-wasm leaves a stale lock dir on Windows when a process exits.
 // Remove it before opening so we don't get "database is locked" on restart.
