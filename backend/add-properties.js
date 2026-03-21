@@ -23,6 +23,23 @@ const properties = [
   '45A Vercoe Road',
   '11 Raddington Way',
   '11A Raddington Way',
+  '1/120 Beerescourt Road',
+  '2/2 Clematis Avenue',
+  '22/182 London Street',
+  '303/220 Tristram Street',
+  '6A Shirley Place',
+  '6 Shirley Place',
+  '2/20 Hunter Street',
+  '1/22 Willoughby Street',
+  '5/22 Willoughby Street',
+  '6/22 Willoughby Street',
+  '3/19 Beale Street',
+  '1/29 Palmerston Street',
+  '16B Ridout Street',
+  '77A Awatere Avenue',
+  '163 River Road North',
+  '163 River Road South',
+  '7/182 London Street',
 ];
 
 const insert = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)');
