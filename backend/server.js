@@ -2,6 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const os = require('os');
+const db = require('./db');
+
+// Auto-seed if this is a fresh database
+const { cnt } = db.prepare('SELECT COUNT(*) as cnt FROM managers').get();
+if (cnt === 0) {
+  console.log('Fresh database detected — running seed...');
+  require('./seed');
+  console.log('Seed complete.');
+}
 
 const app = express();
 app.use(cors());
