@@ -35,10 +35,10 @@ export default function StaffProfile() {
 
   return (
     <div className="page">
-      <button className="btn btn-ghost btn-sm mb-4" onClick={() => navigate('/team')}>← Back</button>
+      <button className="btn btn-ghost btn-sm mb-4" onClick={() => navigate('/staff')}>← Back</button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--navy)', fontSize: 22 }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 22 }}>
           {staff.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
         </div>
         <div>
@@ -51,7 +51,7 @@ export default function StaffProfile() {
         <div className="stat-card"><div className="stat-label">QC Checks</div><div className="stat-value">{qcChecks.length}</div></div>
         <div className="stat-card"><div className="stat-label">Avg QC Score</div><div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{avgScore ? Math.round(avgScore) + '%' : '—'}</div></div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
-        <div className="stat-card"><div className="stat-label">Fully Certified</div><div className="stat-value" style={{ color: 'var(--green)' }}>{trainSessions.filter(t => t.completion_pct === 100).length}</div></div>
+        <div className="stat-card"><div className="stat-label">Service Time</div><div className="stat-value" style={{ fontSize: 28, letterSpacing: -1 }}>{(() => { const days = Math.floor((new Date() - new Date(staff.start_date)) / 86400000); return days >= 365 ? `${Math.floor(days/365)}y ${Math.floor((days%365)/30)}m` : days >= 30 ? `${Math.floor(days/30)}m` : `${days}d`; })()}</div></div>
       </div>
 
       {chartData.length > 1 && (

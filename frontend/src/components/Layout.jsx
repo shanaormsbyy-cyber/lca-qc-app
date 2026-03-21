@@ -3,13 +3,12 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const NAV = [
-  { to: '/',           icon: '🏠', label: 'Dashboard',   end: true },
-  { to: '/team',       icon: '👥', label: 'Team Members' },
-  { to: '/training',   icon: '📋', label: 'Training' },
-  { to: '/qc',         icon: '✅', label: 'QC Checks' },
-  { to: '/scheduling', icon: '📅', label: 'Scheduling' },
-  { to: '/kpis',       icon: '📊', label: 'KPIs' },
-  { to: '/settings',   icon: '⚙️', label: 'Settings' },
+  { to: '/',           label: 'Dashboard',  end: true },
+  { to: '/staff',      label: 'Staff' },
+  { to: '/properties', label: 'Properties' },
+  { to: '/training',   label: 'Training' },
+  { to: '/kpis',       label: 'KPIs' },
+  { to: '/settings',   label: 'Settings' },
 ];
 
 export default function Layout() {
@@ -22,14 +21,10 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      {/* Mobile overlay */}
       {open && (
         <div
           onClick={close}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(4px)', zIndex: 99,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 99 }}
         />
       )}
 
@@ -47,7 +42,6 @@ export default function Layout() {
               onClick={close}
               className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
             >
-              <span className="nav-icon">{n.icon}</span>
               {n.label}
             </NavLink>
           ))}
@@ -61,7 +55,6 @@ export default function Layout() {
       </aside>
 
       <main className="main-area">
-        {/* Mobile top bar */}
         <div className="mobile-topbar">
           <button className="hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
             <span /><span /><span />
