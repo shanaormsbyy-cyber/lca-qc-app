@@ -29,10 +29,25 @@ router.put('/:id/password', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  const all = db.prepare('SELECT COUNT(*) as cnt FROM managers').get();
-  if (all.cnt <= 1) return res.status(400).json({ error: 'Cannot delete the last manager account' });
-  db.prepare('DELETE FROM managers WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  const all = db.prepare('SELECT id FROM managers WHERE id != ?').all(req.params.id);
+  if (all.length === 0) return res.status(400).json({ error: 'Cannot delete the last manager account' });
+
+  // Reassign all records from deleted manager to the current logged-in manager
+  const reassignTo = req.manager.id !== parseInt(req.params.id) ? req.manager.id : all[0].id;
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE qc_checks SET scheduled_by_id=? WHERE scheduled_by_id=?').run(reassignTo, req.params.id);
+    db.prepare('UPDATE qc_checks SET assigned_to_id=? WHERE assigned_to_id=?').run(reassignTo, req.params.id);
+    db.prepare('UPDATE training_sessions SET scheduled_by_id=? WHERE scheduled_by_id=?').run(reassignTo, req.params.id);
+    db.prepare('UPDATE training_sessions SET assigned_to_id=? WHERE assigned_to_id=?').run(reassignTo, req.params.id);
+    db.prepare('DELETE FROM managers WHERE id=?').run(req.params.id);
+    db.exec('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
