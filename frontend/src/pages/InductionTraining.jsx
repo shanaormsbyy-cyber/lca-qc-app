@@ -1,584 +1,246 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
 
-// ─── Colour constants ───────────────────────────────────────────────────────
+// ─── Colours ──────────────────────────────────────────────────────────────────
 const CYAN       = '#00c896';
-const CYAN_DARK  = '#00a07a';
 const CYAN_LIGHT = 'rgba(0,200,150,0.10)';
 const BORDER     = 'rgba(255,255,255,0.10)';
 const SURFACE    = '#112240';
 const SURFACE2   = '#0d1b36';
 const TEXT1      = '#ffffff';
 const TEXT2      = '#94a3b8';
-const TEXT3      = '#475569';
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Exact data from training document ───────────────────────────────────────
 const PROCESSES_TASKS = [
-  { id: 'p1',  label: 'LCA Introduction & Company Overview',             mins: 15 },
-  { id: 'p2',  label: 'Health & Safety Induction',                       mins: 30 },
-  { id: 'p3',  label: 'COSHH / Chemical Handling',                       mins: 20 },
-  { id: 'p4',  label: 'Manual Handling Awareness',                       mins: 20 },
-  { id: 'p5',  label: 'PPE Requirements & Usage',                        mins: 15 },
-  { id: 'p6',  label: 'Cleaning Equipment Overview',                     mins: 20 },
-  { id: 'p7',  label: 'Cleaning Standards & Quality Expectations',       mins: 20 },
-  { id: 'p8',  label: 'Reporting Procedures (incidents, damage, etc.)',  mins: 15 },
-  { id: 'p9',  label: 'Uniform & Personal Presentation',                 mins: 10 },
-  { id: 'p10', label: 'Time Keeping & Attendance Policy',                mins: 15 },
-  { id: 'p11', label: 'Communication Channels (WhatsApp, app, etc.)',    mins: 10 },
-  { id: 'p12', label: 'Payroll & Pay Queries Process',                   mins: 10 },
+  "Employee has signed in to all necessary software accounts.",
+  "Demonstrated how to use staff communication channels and what to use them for.",
+  "Clocking in and out process shown.",
+  "Shown how lockboxes and keys work, where to find access codes etc.",
+  "Told of the correct channels for contact, including who to contact depending on specific issues or queries: Pay, Complaints, etc.",
+  "Adequate training provided on any checklist software used.",
+  "Demonstrated how to visually inspect and maintain equipment.",
+  "House navigation explained (clean from back to front). Top to Bottom, left to right in a circle around the room process explained, as well as the 'room by room' process.",
 ];
 
 const CLEANING_AREAS = [
-  { id: 'ca1',  label: 'Vacuuming – carpets, edges, stairs' },
-  { id: 'ca2',  label: 'Mopping – hard floors (correct technique)' },
-  { id: 'ca3',  label: 'Kitchen – surfaces, appliances, splashbacks' },
-  { id: 'ca4',  label: 'Bathroom – toilet, basin, bath/shower, tiles' },
-  { id: 'ca5',  label: 'Dusting – furniture, skirting, light fittings' },
-  { id: 'ca6',  label: 'Windows & Mirrors – streak-free method' },
-  { id: 'ca7',  label: 'Bedroom – making beds, under-bed, wardrobes' },
-  { id: 'ca8',  label: 'Bin Emptying & Disposal' },
-  { id: 'ca9',  label: 'Deep Clean – oven, fridge, inside cupboards' },
-  { id: 'ca10', label: 'End of Tenancy – full property walkthrough' },
+  "System", "Bathroom", "Kitchen", "Bedroom",
+  "Living Room", "Laundry", "Dusting", "Vacuuming", "Mopping", "Final Touches",
 ];
 
 const VALUES_TASKS = [
-  { id: 'v1', label: 'Integrity – Doing the right thing even when no one is watching' },
-  { id: 'v2', label: 'Reliability – Being on time, every time' },
-  { id: 'v3', label: 'Professionalism – Conduct, language, and behaviour on site' },
-  { id: 'v4', label: 'Respect – For client properties and personal belongings' },
-  { id: 'v5', label: 'Communication – Keeping supervisors informed' },
-  { id: 'v6', label: 'Accountability – Taking ownership of mistakes' },
+  "Educated on business core values and their meanings including how to conduct their behaviour and attitude in accordance with the values.",
+  "Advised on the call in policy, including how to call in & what is considered acceptable notice, as well as the nature of casual / on call employment.",
+  "Employee advised of the scope of services for their role and shown/told what is considered 'Outside the scope of a standard job'. Employee advised on steps to take if a job falls outside the standard policy (refer to excessive cleaning policy).",
+  "Advised on the 3-strike policy, how warnings are issued and what can warrant one, advised on PIPs and why they're issued and how you expect feedback to be handled.",
+  "Advised of the code of conduct policy and the expectations during a clean.",
+  "Advised on equipment return policies in the event of a termination of employment.",
+  "Shown 'What good looks like' in terms of presentation and proper cleaning.",
+  "Advised of how long specific tasks should take and how long is acceptable per each room in each house / property.",
 ];
 
-const SHIFT_TASKS = [
-  {
-    id: 'shift1',
-    title: 'Shift 1 – Shadowing',
-    intro: 'Employee shadows an experienced cleaner for a full shift. No independent tasks — observation and questions only.',
-    tasks: [
-      { id: 's1t1', label: 'Attend full shadow shift with experienced cleaner' },
-      { id: 's1t2', label: 'Observe property entry / key/access procedures' },
-      { id: 's1t3', label: 'Watch full room-by-room cleaning sequence' },
-      { id: 's1t4', label: 'Note chemical usage and labelling' },
-      { id: 's1t5', label: 'End-of-shift Q&A with supervisor' },
-    ],
-  },
-  {
-    id: 'shift2',
-    title: 'Shift 2 – Assisted Cleaning',
-    intro: 'Employee completes tasks alongside the trainer. Trainer corrects technique in real time.',
-    tasks: [
-      { id: 's2t1', label: 'Complete bathroom clean (supervised)' },
-      { id: 's2t2', label: 'Complete kitchen clean (supervised)' },
-      { id: 's2t3', label: 'Vacuum full property (supervised)' },
-      { id: 's2t4', label: 'Mop hard floors (supervised)' },
-      { id: 's2t5', label: 'Demonstrate correct chemical dilution' },
-    ],
-  },
-  {
-    id: 'shift3',
-    title: 'Shift 3 – Independent with Check',
-    intro: 'Employee completes the property independently. Trainer inspects at end and provides written feedback.',
-    tasks: [
-      { id: 's3t1', label: 'Complete full property clean independently' },
-      { id: 's3t2', label: 'Self-check against LCA quality standards' },
-      { id: 's3t3', label: 'Trainer final walkthrough & sign-off' },
-      { id: 's3t4', label: 'Feedback discussion – areas to improve' },
-    ],
-  },
-  {
-    id: 'shift4',
-    title: 'Shift 4 – Solo Clean',
-    intro: 'Employee completes a solo clean. Trainer available by phone only. QC check conducted same day or next day.',
-    tasks: [
-      { id: 's4t1', label: 'Complete full property clean solo' },
-      { id: 's4t2', label: 'Take before/after photos and submit via app' },
-      { id: 's4t3', label: 'Complete post-clean checklist' },
-      { id: 's4t4', label: 'QC review by supervisor within 24 hrs' },
-    ],
-  },
-  {
-    id: 'shift5',
-    title: 'Shift 5 – Sign-Off Clean',
-    intro: 'Final assessment clean. Employee demonstrates full competency. Result determines readiness for independent roster.',
-    tasks: [
-      { id: 's5t1', label: 'Arrive on time with full uniform and equipment' },
-      { id: 's5t2', label: 'Complete full clean to LCA standard independently' },
-      { id: 's5t3', label: 'Submit photo evidence via app' },
-      { id: 's5t4', label: 'Complete end-of-shift self-assessment form' },
-      { id: 's5t5', label: 'Trainer/supervisor sign-off on competency' },
-    ],
-  },
-];
+const SHIFT_TASKS = {
+  1: [
+    { time: "~30 mins", desc: "Introduce trainee and tell them about how their shift will go. Be positive and friendly. Note their punctuality, attitude, and how they present themself." },
+    { time: "~30 mins", desc: "Demonstrate how to clean a bathroom step-by-step, explaining each action slowly." },
+    { time: "~20 mins", desc: "Let the trainee clean a second bathroom using the same method, watching briefly to ensure they understand, then give them space to clean on their own. While they clean, work on another task, like cleaning the kitchen." },
+    { time: "~5 mins",  desc: "Review their work in the bathroom and provide feedback." },
+    { time: "~15 mins", desc: "Show the trainee how to make a bed, demonstrate the end product including how throws, pillows and decorative pillows are presented." },
+    { time: "~20 mins", desc: "Have the trainee make a bed on their own, giving feedback as needed." },
+    { time: "~5 mins",  desc: "Once the trainee has made a bed, show them how to dust, from top to bottom, lifting things up." },
+    { time: "~15 mins", desc: "Have them dust the entire house whilst you're vacuuming, pay special attention to the level of detail taken during dusting and any 'hotspots' — Provide feedback where necessary." },
+    { time: "~15 mins", desc: "Teach the trainee how to mop correctly, from the back of the room out. Demonstrate mopping in the kitchen. Have the employee mop the bathrooms; while they're mopping, complete any checklists / fill out their training forms accordingly." },
+  ],
+  2: [
+    { time: "~30 mins", desc: "Demonstrate how to clean a kitchen step-by-step, explaining each action slowly. Let the trainee do the entire clean. Observe and give pointers where needed." },
+    { time: "~15 mins", desc: "Let the trainee clean one of the bathrooms. Observe and give pointers where needed. Sign-off on the trainee's bathroom work with them beside you." },
+    { time: "~25 mins", desc: "Let the trainee make 2 beds — 1 single + 1 king or queen. Do a bathroom and the final bed whilst the trainee is doing their beds. Check their beds once complete, provide any feedback where necessary." },
+    { time: "~5 mins",  desc: "Let the trainee start vacuuming the floors." },
+    { time: "~5 mins",  desc: "Show them how to set up the vacuum and explain correct usage. Demonstrate proper technique, how to grid, and going back-to-front, getting behind doors and deep in corners etc." },
+    { time: "~20 mins", desc: "Let the trainee vacuum the whole house. Finish dusting / checklists whilst the trainee is vacuuming — Mop behind them." },
+  ],
+  3: [
+    { time: "~30 mins",    desc: "Let the trainee clean a bathroom by themself. If the house has a second bathroom, clean that while they clean the other one. Walk through their clean of the bathroom afterwards and provide feedback." },
+    { time: "~30–45 mins", desc: "Give them a quick refresher of a kitchen clean. Let them clean the whole kitchen. Observe and correct any small mistakes as they go. Reiterate the system (left to right, top down, polish last, etc)." },
+    { time: "~15–20 mins", desc: "Explain how to clean a bedroom from start to finish. Walk around the room and point things out, but do not clean anything. Let the trainee clean the whole bedroom, from making beds to dusting, while you watch and give pointers." },
+    { time: "~15–20 mins", desc: "Let the trainee do the other bedroom unsupervised (beds, dusting). Finish dusting the rest of the house and completing any other tasks while you wait. Check off on their work with them once they've finished and provide feedback." },
+    { time: "~15 mins",    desc: "Explain how to use checklist software, give any tips or tricks to make the process as efficient as possible. Have the trainee complete the checklist for 1 bedroom, 1 bathroom. Observe, give pointers on efficiency, then have the trainee watch you complete the rest." },
+    { time: "~10–15 mins", desc: "Do a walkthrough of the home with the trainee beside you to look at final touches and presentation. Explain how presentation matters, tips they can use, and give feedback." },
+    { time: "~15–20 mins", desc: "Let the trainee start vacuuming the floors." },
+    { time: "~15–20 mins", desc: "Mop behind the trainee and finish up." },
+  ],
+  4: [
+    { time: "~30 mins",    desc: "Let the trainee clean both bathrooms by themself. Observe and give direction where needed. If they have learned any bad habits, now is the time to correct them. Focus on direction: left to right, top to bottom, making sure they don't go back and forth re-cleaning or over-cleaning areas." },
+    { time: "~20–30 mins", desc: "Let the trainee clean the entire kitchen. Whilst they're cleaning the kitchen, make a bed if more than 2 beds have been slept in. Ensure there are TWO beds left for the trainee to make." },
+    { time: "~20–25 mins", desc: "Let the trainee make at least 2 beds in the house. Watch them as they go and give pointers / correct any mistakes." },
+    { time: "~10 mins",    desc: "Let the trainee dust the rest of the house on their own. Begin to plan for Shift 5 while you wait. If you have identified any areas of weakness, make sure these are focussed on in the next shift. Write these things down." },
+    { time: "~15 mins",    desc: "Quickly check off on all their dusting work and provide any feedback." },
+    { time: "~15–20 mins", desc: "Give the trainee a quick refresher on how to vacuum the correct way. Let them vacuum the entire house. Observe for 5–10 minutes to ensure the system is being followed and give direction where needed." },
+    { time: "~15 mins",    desc: "If running behind time, begin mopping while they vacuum. If not, wait for them to finish vacuuming and let them mop the whole house as well. Ensure they use proper technique and give pointers if necessary." },
+  ],
+};
 
-const SHIFT_INTROS = SHIFT_TASKS.reduce((acc, s) => { acc[s.id] = s.intro; return acc; }, {});
+const SHIFT_INTROS = {
+  5: "This is where trainees should be shown time management and efficiency. Fill in your training plan based on observations from the previous 4 training sessions — list items and time allocations for each task. This session should take roughly the time it would take for the house to be completed by an experienced team member. Ensure extra tasks are captured (Laundry, garage, etc).",
+  6: "Time management & attention to detail is the main focus of this session. Plan this session around any feedback you noted in previous sessions. Trainees should be confident in their job at this stage and their error rate should be minimal. Time targets should be at least 90% achieved by this stage.",
+  7: "This is the trainee's final day of training before going solo. Ensure any issues have been addressed and rectified by this stage. Trainee should be confident in software, cleaning processes, presentation standards and overall cleaning standards. Ask questions, ensure they're confident. Plan this session around ensuring the trainee is 'Ready to leave the nest'.",
+};
 
 const SHIFT_5_FIXED = [
-  { id: 'sf1', label: 'Property cleaned to full LCA standard' },
-  { id: 'sf2', label: 'All rooms addressed — no areas missed' },
-  { id: 'sf3', label: 'Chemicals used correctly and safely' },
-  { id: 'sf4', label: 'Equipment left clean and stored properly' },
-  { id: 'sf5', label: 'Photo evidence submitted' },
-  { id: 'sf6', label: 'No damage or complaints reported' },
+  { time: "~15 mins", desc: "Software training — Allow the trainee to complete their own checklist for this entire clean. Time them & provide pointers and tips. Target: under 10 minutes to complete a checklist." },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function mkTasks(arr) {
-  return arr.reduce((acc, t) => { acc[t.id] = false; return acc; }, {});
-}
-
-function mkCustom() {
-  return [{ id: Date.now(), text: '', done: false }];
-}
+// ─── State helpers ─────────────────────────────────────────────────────────────
+function mkTasks(n) { return Array.from({ length: n }, () => ({ checked: false, comment: '' })); }
 
 function initState() {
-  const shiftNotes = {};
-  const shiftVerdict = {};
-  const shiftCustomTasks = {};
-  SHIFT_TASKS.forEach(s => {
-    shiftNotes[s.id]       = '';
-    shiftVerdict[s.id]     = null;
-    shiftCustomTasks[s.id] = mkCustom();
-  });
-
   return {
-    employeeName:      '',
-    startDate:         '',
-    supervisorName:    '',
-    processTasks:      mkTasks(PROCESSES_TASKS),
-    processNotes:      '',
-    cleaningAreaTasks: mkTasks(CLEANING_AREAS),
-    cleaningNotes:     '',
-    valuesTasks:       mkTasks(VALUES_TASKS),
-    valuesNotes:       '',
-    shiftTasks:        SHIFT_TASKS.reduce((acc, s) => { acc[s.id] = mkTasks(s.tasks); return acc; }, {}),
-    shiftNotes,
-    shiftVerdict,
-    shiftCustomTasks,
-    signOffDate:       '',
-    signOffNotes:      '',
-    signedOff:         false,
-    shift5Fixed:       mkTasks(SHIFT_5_FIXED),
+    employeeName: '', inductionDate: '',
+    overview: {
+      contractSigned: false, policiesSigned: false,
+      shifts: [false, false, false, false, false, false, false],
+      processesAndSystems: false, valuesAndGuidelines: false, signOff: false,
+    },
+    processes: mkTasks(PROCESSES_TASKS.length),
+    cleaningAreas: Object.fromEntries(CLEANING_AREAS.map(a => [a, false])),
+    values: mkTasks(VALUES_TASKS.length),
+    shifts: {
+      1: { trainer: '', date: '', tasks: mkTasks(SHIFT_TASKS[1].length) },
+      2: { trainer: '', date: '', tasks: mkTasks(SHIFT_TASKS[2].length), verdict: null, summary: '' },
+      3: { trainer: '', date: '', tasks: mkTasks(SHIFT_TASKS[3].length) },
+      4: { trainer: '', date: '', tasks: mkTasks(SHIFT_TASKS[4].length) },
+      5: { trainer: '', date: '', tasks: mkTasks(SHIFT_5_FIXED.length), custom: [] },
+      6: { trainer: '', date: '', custom: [] },
+      7: { trainer: '', date: '', custom: [] },
+    },
+    signOff: { supervisorName: '', company: '', employeePrint: '', trainerPrint: '', employeeSigned: false, trainerSigned: false },
   };
 }
 
-// ─── Progress helpers ─────────────────────────────────────────────────────────
-function countTasks(obj) {
-  const vals = Object.values(obj);
-  return { done: vals.filter(Boolean).length, total: vals.length };
-}
-
-function totalProgress(state) {
-  const allChecks = [
-    ...Object.values(state.processTasks),
-    ...Object.values(state.cleaningAreaTasks),
-    ...Object.values(state.valuesTasks),
-    ...SHIFT_TASKS.flatMap(s => Object.values(state.shiftTasks[s.id] || {})),
-    ...Object.values(state.shift5Fixed),
-  ];
-  const done  = allChecks.filter(Boolean).length;
-  const total = allChecks.length;
-  return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
-}
-
-// ─── UI Primitives ────────────────────────────────────────────────────────────
+// ─── UI Primitives ─────────────────────────────────────────────────────────────
 function Tick({ checked, onChange }) {
   return (
-    <button
-      onClick={onChange}
-      style={{
-        width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-        border: `2px solid ${checked ? CYAN : 'rgba(255,255,255,0.20)'}`,
-        background: checked ? CYAN : 'transparent',
-        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.15s',
-      }}
-    >
+    <button onClick={onChange} style={{
+      width: 26, height: 26, minWidth: 26, borderRadius: 6, flexShrink: 0,
+      border: `2px solid ${checked ? CYAN : 'rgba(255,255,255,0.20)'}`,
+      background: checked ? CYAN : 'transparent',
+      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      transition: 'all 0.15s',
+    }}>
       {checked && <span style={{ color: '#fff', fontSize: 14, fontWeight: 900, lineHeight: 1 }}>✓</span>}
     </button>
   );
 }
 
-function Field({ label, value, onChange, multiline = false, placeholder = '' }) {
-  const inputStyle = {
-    background: SURFACE2, border: '1.5px solid rgba(255,255,255,0.12)', color: TEXT1,
-    borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%',
-    boxSizing: 'border-box', fontFamily: "'Inter', system-ui, sans-serif",
-    outline: 'none', resize: multiline ? 'vertical' : 'none',
-    minHeight: multiline ? 80 : undefined,
-  };
+function NoteInput({ value, onChange }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>
-        {label}
-      </label>
-      {multiline
-        ? <textarea style={inputStyle} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} />
-        : <input    style={inputStyle} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
-      }
-    </div>
+    <input
+      placeholder="Add a note…"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{
+        width: '100%', boxSizing: 'border-box',
+        background: SURFACE2, border: `1.5px solid ${BORDER}`,
+        borderRadius: 7, padding: '6px 10px', fontSize: 13, color: TEXT2,
+        outline: 'none', fontFamily: 'inherit', marginTop: 6,
+      }}
+    />
   );
 }
 
-function SectionCard({ title, accent = false, children, right = null }) {
+function SectionCard({ title, badge, children, accent }) {
   return (
-    <div style={{ background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14, marginBottom: 20, overflow: 'hidden' }}>
+    <div style={{ background: SURFACE, borderRadius: 14, border: `1.5px solid rgba(255,255,255,0.08)`, overflow: 'hidden', marginBottom: 20 }}>
       <div style={{
         background: accent ? CYAN : SURFACE2,
-        padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        borderBottom: `1.5px solid rgba(255,255,255,0.08)`,
+        padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <span style={{ color: TEXT1, fontWeight: 700, fontSize: 13, letterSpacing: 0.3 }}>{title}</span>
-        {right}
+        <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', color: accent ? '#0a1628' : TEXT1 }}>{title}</span>
+        {badge !== undefined && (
+          <span style={{
+            marginLeft: 'auto', background: accent ? 'rgba(0,0,0,0.15)' : CYAN,
+            color: accent ? '#0a1628' : '#0a1628', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 700,
+          }}>{badge}</span>
+        )}
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
     </div>
   );
 }
 
-function TaskRow({ task, checked, onChange }) {
+function TaskRow({ time, desc, checked, comment, onCheck, onComment }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <Tick checked={checked} onChange={onChange} />
-      <span style={{ flex: 1, fontSize: 14, color: checked ? TEXT2 : TEXT1, textDecoration: checked ? 'line-through' : 'none', transition: 'color 0.15s' }}>
-        {task.label}
-      </span>
-      {task.mins && (
-        <span style={{ background: CYAN_LIGHT, color: CYAN, fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
-          {task.mins} min
-        </span>
-      )}
+    <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 32px', gap: 12, padding: '12px 0', borderBottom: `1px solid ${BORDER}`, alignItems: 'start' }}>
+      <div style={{ background: CYAN_LIGHT, color: CYAN, borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, textAlign: 'center', marginTop: 2 }}>{time}</div>
+      <div>
+        <p style={{ fontSize: 14, color: TEXT1, margin: '0 0 4px', lineHeight: 1.55 }}>{desc}</p>
+        <NoteInput value={comment} onChange={onComment} />
+      </div>
+      <Tick checked={checked} onChange={onCheck} />
     </div>
   );
 }
 
-function ProgressRing({ pct }) {
-  const r = 44, circ = 2 * Math.PI * r;
-  const dash = circ * (pct / 100);
-  return (
-    <svg width={100} height={100} style={{ display: 'block' }}>
-      <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={8} />
-      <circle
-        cx={50} cy={50} r={r} fill="none"
-        stroke={pct === 100 ? CYAN : CYAN}
-        strokeWidth={8} strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round" transform="rotate(-90 50 50)"
-        style={{ transition: 'stroke-dasharray 0.4s ease' }}
-      />
-      <text x={50} y={55} textAnchor="middle" fill={TEXT1} fontSize={20} fontWeight={800} fontFamily="Inter,system-ui,sans-serif">
-        {pct}%
-      </text>
-    </svg>
-  );
-}
+// ─── Pages ──────────────────────────────────────────────────────────────────────
+function Overview({ state, set }) {
+  const ov = state.overview;
+  const items = [ov.contractSigned, ov.policiesSigned, ...ov.shifts, ov.processesAndSystems, ov.valuesAndGuidelines, ov.signOff];
+  const done = items.filter(Boolean).length;
+  const pct = Math.round((done / items.length) * 100);
 
-// ─── Page: Overview ───────────────────────────────────────────────────────────
-function Overview({ state, setState }) {
-  const prog = totalProgress(state);
-
-  const shiftProgress = SHIFT_TASKS.map(s => {
-    const { done, total } = countTasks(state.shiftTasks[s.id]);
-    return { id: s.id, title: s.title, done, total };
+  const toggle = key => set(s => ({ ...s, overview: { ...s.overview, [key]: !s.overview[key] } }));
+  const toggleShift = i => set(s => {
+    const shifts = [...s.overview.shifts]; shifts[i] = !shifts[i];
+    return { ...s, overview: { ...s.overview, shifts } };
   });
 
+  const rows = [
+    { label: 'Contract / IRD Forms Signed', key: 'contractSigned' },
+    { label: 'Employee Policies Signed', key: 'policiesSigned' },
+    ...Array.from({ length: 7 }, (_, i) => ({ label: `Shift ${i + 1}`, shiftIdx: i })),
+    { label: 'Processes & Systems', key: 'processesAndSystems' },
+    { label: 'Values & Guidelines', key: 'valuesAndGuidelines' },
+    { label: 'Sign-Off Sheet', key: 'signOff' },
+  ];
+
   return (
     <div>
-      {/* Summary card */}
-      <div style={{ background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 24, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 28 }}>
-        <ProgressRing pct={prog.pct} />
-        <div>
-          <div style={{ color: TEXT2, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Overall Progress</div>
-          <div style={{ color: TEXT1, fontSize: 28, fontWeight: 800 }}>{prog.done} <span style={{ color: TEXT3, fontSize: 16, fontWeight: 500 }}>/ {prog.total} tasks</span></div>
-          {prog.pct === 100 && <div style={{ color: CYAN, fontSize: 13, fontWeight: 700, marginTop: 6 }}>Induction complete!</div>}
-        </div>
-      </div>
-
-      {/* Employee details */}
       <SectionCard title="Employee Details">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label="Employee Name"    value={state.employeeName}   onChange={v => setState(s => ({ ...s, employeeName: v }))}   placeholder="Full name" />
-          <Field label="Start Date"       value={state.startDate}      onChange={v => setState(s => ({ ...s, startDate: v }))}      placeholder="DD/MM/YYYY" />
-          <Field label="Supervisor"       value={state.supervisorName} onChange={v => setState(s => ({ ...s, supervisorName: v }))} placeholder="Supervisor name" />
-        </div>
-      </SectionCard>
-
-      {/* Shift progress summary */}
-      <SectionCard title="Shift Checklist Progress">
-        {shiftProgress.map(sp => (
-          <div key={sp.id} style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 13, color: TEXT1 }}>{sp.title}</span>
-              <span style={{ fontSize: 12, color: TEXT2 }}>{sp.done}/{sp.total}</span>
-            </div>
-            <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ height: '100%', background: CYAN, width: `${sp.total ? (sp.done / sp.total) * 100 : 0}%`, transition: 'width 0.3s' }} />
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Employee Name</label>
+            <input value={state.employeeName} onChange={e => set(s => ({ ...s, employeeName: e.target.value }))}
+              placeholder="Full name" style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
           </div>
-        ))}
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── Page: Processes ──────────────────────────────────────────────────────────
-function ProcessesPage({ state, setState }) {
-  const { done, total } = countTasks(state.processTasks);
-  return (
-    <div>
-      <SectionCard
-        title="Induction Processes"
-        accent
-        right={<span style={{ color: TEXT1, fontSize: 12, fontWeight: 700 }}>{done}/{total}</span>}
-      >
-        {PROCESSES_TASKS.map(t => (
-          <TaskRow
-            key={t.id} task={t}
-            checked={state.processTasks[t.id]}
-            onChange={() => setState(s => ({ ...s, processTasks: { ...s.processTasks, [t.id]: !s.processTasks[t.id] } }))}
-          />
-        ))}
-      </SectionCard>
-      <SectionCard title="Notes">
-        <Field label="Process Notes" multiline value={state.processNotes} onChange={v => setState(s => ({ ...s, processNotes: v }))} placeholder="Any notes on the induction process…" />
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── Page: Cleaning Areas ─────────────────────────────────────────────────────
-function CleaningAreasPage({ state, setState }) {
-  const { done, total } = countTasks(state.cleaningAreaTasks);
-  return (
-    <div>
-      <SectionCard
-        title="Cleaning Areas Covered"
-        accent
-        right={<span style={{ color: TEXT1, fontSize: 12, fontWeight: 700 }}>{done}/{total}</span>}
-      >
-        {CLEANING_AREAS.map(t => (
-          <TaskRow
-            key={t.id} task={t}
-            checked={state.cleaningAreaTasks[t.id]}
-            onChange={() => setState(s => ({ ...s, cleaningAreaTasks: { ...s.cleaningAreaTasks, [t.id]: !s.cleaningAreaTasks[t.id] } }))}
-          />
-        ))}
-      </SectionCard>
-      <SectionCard title="Notes">
-        <Field label="Cleaning Area Notes" multiline value={state.cleaningNotes} onChange={v => setState(s => ({ ...s, cleaningNotes: v }))} placeholder="Any notes on areas covered…" />
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── Page: Values ─────────────────────────────────────────────────────────────
-function ValuesPage({ state, setState }) {
-  const { done, total } = countTasks(state.valuesTasks);
-  return (
-    <div>
-      <SectionCard
-        title="LCA Values & Conduct"
-        accent
-        right={<span style={{ color: TEXT1, fontSize: 12, fontWeight: 700 }}>{done}/{total}</span>}
-      >
-        {VALUES_TASKS.map(t => (
-          <TaskRow
-            key={t.id} task={t}
-            checked={state.valuesTasks[t.id]}
-            onChange={() => setState(s => ({ ...s, valuesTasks: { ...s.valuesTasks, [t.id]: !s.valuesTasks[t.id] } }))}
-          />
-        ))}
-      </SectionCard>
-      <SectionCard title="Notes">
-        <Field label="Values Notes" multiline value={state.valuesNotes} onChange={v => setState(s => ({ ...s, valuesNotes: v }))} placeholder="Any notes on values discussion…" />
-      </SectionCard>
-    </div>
-  );
-}
-
-// ─── Page: Shift ──────────────────────────────────────────────────────────────
-function ShiftPage({ shift, state, setState }) {
-  const tasks      = state.shiftTasks[shift.id] || {};
-  const { done, total } = countTasks(tasks);
-  const verdict    = state.shiftVerdict[shift.id];
-  const notes      = state.shiftNotes[shift.id] || '';
-  const customs    = state.shiftCustomTasks[shift.id] || [];
-
-  const setVerdict = v => setState(s => ({ ...s, shiftVerdict: { ...s.shiftVerdict, [shift.id]: v } }));
-  const setNotes   = v => setState(s => ({ ...s, shiftNotes:   { ...s.shiftNotes,   [shift.id]: v } }));
-
-  const addCustom = () => setState(s => ({
-    ...s,
-    shiftCustomTasks: { ...s.shiftCustomTasks, [shift.id]: [...(s.shiftCustomTasks[shift.id] || []), { id: Date.now(), text: '', done: false }] },
-  }));
-
-  const updateCustomText = (cid, text) => setState(s => ({
-    ...s,
-    shiftCustomTasks: {
-      ...s.shiftCustomTasks,
-      [shift.id]: (s.shiftCustomTasks[shift.id] || []).map(c => c.id === cid ? { ...c, text } : c),
-    },
-  }));
-
-  const toggleCustom = cid => setState(s => ({
-    ...s,
-    shiftCustomTasks: {
-      ...s.shiftCustomTasks,
-      [shift.id]: (s.shiftCustomTasks[shift.id] || []).map(c => c.id === cid ? { ...c, done: !c.done } : c),
-    },
-  }));
-
-  const removeCustom = cid => setState(s => ({
-    ...s,
-    shiftCustomTasks: {
-      ...s.shiftCustomTasks,
-      [shift.id]: (s.shiftCustomTasks[shift.id] || []).filter(c => c.id !== cid),
-    },
-  }));
-
-  return (
-    <div>
-      {/* Intro */}
-      <div style={{ background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 16, marginBottom: 20 }}>
-        <div style={{ color: TEXT2, fontSize: 13, lineHeight: 1.6 }}>{SHIFT_INTROS[shift.id]}</div>
-      </div>
-
-      {/* Tasks */}
-      <SectionCard
-        title="Shift Tasks"
-        accent
-        right={<span style={{ color: TEXT1, fontSize: 12, fontWeight: 700 }}>{done}/{total}</span>}
-      >
-        {shift.tasks.map(t => (
-          <TaskRow
-            key={t.id} task={t}
-            checked={tasks[t.id]}
-            onChange={() => setState(s => ({
-              ...s,
-              shiftTasks: { ...s.shiftTasks, [shift.id]: { ...s.shiftTasks[shift.id], [t.id]: !s.shiftTasks[shift.id][t.id] } },
-            }))}
-          />
-        ))}
-      </SectionCard>
-
-      {/* Shift 5 fixed criteria */}
-      {shift.id === 'shift5' && (
-        <SectionCard title="Sign-Off Criteria" accent>
-          {SHIFT_5_FIXED.map(t => (
-            <TaskRow
-              key={t.id} task={t}
-              checked={state.shift5Fixed[t.id]}
-              onChange={() => setState(s => ({ ...s, shift5Fixed: { ...s.shift5Fixed, [t.id]: !s.shift5Fixed[t.id] } }))}
-            />
-          ))}
-        </SectionCard>
-      )}
-
-      {/* Custom tasks */}
-      <SectionCard title="Additional Observations">
-        {customs.map(c => (
-          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, background: 'rgba(0,200,150,0.07)', borderRadius: 8, padding: '8px 10px' }}>
-            <Tick checked={c.done} onChange={() => toggleCustom(c.id)} />
-            <input
-              value={c.text}
-              onChange={e => updateCustomText(c.id, e.target.value)}
-              placeholder="Add observation…"
-              style={{ flex: 1, background: 'transparent', border: 'none', color: TEXT1, fontSize: 14, outline: 'none', fontFamily: "'Inter', system-ui, sans-serif" }}
-            />
-            <button onClick={() => removeCustom(c.id)} style={{ background: 'none', border: 'none', color: TEXT3, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Induction Date</label>
+            <input type="date" value={state.inductionDate} onChange={e => set(s => ({ ...s, inductionDate: e.target.value }))}
+              style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
           </div>
-        ))}
-        <button
-          onClick={addCustom}
-          style={{ background: 'none', border: `1px dashed ${CYAN}`, color: CYAN, borderRadius: 8, padding: '7px 14px', fontSize: 13, cursor: 'pointer', marginTop: 4 }}
-        >
-          + Add observation
-        </button>
-      </SectionCard>
-
-      {/* Shift verdict */}
-      <SectionCard title="Shift Outcome">
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-          <button
-            onClick={() => setVerdict('pass')}
-            style={{
-              flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              border: `2px solid ${verdict === 'pass' ? '#22c55e' : 'rgba(255,255,255,0.12)'}`,
-              background: verdict === 'pass' ? 'rgba(34,197,94,0.15)' : 'transparent',
-              color: verdict === 'pass' ? '#22c55e' : TEXT2,
-              transition: 'all 0.15s',
-            }}
-          >
-            Pass
-          </button>
-          <button
-            onClick={() => setVerdict('needs-work')}
-            style={{
-              flex: 1, padding: '10px 0', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              border: `2px solid ${verdict === 'needs-work' ? CYAN : 'rgba(255,255,255,0.12)'}`,
-              background: verdict === 'needs-work' ? CYAN_LIGHT : 'transparent',
-              color: verdict === 'needs-work' ? CYAN : TEXT2,
-              transition: 'all 0.15s',
-            }}
-          >
-            Needs Work
-          </button>
         </div>
-        <Field label="Shift Notes" multiline value={notes} onChange={setNotes} placeholder="Notes on this shift…" />
       </SectionCard>
-    </div>
-  );
-}
 
-// ─── Page: Sign-Off ───────────────────────────────────────────────────────────
-function SignOffPage({ state, setState }) {
-  const prog = totalProgress(state);
-  return (
-    <div>
-      <SectionCard title="Induction Sign-Off" accent>
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            <ProgressRing pct={prog.pct} />
-            <div>
-              <div style={{ color: TEXT2, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Overall Completion</div>
-              <div style={{ color: TEXT1, fontSize: 22, fontWeight: 800 }}>{prog.done}/{prog.total} tasks</div>
-            </div>
+      <SectionCard title="Overall Progress" accent>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ fontSize: 52, fontWeight: 900, color: '#0a1628', lineHeight: 1 }}>{pct}%</div>
+          <div>
+            <div style={{ color: '#0a1628', fontWeight: 700, fontSize: 18 }}>{done} / {items.length} complete</div>
+            <div style={{ color: 'rgba(0,0,0,0.55)', fontSize: 13, marginTop: 2 }}>Induction checklist progress</div>
           </div>
-          {prog.pct < 100 && (
-            <div style={{ background: CYAN_LIGHT, border: `1px solid ${CYAN}`, borderRadius: 8, padding: '10px 14px', color: CYAN, fontSize: 13, fontWeight: 600 }}>
-              {prog.total - prog.done} task{prog.total - prog.done !== 1 ? 's' : ''} still incomplete. Complete all tasks before final sign-off.
-            </div>
-          )}
-        </div>
-
-        <Field label="Sign-Off Date" value={state.signOffDate} onChange={v => setState(s => ({ ...s, signOffDate: v }))} placeholder="DD/MM/YYYY" />
-        <Field label="Sign-Off Notes" multiline value={state.signOffNotes} onChange={v => setState(s => ({ ...s, signOffNotes: v }))} placeholder="Any final notes or conditions…" />
-
-        <div style={{ marginTop: 8 }}>
-          <button
-            onClick={() => setState(s => ({ ...s, signedOff: !s.signedOff }))}
-            style={{
-              width: '100%', padding: '14px 0', borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: 'pointer',
-              border: `2px solid ${state.signedOff ? '#22c55e' : CYAN}`,
-              background: state.signedOff ? 'rgba(34,197,94,0.15)' : CYAN_LIGHT,
-              color: state.signedOff ? '#22c55e' : CYAN,
-              transition: 'all 0.2s',
-            }}
-          >
-            {state.signedOff ? '✓ Induction Signed Off' : 'Mark Induction as Complete'}
-          </button>
+          <div style={{ flex: 1, height: 8, background: 'rgba(0,0,0,0.15)', borderRadius: 99, overflow: 'hidden', maxWidth: 200, marginLeft: 'auto' }}>
+            <div style={{ height: '100%', background: '#0a1628', width: `${pct}%`, borderRadius: 99, transition: 'width 0.3s' }} />
+          </div>
         </div>
       </SectionCard>
 
-      {/* Shift verdict summary */}
-      <SectionCard title="Shift Outcomes Summary">
-        {SHIFT_TASKS.map(s => {
-          const v = state.shiftVerdict[s.id];
+      <SectionCard title="Completion Checklist" badge={`${done}/${items.length}`}>
+        {rows.map((row, i) => {
+          const checked = row.shiftIdx !== undefined ? ov.shifts[row.shiftIdx] : ov[row.key];
+          const toggle_ = row.shiftIdx !== undefined ? () => toggleShift(row.shiftIdx) : () => toggle(row.key);
           return (
-            <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: 13, color: TEXT1 }}>{s.title}</span>
-              {v === 'pass'       && <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e',  fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 10px' }}>Pass</span>}
-              {v === 'needs-work' && <span style={{ background: CYAN_LIGHT,             color: CYAN,       fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 10px' }}>Needs Work</span>}
-              {!v                 && <span style={{ background: 'rgba(255,255,255,0.06)', color: TEXT3,    fontSize: 11, fontWeight: 700, borderRadius: 6, padding: '3px 10px' }}>Pending</span>}
+            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < rows.length - 1 ? `1px solid ${BORDER}` : 'none' }}>
+              <span style={{ fontSize: 14, color: checked ? TEXT2 : TEXT1, textDecoration: checked ? 'line-through' : 'none' }}>{row.label}</span>
+              <Tick checked={checked} onChange={toggle_} />
             </div>
           );
         })}
@@ -587,30 +249,287 @@ function SignOffPage({ state, setState }) {
   );
 }
 
-// ─── Navigation ───────────────────────────────────────────────────────────────
+function ProcessesPage({ state, set }) {
+  const done = state.processes.filter(t => t.checked).length;
+  const toggle = i => set(s => { const p = [...s.processes]; p[i] = { ...p[i], checked: !p[i].checked }; return { ...s, processes: p }; });
+  const setNote = (i, v) => set(s => { const p = [...s.processes]; p[i] = { ...p[i], comment: v }; return { ...s, processes: p }; });
+  const toggleArea = a => set(s => ({ ...s, cleaningAreas: { ...s.cleaningAreas, [a]: !s.cleaningAreas[a] } }));
+
+  return (
+    <div>
+      <SectionCard title="Processes & System Usage" badge={`${done}/${PROCESSES_TASKS.length}`}>
+        {PROCESSES_TASKS.map((task, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderBottom: i < PROCESSES_TASKS.length - 1 ? `1px solid ${BORDER}` : 'none' }}>
+            <Tick checked={state.processes[i].checked} onChange={() => toggle(i)} />
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, color: state.processes[i].checked ? TEXT2 : TEXT1, margin: 0, lineHeight: 1.55, textDecoration: state.processes[i].checked ? 'line-through' : 'none' }}>{task}</p>
+              <NoteInput value={state.processes[i].comment} onChange={v => setNote(i, v)} />
+            </div>
+          </div>
+        ))}
+      </SectionCard>
+
+      <SectionCard title="Demonstrated How to Clean — mark each area completed">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+          {CLEANING_AREAS.map(area => {
+            const checked = state.cleaningAreas[area];
+            return (
+              <button key={area} onClick={() => toggleArea(area)} style={{
+                border: `2px solid ${checked ? CYAN : BORDER}`,
+                background: checked ? CYAN_LIGHT : SURFACE2,
+                borderRadius: 9, padding: '10px 6px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}>
+                <span style={{ fontSize: 18 }}>{checked ? '✓' : '○'}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: checked ? CYAN : TEXT2, letterSpacing: 0.5 }}>{area.toUpperCase()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+function ValuesPage({ state, set }) {
+  const done = state.values.filter(t => t.checked).length;
+  const toggle = i => set(s => { const v = [...s.values]; v[i] = { ...v[i], checked: !v[i].checked }; return { ...s, values: v }; });
+  const setNote = (i, val) => set(s => { const v = [...s.values]; v[i] = { ...v[i], comment: val }; return { ...s, values: v }; });
+
+  return (
+    <SectionCard title="Values, Guidelines & Expectations" badge={`${done}/${VALUES_TASKS.length}`}>
+      {VALUES_TASKS.map((task, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 0', borderBottom: i < VALUES_TASKS.length - 1 ? `1px solid ${BORDER}` : 'none' }}>
+          <Tick checked={state.values[i].checked} onChange={() => toggle(i)} />
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 14, color: state.values[i].checked ? TEXT2 : TEXT1, margin: 0, lineHeight: 1.55, textDecoration: state.values[i].checked ? 'line-through' : 'none' }}>{task}</p>
+            <NoteInput value={state.values[i].comment} onChange={v => setNote(i, v)} />
+          </div>
+        </div>
+      ))}
+    </SectionCard>
+  );
+}
+
+function ShiftPage({ shiftNum, state, set }) {
+  const shift = state.shifts[shiftNum];
+  const fixedTasks = shiftNum <= 4 ? SHIFT_TASKS[shiftNum] : SHIFT_5_FIXED;
+  const isCustom = shiftNum >= 5;
+  const intro = SHIFT_INTROS[shiftNum];
+  const hasVerdict = shiftNum === 2;
+
+  const setMeta = (key, val) => set(s => ({ ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], [key]: val } } }));
+
+  const toggleTask = i => set(s => {
+    const t = [...s.shifts[shiftNum].tasks];
+    t[i] = { ...t[i], checked: !t[i].checked };
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], tasks: t } } };
+  });
+  const setTaskNote = (i, v) => set(s => {
+    const t = [...s.shifts[shiftNum].tasks];
+    t[i] = { ...t[i], comment: v };
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], tasks: t } } };
+  });
+
+  const addCustom = () => set(s => {
+    const custom = [...(s.shifts[shiftNum].custom || []), { time: '', desc: '', checked: false, comment: '' }];
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], custom } } };
+  });
+  const removeCustom = i => set(s => {
+    const custom = (s.shifts[shiftNum].custom || []).filter((_, idx) => idx !== i);
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], custom } } };
+  });
+  const setCustomField = (i, key, val) => set(s => {
+    const custom = [...(s.shifts[shiftNum].custom || [])];
+    custom[i] = { ...custom[i], [key]: val };
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], custom } } };
+  });
+  const toggleCustom = i => set(s => {
+    const custom = [...(s.shifts[shiftNum].custom || [])];
+    custom[i] = { ...custom[i], checked: !custom[i].checked };
+    return { ...s, shifts: { ...s.shifts, [shiftNum]: { ...s.shifts[shiftNum], custom } } };
+  });
+
+  const fixedDone = (shift.tasks || []).filter(t => t.checked).length;
+  const customDone = (shift.custom || []).filter(t => t.checked).length;
+  const totalDone = fixedDone + customDone;
+  const totalCount = (shift.tasks ? shift.tasks.length : 0) + (shift.custom ? shift.custom.length : 0);
+
+  const shiftLabels = { 1: 'Trial — Supervised', 2: 'Trial — Supervised', 3: 'Training — Supervised', 4: 'Training — Supervised', 5: 'Training — Supervised', 6: 'Training — Supervised', 7: 'Training — Final Supervised' };
+
+  return (
+    <div>
+      <SectionCard title={`Shift ${shiftNum} — ${shiftLabels[shiftNum]}`} accent>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {['trainer', 'date'].map(key => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.55)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{key === 'trainer' ? 'Trainer' : 'Date'}</label>
+              <input type={key === 'date' ? 'date' : 'text'} value={shift[key]} onChange={e => setMeta(key, e.target.value)} placeholder={key === 'trainer' ? 'Trainer name' : ''}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.15)', border: '1.5px solid rgba(0,0,0,0.20)', borderRadius: 7, padding: '7px 11px', fontSize: 14, color: '#0a1628', outline: 'none', fontFamily: 'inherit' }} />
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {intro && (
+        <div style={{ background: CYAN_LIGHT, border: `1.5px solid rgba(0,200,150,0.25)`, borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: CYAN, lineHeight: 1.6, margin: 0 }}>{intro}</p>
+        </div>
+      )}
+
+      <SectionCard title="Task Checklist" badge={`${totalDone}/${totalCount}`}>
+        {(shiftNum <= 4 ? fixedTasks : []).map((task, i) => (
+          <TaskRow key={i}
+            time={task.time} desc={task.desc}
+            checked={shift.tasks?.[i]?.checked || false}
+            comment={shift.tasks?.[i]?.comment || ''}
+            onCheck={() => toggleTask(i)}
+            onComment={v => setTaskNote(i, v)}
+          />
+        ))}
+        {shiftNum === 5 && SHIFT_5_FIXED.map((task, i) => (
+          <TaskRow key={i}
+            time={task.time} desc={task.desc}
+            checked={shift.tasks?.[i]?.checked || false}
+            comment={shift.tasks?.[i]?.comment || ''}
+            onCheck={() => toggleTask(i)}
+            onComment={v => setTaskNote(i, v)}
+          />
+        ))}
+
+        {isCustom && (shift.custom || []).map((task, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 32px', gap: 12, padding: '12px 0', borderBottom: `1px solid ${BORDER}`, alignItems: 'start', background: 'rgba(0,200,150,0.03)' }}>
+            <input value={task.time} onChange={e => setCustomField(i, 'time', e.target.value)} placeholder="~time"
+              style={{ background: CYAN_LIGHT, border: `1.5px solid rgba(0,200,150,0.3)`, borderRadius: 6, padding: '5px 7px', fontSize: 12, fontWeight: 700, color: CYAN, outline: 'none', fontFamily: 'inherit', textAlign: 'center' }} />
+            <div>
+              <input value={task.desc} onChange={e => setCustomField(i, 'desc', e.target.value)} placeholder="Task description…"
+                style={{ width: '100%', boxSizing: 'border-box', background: SURFACE2, border: `1.5px solid ${BORDER}`, borderRadius: 7, padding: '7px 10px', fontSize: 14, color: TEXT1, outline: 'none', fontFamily: 'inherit', marginBottom: 6 }} />
+              <NoteInput value={task.comment} onChange={v => setCustomField(i, 'comment', v)} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+              <Tick checked={task.checked} onChange={() => toggleCustom(i)} />
+              <button onClick={() => removeCustom(i)} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 16, cursor: 'pointer', padding: 0 }}>✕</button>
+            </div>
+          </div>
+        ))}
+
+        {isCustom && (
+          <button onClick={addCustom} style={{ marginTop: 14, background: CYAN_LIGHT, color: CYAN, border: `1.5px dashed rgba(0,200,150,0.4)`, borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%', fontFamily: 'inherit' }}>
+            + Add Task
+          </button>
+        )}
+      </SectionCard>
+
+      {hasVerdict && (
+        <SectionCard title="End of Trial Verdict">
+          <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+            {[['yes', 'Advance — Yes', '#22c55e', '#f0fdf4', '#166534'], ['no', 'Do Not Advance — No', '#ef4444', 'rgba(239,68,68,0.1)', '#ef4444']].map(([val, label, color, bg, textColor]) => (
+              <button key={val} onClick={() => setMeta('verdict', val)} style={{
+                flex: 1, padding: '10px', borderRadius: 9,
+                border: `2px solid ${shift.verdict === val ? color : BORDER}`,
+                background: shift.verdict === val ? bg : SURFACE2,
+                color: shift.verdict === val ? textColor : TEXT2,
+                fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}>{label}</button>
+            ))}
+          </div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>End of Trial Summary</label>
+          <textarea value={shift.summary || ''} onChange={e => setMeta('summary', e.target.value)} placeholder="Write a summary of the trial here…" rows={4}
+            style={{ width: '100%', boxSizing: 'border-box', background: SURFACE2, border: `1.5px solid ${BORDER}`, borderRadius: 8, padding: '9px 12px', fontSize: 14, color: TEXT1, outline: 'none', fontFamily: 'inherit', resize: 'vertical' }} />
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
+function SignOffPage({ state, set }) {
+  const so = state.signOff;
+  const setField = (key, val) => set(s => ({ ...s, signOff: { ...s.signOff, [key]: val } }));
+  const allDone = so.supervisorName && so.company && so.employeePrint && so.trainerPrint && so.employeeSigned && so.trainerSigned;
+
+  return (
+    <div>
+      <SectionCard title="Training Sign-Off Sheet" accent>
+        <p style={{ color: '#0a1628', fontSize: 13, lineHeight: 1.6, margin: 0, fontWeight: 600 }}>Complete this section once all 7 shifts and onboarding modules are finished.</p>
+      </SectionCard>
+
+      <SectionCard title="Details">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {[['supervisorName', 'Supervisor Name', "Supervisor's full name"], ['company', 'Company / On behalf of', 'Company name'], ['employeePrint', 'Employee Name (Print)', "Employee's full name"], ['trainerPrint', 'Trainer Name (Print)', "Trainer's full name"]].map(([key, label, placeholder]) => (
+            <div key={key}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{label}</label>
+              <input value={so[key] || ''} onChange={e => setField(key, e.target.value)} placeholder={placeholder}
+                style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Declaration">
+        <p style={{ fontSize: 13.5, color: TEXT2, lineHeight: 1.75, margin: 0 }}>
+          I <strong style={{ color: TEXT1 }}>{so.supervisorName || '_______________'}</strong> (Supervisor) on behalf of <strong style={{ color: TEXT1 }}>{so.company || '_______________'}</strong>, have trained and observed <strong style={{ color: TEXT1 }}>{state.employeeName || '_______________'}</strong> (Employee) during their training as Cleaning Team Member and have walked through all necessary processes, guidelines, policies, and expectations to be upheld during their employment.
+          <br /><br />
+          Based on my observation and assessment, I certify that the employee has demonstrated adequate understanding of their responsibilities and the skills necessary to perform their role competently.
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Acknowledgment of Training by Employee">
+        <p style={{ fontSize: 13, color: TEXT2, lineHeight: 1.7, fontStyle: 'italic', margin: '0 0 16px' }}>
+          "I, the undersigned employee, acknowledge that I have received thorough training in my role as a Cleaning Team Member. This training has equipped me with the necessary knowledge, skills, and understanding to fulfill the duties and responsibilities associated with this position."
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {[['employeeSigned', 'employeePrint', 'Employee'], ['trainerSigned', 'trainerPrint', 'Trainer']].map(([signKey, printKey, label]) => (
+            <div key={signKey} style={{ border: `2px solid ${so[signKey] ? '#22c55e' : BORDER}`, borderRadius: 10, padding: 16, background: so[signKey] ? 'rgba(34,197,94,0.08)' : SURFACE2 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 10px' }}>{label}</p>
+              <p style={{ fontSize: 14, color: TEXT1, margin: '0 0 12px' }}>{so[printKey] || '—'}</p>
+              <button onClick={() => setField(signKey, !so[signKey])} style={{
+                width: '100%', padding: '9px', borderRadius: 8,
+                border: `2px solid ${so[signKey] ? '#22c55e' : BORDER}`,
+                background: so[signKey] ? '#22c55e' : 'transparent',
+                color: so[signKey] ? '#fff' : TEXT2,
+                fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+              }}>{so[signKey] ? '✓ Signed' : 'Tap to Sign'}</button>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {allDone && (
+        <div style={{ background: '#22c55e', borderRadius: 12, padding: '16px 20px', textAlign: 'center' }}>
+          <p style={{ color: '#fff', fontWeight: 900, fontSize: 18, margin: 0 }}>Training Complete!</p>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, margin: '4px 0 0' }}>{state.employeeName} is officially signed off.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Nav ───────────────────────────────────────────────────────────────────────
 const NAV = [
-  { id: 'overview',    label: 'Overview' },
-  { id: 'processes',   label: 'Processes' },
-  { id: 'areas',       label: 'Cleaning Areas' },
-  { id: 'values',      label: 'Values' },
-  ...SHIFT_TASKS.map(s => ({ id: s.id, label: s.title })),
-  { id: 'signoff',     label: 'Sign Off' },
+  { id: 'overview',   label: 'Overview' },
+  { id: 'processes',  label: 'Processes & Systems' },
+  { id: 'values',     label: 'Values & Guidelines' },
+  { id: 'shift1',     label: 'Shift 1' },
+  { id: 'shift2',     label: 'Shift 2' },
+  { id: 'shift3',     label: 'Shift 3' },
+  { id: 'shift4',     label: 'Shift 4' },
+  { id: 'shift5',     label: 'Shift 5' },
+  { id: 'shift6',     label: 'Shift 6' },
+  { id: 'shift7',     label: 'Shift 7' },
+  { id: 'signoff',    label: 'Sign-Off' },
 ];
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main ──────────────────────────────────────────────────────────────────────
 export default function InductionTraining() {
-  const [staffList,       setStaffList]       = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
-  const [state,           setState]           = useState(initState);
-  const [page,            setPage]            = useState('overview');
-  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [state, setState] = useState(initState);
+  const [page, setPage] = useState('overview');
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Load staff list
-  useEffect(() => {
-    api.get('/staff').then(r => setStaffList(r.data)).catch(() => {});
-  }, []);
+  useEffect(() => { api.get('/staff').then(r => setStaffList(r.data)); }, []);
 
-  // Auto-save
   useEffect(() => {
     if (selectedStaffId) {
       localStorage.setItem('lca-induction-' + selectedStaffId, JSON.stringify(state));
@@ -621,154 +540,108 @@ export default function InductionTraining() {
     setSelectedStaffId(id);
     if (!id) return;
     const saved = localStorage.getItem('lca-induction-' + id);
-    if (saved) {
-      try { setState(JSON.parse(saved)); return; } catch {}
-    }
-    const staffMember = staffList.find(s => String(s.id) === String(id));
+    if (saved) { try { setState(JSON.parse(saved)); return; } catch {} }
+    const member = staffList.find(s => String(s.id) === id);
     const fresh = initState();
-    if (staffMember) fresh.employeeName = staffMember.name;
+    if (member) fresh.employeeName = member.name;
     setState(fresh);
+    setPage('overview');
   }
 
-  const currentNavIdx = NAV.findIndex(n => n.id === page);
+  function getProgress(id) {
+    if (id === 'overview') {
+      const ov = state.overview;
+      const items = [ov.contractSigned, ov.policiesSigned, ...ov.shifts, ov.processesAndSystems, ov.valuesAndGuidelines, ov.signOff];
+      return { done: items.filter(Boolean).length, total: items.length };
+    }
+    if (id === 'processes') {
+      const d = state.processes.filter(t => t.checked).length + Object.values(state.cleaningAreas).filter(Boolean).length;
+      return { done: d, total: PROCESSES_TASKS.length + CLEANING_AREAS.length };
+    }
+    if (id === 'values') {
+      return { done: state.values.filter(t => t.checked).length, total: VALUES_TASKS.length };
+    }
+    if (id.startsWith('shift')) {
+      const n = parseInt(id.replace('shift', ''));
+      const sh = state.shifts[n];
+      const fd = (sh.tasks || []).filter(t => t.checked).length;
+      const cd = (sh.custom || []).filter(t => t.checked).length;
+      return { done: fd + cd, total: (sh.tasks || []).length + (sh.custom || []).length };
+    }
+    if (id === 'signoff') {
+      const so = state.signOff;
+      const d = [so.supervisorName, so.company, so.employeePrint, so.trainerPrint].filter(Boolean).length + (so.employeeSigned ? 1 : 0) + (so.trainerSigned ? 1 : 0);
+      return { done: d, total: 6 };
+    }
+    return { done: 0, total: 0 };
+  }
 
-  const renderPage = () => {
-    if (page === 'overview')  return <Overview         state={state} setState={setState} />;
-    if (page === 'processes') return <ProcessesPage    state={state} setState={setState} />;
-    if (page === 'areas')     return <CleaningAreasPage state={state} setState={setState} />;
-    if (page === 'values')    return <ValuesPage        state={state} setState={setState} />;
-    if (page === 'signoff')   return <SignOffPage       state={state} setState={setState} />;
-    const shift = SHIFT_TASKS.find(s => s.id === page);
-    if (shift) return <ShiftPage shift={shift} state={state} setState={setState} />;
-    return null;
-  };
+  const pageIdx = NAV.findIndex(n => n.id === page);
 
   return (
     <div className="page">
       <div className="page-header">
         <h1>Induction Training Plan</h1>
+        <p>Cornerstone 7-shift training programme</p>
       </div>
 
       {/* Staff selector */}
       <div style={{ marginBottom: 24 }}>
-        <label style={{ fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-          SELECT EMPLOYEE
-        </label>
-        <select
-          value={selectedStaffId}
-          onChange={e => handleSelectStaff(e.target.value)}
-          style={{
-            background: SURFACE, border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: 8,
-            padding: '10px 14px', color: selectedStaffId ? TEXT1 : TEXT2, fontSize: 14,
-            width: '100%', maxWidth: 360, fontFamily: "'Inter', system-ui, sans-serif",
-            outline: 'none', cursor: 'pointer',
-          }}
-        >
-          <option value="">Choose a team member to begin...</option>
+        <label style={{ fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>Select Employee</label>
+        <select value={selectedStaffId} onChange={e => handleSelectStaff(e.target.value)}
+          style={{ background: SURFACE, border: `1.5px solid rgba(255,255,255,0.12)`, borderRadius: 8, padding: '10px 14px', color: selectedStaffId ? TEXT1 : TEXT2, fontSize: 14, width: '100%', maxWidth: 360, outline: 'none', fontFamily: 'inherit' }}>
+          <option value="">Choose a team member to begin…</option>
           {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 
-      {/* No staff selected */}
-      {!selectedStaffId && (
-        <div style={{ background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '32px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>
-            <span style={{ color: CYAN, fontWeight: 900, fontSize: 28, fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: 2 }}>LCA</span>
-          </div>
-          <div style={{ color: TEXT2, fontSize: 15 }}>Select a team member above to start or continue their induction.</div>
-        </div>
-      )}
-
-      {/* Main content */}
-      {selectedStaffId && (
-        <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-
-          {/* Page header bar */}
-          <div style={{ background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <span style={{ color: CYAN, fontWeight: 900, fontSize: 22, letterSpacing: 2 }}>LCA</span>
-              <div>
-                <div style={{ color: TEXT1, fontWeight: 700, fontSize: 15 }}>{state.employeeName || 'New Employee'}</div>
-                <div style={{ color: TEXT2, fontSize: 12 }}>{state.startDate ? `Started ${state.startDate}` : 'Start date not set'}</div>
-              </div>
-            </div>
-            {state.signedOff && (
-              <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: 12, fontWeight: 700, borderRadius: 6, padding: '4px 12px' }}>
-                Signed Off
-              </span>
-            )}
+      {!selectedStaffId ? (
+        <div style={{ color: TEXT2, fontSize: 14, padding: '32px 0', textAlign: 'center' }}>Select a team member above to start or continue their induction.</div>
+      ) : (
+        <>
+          {/* Section nav */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 24 }}>
+            {NAV.map(n => {
+              const { done, total } = getProgress(n.id);
+              const active = page === n.id;
+              const complete = total > 0 && done === total;
+              return (
+                <button key={n.id} onClick={() => setPage(n.id)} style={{
+                  padding: '7px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: active ? 700 : 500,
+                  border: `1.5px solid ${active ? CYAN : complete ? 'rgba(34,197,94,0.4)' : BORDER}`,
+                  background: active ? CYAN_LIGHT : complete ? 'rgba(34,197,94,0.08)' : 'transparent',
+                  color: active ? CYAN : complete ? '#22c55e' : TEXT2,
+                  fontFamily: 'inherit',
+                }}>
+                  {n.label}{total > 0 && ` (${done}/${total})`}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Mobile nav menu toggle */}
-          <div style={{ marginBottom: 16 }}>
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                background: SURFACE, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 10,
-                padding: '10px 16px', color: TEXT1, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                width: '100%',
-              }}
-            >
-              <span style={{ flex: 1, textAlign: 'left' }}>{NAV.find(n => n.id === page)?.label}</span>
-              <span style={{ color: TEXT2, fontSize: 11 }}>{menuOpen ? '▲' : '▼'} Menu</span>
-            </button>
+          {/* Page content */}
+          {page === 'overview'  && <Overview      state={state} set={setState} />}
+          {page === 'processes' && <ProcessesPage state={state} set={setState} />}
+          {page === 'values'    && <ValuesPage    state={state} set={setState} />}
+          {page === 'shift1'    && <ShiftPage shiftNum={1} state={state} set={setState} />}
+          {page === 'shift2'    && <ShiftPage shiftNum={2} state={state} set={setState} />}
+          {page === 'shift3'    && <ShiftPage shiftNum={3} state={state} set={setState} />}
+          {page === 'shift4'    && <ShiftPage shiftNum={4} state={state} set={setState} />}
+          {page === 'shift5'    && <ShiftPage shiftNum={5} state={state} set={setState} />}
+          {page === 'shift6'    && <ShiftPage shiftNum={6} state={state} set={setState} />}
+          {page === 'shift7'    && <ShiftPage shiftNum={7} state={state} set={setState} />}
+          {page === 'signoff'   && <SignOffPage   state={state} set={setState} />}
 
-            {menuOpen && (
-              <div style={{ background: SURFACE2, border: '1.5px solid rgba(255,255,255,0.08)', borderRadius: 10, marginTop: 6, overflow: 'hidden' }}>
-                {NAV.map((n, i) => (
-                  <button
-                    key={n.id}
-                    onClick={() => { setPage(n.id); setMenuOpen(false); }}
-                    style={{
-                      display: 'block', width: '100%', textAlign: 'left',
-                      padding: '11px 16px', fontSize: 13, cursor: 'pointer',
-                      background: n.id === page ? CYAN_LIGHT : 'transparent',
-                      color: n.id === page ? CYAN : TEXT2,
-                      fontWeight: n.id === page ? 700 : 400,
-                      border: 'none', borderBottom: i < NAV.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                      fontFamily: "'Inter', system-ui, sans-serif",
-                    }}
-                  >
-                    {n.label}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Prev / Next */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, paddingTop: 16, borderTop: `1px solid ${BORDER}` }}>
+            {pageIdx > 0
+              ? <button onClick={() => setPage(NAV[pageIdx - 1].id)} style={{ background: SURFACE, border: `1.5px solid ${BORDER}`, borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 700, color: TEXT2, cursor: 'pointer', fontFamily: 'inherit' }}>← {NAV[pageIdx - 1].label}</button>
+              : <div />}
+            {pageIdx < NAV.length - 1
+              ? <button onClick={() => setPage(NAV[pageIdx + 1].id)} style={{ background: CYAN, border: 'none', borderRadius: 9, padding: '9px 18px', fontSize: 13, fontWeight: 700, color: '#0a1628', cursor: 'pointer', fontFamily: 'inherit' }}>{NAV[pageIdx + 1].label} →</button>
+              : <div />}
           </div>
-
-          {/* Content */}
-          {renderPage()}
-
-          {/* Bottom navigation */}
-          <div style={{ display: 'flex', gap: 12, marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-            <button
-              disabled={currentNavIdx <= 0}
-              onClick={() => currentNavIdx > 0 && setPage(NAV[currentNavIdx - 1].id)}
-              style={{
-                flex: 1, padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: currentNavIdx <= 0 ? 'not-allowed' : 'pointer',
-                border: '1.5px solid rgba(255,255,255,0.12)', background: SURFACE, color: currentNavIdx <= 0 ? TEXT3 : TEXT2,
-                opacity: currentNavIdx <= 0 ? 0.5 : 1, transition: 'all 0.15s',
-                fontFamily: "'Inter', system-ui, sans-serif",
-              }}
-            >
-              Previous
-            </button>
-            <button
-              disabled={currentNavIdx >= NAV.length - 1}
-              onClick={() => currentNavIdx < NAV.length - 1 && setPage(NAV[currentNavIdx + 1].id)}
-              style={{
-                flex: 2, padding: '12px 0', borderRadius: 10, fontSize: 14, fontWeight: 700,
-                cursor: currentNavIdx >= NAV.length - 1 ? 'not-allowed' : 'pointer',
-                border: 'none', background: currentNavIdx >= NAV.length - 1 ? 'rgba(0,200,150,0.3)' : CYAN, color: '#fff',
-                opacity: currentNavIdx >= NAV.length - 1 ? 0.5 : 1, transition: 'all 0.15s',
-                fontFamily: "'Inter', system-ui, sans-serif",
-              }}
-            >
-              Next: {currentNavIdx < NAV.length - 1 ? NAV[currentNavIdx + 1].label : 'Done'}
-            </button>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );
