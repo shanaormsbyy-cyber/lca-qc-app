@@ -18,6 +18,7 @@ export default function Dashboard() {
 
   // Create check modal
   const [showCreate, setShowCreate] = useState(false);
+  const [createType, setCreateType] = useState('staff'); // 'staff' | 'property'
   const [checklists, setChecklists] = useState([]);
   const [staff, setStaff] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -49,7 +50,8 @@ export default function Dashboard() {
     }).finally(() => setLoading(false));
   }, [manager.id]);
 
-  const openCreate = (preselect = {}) => {
+  const openCreate = (preselect = {}, type = 'staff') => {
+    setCreateType(type);
     setCheckForm({
       property_id: String(preselect.property_id || ''),
       staff_id: String(preselect.staff_id || ''),
@@ -229,7 +231,7 @@ export default function Dashboard() {
                     <span style={{ fontWeight: 600 }}>{p.name}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <DueBadge status={p.status} daysLeft={p.days_left} />
-                      <button className="btn btn-sm btn-primary" onClick={() => openCreate({ property_id: p.id })}>Start</button>
+                      <button className="btn btn-sm btn-primary" onClick={() => openCreate({ property_id: p.id }, 'property')}>Start</button>
                     </div>
                   </div>
                 ))}
@@ -321,7 +323,7 @@ export default function Dashboard() {
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">New QC Check</div>
+            <div className="modal-title">{createType === 'property' ? 'Property Health Check' : 'New QC Check'}</div>
             <div className="form-group">
               <label className="form-label">Property</label>
               <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>
@@ -330,9 +332,9 @@ export default function Dashboard() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Staff Member Being Assessed</label>
+              <label className="form-label">{createType === 'property' ? 'Who cleaned this property?' : 'Staff Member Being Assessed'}</label>
               <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
-                <option value="">Select staff member…</option>
+                <option value="">{createType === 'property' ? 'Select cleaner…' : 'Select staff member…'}</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
