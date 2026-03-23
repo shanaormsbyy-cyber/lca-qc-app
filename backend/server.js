@@ -61,6 +61,7 @@ if (qcCol && qcCol.notnull === 1) {
   console.log('Migrating qc_checks: making staff_id nullable…');
   db.exec('PRAGMA foreign_keys=OFF');
   db.exec(`
+    DROP TABLE IF EXISTS qc_checks_new;
     CREATE TABLE qc_checks_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       property_id INTEGER NOT NULL REFERENCES properties(id),
