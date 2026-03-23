@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../api';
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
@@ -112,9 +112,17 @@ function initState() {
       6: { trainer: '', date: '', custom: [] },
       7: { trainer: '', date: '', custom: [] },
     },
-    signOff: { supervisorName: '', company: '', employeePrint: '', trainerPrint: '', employeeSigned: false, trainerSigned: false },
+    signOff: { supervisorName: '', company: '', employeePrint: '', trainerPrint: '', supervisorSig: null, employeeSig: null, trainerSig: null },
   };
 }
+
+// ─── Shared input style ────────────────────────────────────────────────────────
+const INPUT = {
+  background: SURFACE2, border: `1.5px solid rgba(255,255,255,0.15)`,
+  color: TEXT1, colorScheme: 'dark', borderRadius: 8, padding: '8px 12px',
+  fontSize: 14, width: '100%', boxSizing: 'border-box',
+  outline: 'none', fontFamily: 'inherit',
+};
 
 // ─── UI Primitives ─────────────────────────────────────────────────────────────
 function Tick({ checked, onChange }) {
@@ -137,19 +145,14 @@ function NoteInput({ value, onChange }) {
       placeholder="Add a note…"
       value={value}
       onChange={e => onChange(e.target.value)}
-      style={{
-        width: '100%', boxSizing: 'border-box',
-        background: SURFACE2, border: `1.5px solid ${BORDER}`,
-        borderRadius: 7, padding: '6px 10px', fontSize: 13, color: TEXT2,
-        outline: 'none', fontFamily: 'inherit', marginTop: 6,
-      }}
+      style={{ ...INPUT, fontSize: 13, color: TEXT2, padding: '6px 10px', marginTop: 6 }}
     />
   );
 }
 
 function SectionCard({ title, badge, children, accent }) {
   return (
-    <div style={{ background: SURFACE, borderRadius: 14, border: `1.5px solid rgba(255,255,255,0.08)`, overflow: 'hidden', marginBottom: 20 }}>
+    <div style={{ background: SURFACE, borderRadius: 14, border: `1.5px solid rgba(255,255,255,0.08)`, marginBottom: 20 }}>
       <div style={{
         background: accent ? CYAN : SURFACE2,
         borderBottom: `1.5px solid rgba(255,255,255,0.08)`,
@@ -210,12 +213,12 @@ function Overview({ state, set }) {
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Employee Name</label>
             <input value={state.employeeName} onChange={e => set(s => ({ ...s, employeeName: e.target.value }))}
-              placeholder="Full name" style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+              placeholder="Full name" style={INPUT} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Induction Date</label>
             <input type="date" value={state.inductionDate} onChange={e => set(s => ({ ...s, inductionDate: e.target.value }))}
-              style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+              style={INPUT} />
           </div>
         </div>
       </SectionCard>
@@ -364,9 +367,9 @@ function ShiftPage({ shiftNum, state, set }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {['trainer', 'date'].map(key => (
             <div key={key}>
-              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.55)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{key === 'trainer' ? 'Trainer' : 'Date'}</label>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.6)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{key === 'trainer' ? 'Trainer' : 'Date'}</label>
               <input type={key === 'date' ? 'date' : 'text'} value={shift[key]} onChange={e => setMeta(key, e.target.value)} placeholder={key === 'trainer' ? 'Trainer name' : ''}
-                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(0,0,0,0.15)', border: '1.5px solid rgba(0,0,0,0.20)', borderRadius: 7, padding: '7px 11px', fontSize: 14, color: '#0a1628', outline: 'none', fontFamily: 'inherit' }} />
+                style={{ ...INPUT, background: 'rgba(255,255,255,0.9)', color: '#0a1628', colorScheme: 'light', border: '1.5px solid rgba(0,0,0,0.15)' }} />
             </div>
           ))}
         </div>
@@ -443,10 +446,93 @@ function ShiftPage({ shiftNum, state, set }) {
   );
 }
 
+function SignaturePad({ label, value, onChange }) {
+  const canvasRef = useRef(null);
+  const drawing = useRef(false);
+  const lastPos = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (value) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      img.src = value;
+    }
+  }, []);
+
+  function getPos(e) {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+  }
+
+  function start(e) {
+    e.preventDefault();
+    drawing.current = true;
+    lastPos.current = getPos(e);
+  }
+
+  function move(e) {
+    e.preventDefault();
+    if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.strokeStyle = '#0a1628';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    lastPos.current = pos;
+  }
+
+  function stop(e) {
+    if (!drawing.current) return;
+    drawing.current = false;
+    onChange(canvasRef.current.toDataURL());
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    onChange(null);
+  }
+
+  return (
+    <div style={{ border: `2px solid ${value ? CYAN : BORDER}`, borderRadius: 10, padding: 16, background: value ? CYAN_LIGHT : SURFACE2 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</span>
+        {value && <button onClick={clear} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Clear</button>}
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={400} height={120}
+        onMouseDown={start} onMouseMove={move} onMouseUp={stop} onMouseLeave={stop}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={stop}
+        style={{ width: '100%', height: 120, background: '#fff', borderRadius: 7, cursor: 'crosshair', display: 'block', touchAction: 'none' }}
+      />
+      {!value && <p style={{ fontSize: 12, color: TEXT2, margin: '8px 0 0', textAlign: 'center' }}>Draw your signature above</p>}
+      {value && <p style={{ fontSize: 12, color: CYAN, margin: '8px 0 0', textAlign: 'center', fontWeight: 600 }}>✓ Signed</p>}
+    </div>
+  );
+}
+
 function SignOffPage({ state, set }) {
   const so = state.signOff;
   const setField = (key, val) => set(s => ({ ...s, signOff: { ...s.signOff, [key]: val } }));
-  const allDone = so.supervisorName && so.company && so.employeePrint && so.trainerPrint && so.employeeSigned && so.trainerSigned;
+  const allDone = so.supervisorName && so.company && so.employeePrint && so.trainerPrint && so.supervisorSig && so.employeeSig && so.trainerSig;
 
   return (
     <div>
@@ -456,11 +542,10 @@ function SignOffPage({ state, set }) {
 
       <SectionCard title="Details">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {[['supervisorName', 'Supervisor Name', "Supervisor's full name"], ['company', 'Company / On behalf of', 'Company name'], ['employeePrint', 'Employee Name (Print)', "Employee's full name"], ['trainerPrint', 'Trainer Name (Print)', "Trainer's full name"]].map(([key, label, placeholder]) => (
+          {[['supervisorName', 'Supervisor / Manager Name', "Supervisor's full name"], ['company', 'Company / On behalf of', 'Company name'], ['employeePrint', 'Employee Name (Print)', "Employee's full name"], ['trainerPrint', 'Trainer Name (Print)', "Trainer's full name"]].map(([key, label, placeholder]) => (
             <div key={key}>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>{label}</label>
-              <input value={so[key] || ''} onChange={e => setField(key, e.target.value)} placeholder={placeholder}
-                style={{ background: SURFACE2, border: `1.5px solid ${BORDER}`, color: TEXT1, borderRadius: 8, padding: '8px 12px', fontSize: 14, width: '100%', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }} />
+              <input value={so[key] || ''} onChange={e => setField(key, e.target.value)} placeholder={placeholder} style={INPUT} />
             </div>
           ))}
         </div>
@@ -478,20 +563,13 @@ function SignOffPage({ state, set }) {
         <p style={{ fontSize: 13, color: TEXT2, lineHeight: 1.7, fontStyle: 'italic', margin: '0 0 16px' }}>
           "I, the undersigned employee, acknowledge that I have received thorough training in my role as a Cleaning Team Member. This training has equipped me with the necessary knowledge, skills, and understanding to fulfill the duties and responsibilities associated with this position."
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {[['employeeSigned', 'employeePrint', 'Employee'], ['trainerSigned', 'trainerPrint', 'Trainer']].map(([signKey, printKey, label]) => (
-            <div key={signKey} style={{ border: `2px solid ${so[signKey] ? '#22c55e' : BORDER}`, borderRadius: 10, padding: 16, background: so[signKey] ? 'rgba(34,197,94,0.08)' : SURFACE2 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: TEXT2, letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 10px' }}>{label}</p>
-              <p style={{ fontSize: 14, color: TEXT1, margin: '0 0 12px' }}>{so[printKey] || '—'}</p>
-              <button onClick={() => setField(signKey, !so[signKey])} style={{
-                width: '100%', padding: '9px', borderRadius: 8,
-                border: `2px solid ${so[signKey] ? '#22c55e' : BORDER}`,
-                background: so[signKey] ? '#22c55e' : 'transparent',
-                color: so[signKey] ? '#fff' : TEXT2,
-                fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-              }}>{so[signKey] ? '✓ Signed' : 'Tap to Sign'}</button>
-            </div>
-          ))}
+      </SectionCard>
+
+      <SectionCard title="Signatures">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <SignaturePad label="Manager / Supervisor Signature" value={so.supervisorSig} onChange={v => setField('supervisorSig', v)} />
+          <SignaturePad label="Trainer Signature" value={so.trainerSig} onChange={v => setField('trainerSig', v)} />
+          <SignaturePad label="Employee Signature" value={so.employeeSig} onChange={v => setField('employeeSig', v)} />
         </div>
       </SectionCard>
 
