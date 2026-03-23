@@ -68,9 +68,12 @@ export default function Dashboard() {
     if (!property_id || (staffRequired && !staff_id) || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
     setCreating(true);
     try {
-      const r = await api.post('/qc/checks', checkForm);
+      const payload = { ...checkForm, staff_id: staff_id || null };
+      const r = await api.post('/qc/checks', payload);
       setShowCreate(false);
       navigate(`/qc/checks/${r.data.id}`);
+    } catch (e) {
+      alert('Failed to create check: ' + (e.response?.data?.error || e.message));
     } finally {
       setCreating(false);
     }

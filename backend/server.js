@@ -55,6 +55,36 @@ for (const name of lcaStaff) {
 }
 if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
 
+// Migration: make qc_checks.staff_id nullable (was NOT NULL)
+const qcCol = db.prepare("PRAGMA table_info(qc_checks)").all().find(c => c.name === 'staff_id');
+if (qcCol && qcCol.notnull === 1) {
+  console.log('Migrating qc_checks: making staff_id nullable…');
+  db.exec('PRAGMA foreign_keys=OFF');
+  db.exec(`
+    CREATE TABLE qc_checks_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_id INTEGER NOT NULL REFERENCES properties(id),
+      staff_id INTEGER REFERENCES staff(id),
+      checklist_id INTEGER NOT NULL REFERENCES qc_checklists(id),
+      scheduled_by_id INTEGER NOT NULL REFERENCES managers(id),
+      assigned_to_id INTEGER NOT NULL REFERENCES managers(id),
+      date TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      total_score REAL DEFAULT 0,
+      max_score REAL DEFAULT 0,
+      score_pct REAL DEFAULT 0,
+      signed_off_by TEXT,
+      signed_off_at TEXT,
+      notes TEXT
+    );
+    INSERT INTO qc_checks_new SELECT * FROM qc_checks;
+    DROP TABLE qc_checks;
+    ALTER TABLE qc_checks_new RENAME TO qc_checks;
+  `);
+  db.exec('PRAGMA foreign_keys=ON');
+  console.log('Migration complete: staff_id is now nullable.');
+}
+
 // Auto-migrate Jacqueline Kirker as a manager
 const existingManagers = new Set(db.prepare('SELECT username FROM managers').all().map(r => r.username));
 if (!existingManagers.has('jacqueline')) {

@@ -131,7 +131,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS qc_checks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id INTEGER NOT NULL REFERENCES properties(id),
-    staff_id INTEGER NOT NULL REFERENCES staff(id),
+    staff_id INTEGER REFERENCES staff(id),
     checklist_id INTEGER NOT NULL REFERENCES qc_checklists(id),
     scheduled_by_id INTEGER NOT NULL REFERENCES managers(id),
     assigned_to_id INTEGER NOT NULL REFERENCES managers(id),
