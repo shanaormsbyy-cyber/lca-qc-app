@@ -13,6 +13,7 @@ import QCCheckForm from './pages/QCCheckForm';
 import KPIs from './pages/KPIs';
 import ManagerProfile from './pages/ManagerProfile';
 import Settings from './pages/Settings';
+import InductionTraining from './pages/InductionTraining';
 
 function RequireAuth({ children }) {
   const { manager, loading } = useAuth();
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="properties" element={<Properties />} />
         <Route path="training" element={<Training />} />
         <Route path="training/sessions/:id" element={<TrainingSession />} />
+        <Route path="training/induction" element={<InductionTraining />} />
         <Route path="qc/checks/:id" element={<QCCheckForm />} />
         <Route path="kpis" element={<KPIs />} />
         <Route path="kpis/:managerId" element={<ManagerProfile />} />

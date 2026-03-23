@@ -126,6 +126,7 @@ export default function Training() {
       <div className="tab-row">
         <button className={`tab-btn${tab === 'sessions' ? ' active' : ''}`} onClick={() => setTab('sessions')}>Sessions</button>
         <button className={`tab-btn${tab === 'checklists' ? ' active' : ''}`} onClick={() => setTab('checklists')}>Checklists</button>
+        <button className="tab-btn" onClick={() => navigate('/training/induction')}>Induction Plan</button>
       </div>
 
       {tab === 'sessions' && (
