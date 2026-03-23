@@ -64,7 +64,8 @@ export default function Dashboard() {
 
   const createCheck = async () => {
     const { property_id, staff_id, checklist_id, assigned_to_id, date } = checkForm;
-    if (!property_id || !staff_id || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
+    const staffRequired = createType !== 'property';
+    if (!property_id || (staffRequired && !staff_id) || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
     setCreating(true);
     try {
       const r = await api.post('/qc/checks', checkForm);
@@ -332,7 +333,7 @@ export default function Dashboard() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">{createType === 'property' ? 'Who cleaned this property?' : 'Staff Member Being Assessed'}</label>
+              <label className="form-label">{createType === 'property' ? 'Who cleaned this property? (optional)' : 'Staff Member Being Assessed'}</label>
               <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
                 <option value="">{createType === 'property' ? 'Select cleaner…' : 'Select staff member…'}</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
