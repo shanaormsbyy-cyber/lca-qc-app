@@ -56,7 +56,10 @@ for (const name of lcaStaff) {
 if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
 
 // Migration: make qc_checks.staff_id nullable (was NOT NULL)
-const qcCol = db.prepare("PRAGMA table_info(qc_checks)").all().find(c => c.name === 'staff_id');
+const _pragmaStmt = db.prepare("PRAGMA table_info(qc_checks)");
+const _qcCols = _pragmaStmt.all([]);
+_pragmaStmt.finalize();
+const qcCol = _qcCols.find(c => c.name === 'staff_id');
 if (qcCol && qcCol.notnull === 1) {
   console.log('Migrating qc_checks: making staff_id nullable…');
   db.exec('PRAGMA foreign_keys=OFF');
