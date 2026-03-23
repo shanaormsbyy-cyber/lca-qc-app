@@ -45,6 +45,12 @@ export default function QCCheckForm() {
     return max ? (total / max) * 100 : 0;
   };
 
+  const deleteCheck = async () => {
+    if (!confirm('Delete this QC check and all its results? This cannot be undone.')) return;
+    await api.delete(`/qc/checks/${id}`);
+    navigate('/qc');
+  };
+
   const save = async (complete = false) => {
     setSaving(true);
     const payload = { items };
@@ -206,14 +212,19 @@ export default function QCCheckForm() {
         </div>
       ))}
 
-      {check.status !== 'complete' && (
-        <div className="flex gap-3 mt-4">
-          <button className="btn btn-secondary" onClick={() => save(false)} disabled={saving}>Save Progress</button>
-          <button className="btn btn-primary" onClick={() => save(true)} disabled={saving}>
-            {saving ? <><span className="spinner" /> Saving…</> : '✓ Sign Off & Complete'}
-          </button>
+      <div className="flex gap-3 mt-4" style={{ justifyContent: 'space-between' }}>
+        <div className="flex gap-3">
+          {check.status !== 'complete' && (
+            <>
+              <button className="btn btn-secondary" onClick={() => save(false)} disabled={saving}>Save Progress</button>
+              <button className="btn btn-primary" onClick={() => save(true)} disabled={saving}>
+                {saving ? <><span className="spinner" /> Saving…</> : '✓ Sign Off & Complete'}
+              </button>
+            </>
+          )}
         </div>
-      )}
+        <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
+      </div>
     </div>
   );
 }
