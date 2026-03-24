@@ -31,7 +31,8 @@ const db = require('./db');
       score_pct REAL DEFAULT 0,
       signed_off_by TEXT,
       signed_off_at TEXT,
-      notes TEXT
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
     )`);
     db.exec('INSERT INTO qc_checks_new SELECT * FROM qc_checks');
     db.exec('DROP TABLE qc_checks');
