@@ -5,12 +5,52 @@ const os = require('os');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
 
+// ── Migration: make qc_checks.staff_id nullable (was NOT NULL) ──────────────
+// Must run FIRST, before any other prepared statements are left open,
+// because node-sqlite3-wasm DDL fails if any read statement is still active.
+{
+  const s = db.prepare("PRAGMA table_info(qc_checks)");
+  const cols = s.all([]);
+  s.finalize();
+  const col = cols.find(c => c.name === 'staff_id');
+  if (col && col.notnull === 1) {
+    console.log('Migrating qc_checks: making staff_id nullable…');
+    db.exec('PRAGMA foreign_keys=OFF');
+    db.exec('DROP TABLE IF EXISTS qc_checks_new');
+    db.exec(`CREATE TABLE qc_checks_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      property_id INTEGER NOT NULL REFERENCES properties(id),
+      staff_id INTEGER REFERENCES staff(id),
+      checklist_id INTEGER NOT NULL REFERENCES qc_checklists(id),
+      scheduled_by_id INTEGER NOT NULL REFERENCES managers(id),
+      assigned_to_id INTEGER NOT NULL REFERENCES managers(id),
+      date TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      total_score REAL DEFAULT 0,
+      max_score REAL DEFAULT 0,
+      score_pct REAL DEFAULT 0,
+      signed_off_by TEXT,
+      signed_off_at TEXT,
+      notes TEXT
+    )`);
+    db.exec('INSERT INTO qc_checks_new SELECT * FROM qc_checks');
+    db.exec('DROP TABLE qc_checks');
+    db.exec('ALTER TABLE qc_checks_new RENAME TO qc_checks');
+    db.exec('PRAGMA foreign_keys=ON');
+    console.log('Migration complete: staff_id is now nullable.');
+  }
+}
+
 // Auto-seed if this is a fresh database
-const { cnt } = db.prepare('SELECT COUNT(*) as cnt FROM managers').get();
-if (cnt === 0) {
-  console.log('Fresh database detected — running seed...');
-  require('./seed');
-  console.log('Seed complete.');
+{
+  const s = db.prepare('SELECT COUNT(*) as cnt FROM managers');
+  const { cnt } = s.get([]);
+  s.finalize();
+  if (cnt === 0) {
+    console.log('Fresh database detected — running seed...');
+    require('./seed');
+    console.log('Seed complete.');
+  }
 }
 
 // Auto-migrate KOSH properties (insert any missing ones)
@@ -26,16 +66,21 @@ const koshProperties = [
   '16B Ridout Street','77A Awatere Avenue','163 River Road North','163 River Road South',
   '7/182 London Street',
 ];
-const insertProp = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)');
-const existingProps = new Set(db.prepare('SELECT name FROM properties').all().map(r => r.name));
-let migratedCount = 0;
-for (const name of koshProperties) {
-  if (!existingProps.has(name)) {
-    insertProp.run(name, '', '');
-    migratedCount++;
+{
+  const insertProp = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)');
+  const sel = db.prepare('SELECT name FROM properties');
+  const existingProps = new Set(sel.all([]).map(r => r.name));
+  sel.finalize();
+  let migratedCount = 0;
+  for (const name of koshProperties) {
+    if (!existingProps.has(name)) {
+      insertProp.run(name, '', '');
+      migratedCount++;
+    }
   }
+  insertProp.finalize();
+  if (migratedCount > 0) console.log(`Migrated ${migratedCount} KOSH properties into database.`);
 }
-if (migratedCount > 0) console.log(`Migrated ${migratedCount} KOSH properties into database.`);
 
 // Auto-migrate staff members (insert any missing ones)
 const lcaStaff = [
@@ -44,55 +89,34 @@ const lcaStaff = [
   'Micayla Hughes','Milly Charlton','Paula Stacey','Tarlya Carey','Tarmz Brown',
   'Tea Manuel','Tegan Watson-King','Tirihana Tahatika','Vienna Pahi','Wiki King',
 ];
-const insertStaff = db.prepare('INSERT INTO staff (name, role, start_date) VALUES (?, ?, ?)');
-const existingStaff = new Set(db.prepare('SELECT name FROM staff').all().map(r => r.name));
-let migratedStaff = 0;
-for (const name of lcaStaff) {
-  if (!existingStaff.has(name)) {
-    insertStaff.run(name, 'Cleaner', '');
-    migratedStaff++;
+{
+  const insertStaff = db.prepare('INSERT INTO staff (name, role, start_date) VALUES (?, ?, ?)');
+  const sel = db.prepare('SELECT name FROM staff');
+  const existingStaff = new Set(sel.all([]).map(r => r.name));
+  sel.finalize();
+  let migratedStaff = 0;
+  for (const name of lcaStaff) {
+    if (!existingStaff.has(name)) {
+      insertStaff.run(name, 'Cleaner', '');
+      migratedStaff++;
+    }
   }
-}
-if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
-
-// Migration: make qc_checks.staff_id nullable (was NOT NULL)
-const _pragmaStmt = db.prepare("PRAGMA table_info(qc_checks)");
-const _qcCols = _pragmaStmt.all([]);
-_pragmaStmt.finalize();
-const qcCol = _qcCols.find(c => c.name === 'staff_id');
-if (qcCol && qcCol.notnull === 1) {
-  console.log('Migrating qc_checks: making staff_id nullable…');
-  db.exec('PRAGMA foreign_keys=OFF');
-  db.exec('DROP TABLE IF EXISTS qc_checks_new');
-  db.exec(`CREATE TABLE qc_checks_new (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    property_id INTEGER NOT NULL REFERENCES properties(id),
-    staff_id INTEGER REFERENCES staff(id),
-    checklist_id INTEGER NOT NULL REFERENCES qc_checklists(id),
-    scheduled_by_id INTEGER NOT NULL REFERENCES managers(id),
-    assigned_to_id INTEGER NOT NULL REFERENCES managers(id),
-    date TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    total_score REAL DEFAULT 0,
-    max_score REAL DEFAULT 0,
-    score_pct REAL DEFAULT 0,
-    signed_off_by TEXT,
-    signed_off_at TEXT,
-    notes TEXT
-  )`);
-  db.exec('INSERT INTO qc_checks_new SELECT * FROM qc_checks');
-  db.exec('DROP TABLE qc_checks');
-  db.exec('ALTER TABLE qc_checks_new RENAME TO qc_checks');
-  db.exec('PRAGMA foreign_keys=ON');
-  console.log('Migration complete: staff_id is now nullable.');
+  insertStaff.finalize();
+  if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
 }
 
 // Auto-migrate Jacqueline Kirker as a manager
-const existingManagers = new Set(db.prepare('SELECT username FROM managers').all().map(r => r.username));
-if (!existingManagers.has('jacqueline')) {
-  const hash = bcrypt.hashSync('lca123', 10);
-  db.prepare('INSERT INTO managers (username, password_hash, name) VALUES (?, ?, ?)').run('jacqueline', hash, 'Jacqueline Kirker');
-  console.log('Added manager: Jacqueline Kirker (username: jacqueline, password: lca123)');
+{
+  const sel = db.prepare('SELECT username FROM managers');
+  const existingManagers = new Set(sel.all([]).map(r => r.username));
+  sel.finalize();
+  if (!existingManagers.has('jacqueline')) {
+    const hash = bcrypt.hashSync('lca123', 10);
+    const ins = db.prepare('INSERT INTO managers (username, password_hash, name) VALUES (?, ?, ?)');
+    ins.run('jacqueline', hash, 'Jacqueline Kirker');
+    ins.finalize();
+    console.log('Added manager: Jacqueline Kirker (username: jacqueline, password: lca123)');
+  }
 }
 
 const app = express();
@@ -120,7 +144,6 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
-  // Print local network IPs so other devices know where to connect
   const nets = os.networkInterfaces();
   const ips = [];
   for (const iface of Object.values(nets)) {
