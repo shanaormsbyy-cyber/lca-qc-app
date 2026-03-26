@@ -119,50 +119,70 @@ export default function QCCheckForm() {
   const exportPDF = () => {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const W = 210;
-    const pct = Math.round(check.score_pct);
+    const H = 297;
+    const pct = Math.round(check.score_pct || liveScore());
+    const today = new Date().toISOString().slice(0, 10);
     const failedItems = items.filter(i =>
       (i.score_type === 'pass_fail' && i.score === 0) ||
       (i.score_type === '1_to_5' && i.score <= 2)
     );
 
-    // ── HEADER BAND ────────────────────────────────────────────────────────────
+    // Helper: fill full dark background on the current page
+    const fillPageBg = () => {
+      doc.setFillColor(13, 13, 20);
+      doc.rect(0, 0, W, H, 'F');
+    };
+
+    // Helper: draw header band on current page
+    const drawHeader = () => {
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 0, W, 52, 'F');
+      doc.setFillColor(...CYAN_PDF);
+      doc.rect(0, 50, W, 3, 'F');
+    };
+
+    // Page 1 background + header
+    fillPageBg();
+    drawHeader();
+
+    // Logo: styled text badge (replace with addImage when logo file available)
     doc.setFillColor(...NAVY);
-    doc.rect(0, 0, W, 52, 'F');
-
-    // Accent stripe
-    doc.setFillColor(...CYAN_PDF);
-    doc.rect(0, 50, W, 3, 'F');
-
-    // Logo circle
-    doc.setFillColor(...CYAN_PDF);
-    doc.circle(22, 22, 12, 'F');
-    doc.setTextColor(...NAVY);
-    doc.setFontSize(13);
+    doc.roundedRect(10, 9, 26, 33, 4, 4, 'F');
+    doc.setDrawColor(...CYAN_PDF);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(10, 9, 26, 33, 4, 4, 'S');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(15);
     doc.setFont(undefined, 'bold');
-    doc.text('LCA', 22, 26, { align: 'center' });
+    doc.text('LCA', 23, 24, { align: 'center' });
+    doc.setFontSize(6.5);
+    doc.setFont(undefined, 'normal');
+    doc.text('cleaning', 23, 31, { align: 'center' });
+    doc.setTextColor(...CYAN_PDF);
+    doc.setFontSize(6.5);
+    doc.text('services', 23, 37, { align: 'center' });
 
     // Company name & subtitle
     doc.setTextColor(...WHITE);
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
-    doc.text('LCA Cleaning Services', 40, 20);
-
+    doc.text('LCA Cleaning Services', 42, 22);
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.setTextColor(180, 210, 200);
-    doc.text('Quality Control Inspection Report', 40, 28);
+    doc.setTextColor(...CYAN_PDF);
+    doc.text('Quality Control Inspection Report', 42, 30);
 
     // Report date (top-right)
-    doc.setFontSize(9);
-    doc.setTextColor(160, 190, 180);
-    doc.text(`Generated: ${fmtDate(new Date().toISOString().slice(0, 10))}`, W - 14, 20, { align: 'right' });
+    doc.setFontSize(8);
+    doc.setTextColor(160, 190, 200);
+    doc.text(`Generated: ${fmtDate(today)}`, W - 14, 22, { align: 'right' });
 
     // ── SCORE BADGE (right side of header) ────────────────────────────────────
     const badgeX = W - 30;
     const badgeY = 28;
     const scoreRgbVal = scoreRgb(pct);
     doc.setFillColor(...scoreRgbVal);
-    doc.roundedRect(badgeX - 18, badgeY - 14, 36, 18, 4, 4, 'F');
+    doc.roundedRect(badgeX - 18, badgeY - 12, 36, 18, 4, 4, 'F');
     doc.setTextColor(...WHITE);
     doc.setFontSize(18);
     doc.setFont(undefined, 'bold');
@@ -170,10 +190,6 @@ export default function QCCheckForm() {
     doc.setFontSize(7);
     doc.setFont(undefined, 'normal');
     doc.text('OVERALL SCORE', badgeX, badgeY + 5, { align: 'center' });
-
-    // ── PAGE BODY BACKGROUND ───────────────────────────────────────────────────
-    doc.setFillColor(13, 13, 20); // dark body bg
-    doc.rect(0, 53, W, 244, 'F');
 
     // ── INFO GRID ──────────────────────────────────────────────────────────────
     let y = 62;
@@ -309,6 +325,11 @@ export default function QCCheckForm() {
         4: { cellWidth: 10, halign: 'center' },
         5: { cellWidth: 'auto' },
       },
+      didDrawPage: () => {
+        // Redraw dark bg on every new page autoTable creates
+        const pg = doc.internal.getCurrentPageInfo().pageNumber;
+        if (pg > 1) { fillPageBg(); }
+      },
       didDrawCell: (data) => {
         // Red left border for fail rows
         if (data.section === 'body') {
@@ -326,7 +347,7 @@ export default function QCCheckForm() {
 
     // ── FAILED ITEMS HIGHLIGHT ─────────────────────────────────────────────────
     if (failedItems.length > 0) {
-      if (y > 240) { doc.addPage(); y = 20; }
+      if (y > 240) { doc.addPage(); fillPageBg(); y = 20; }
 
       doc.setFontSize(11);
       doc.setFont(undefined, 'bold');
@@ -335,7 +356,7 @@ export default function QCCheckForm() {
       y += 5;
 
       failedItems.forEach(item => {
-        if (y > 270) { doc.addPage(); y = 20; }
+        if (y > 270) { doc.addPage(); fillPageBg(); y = 20; }
         doc.setFillColor(60, 10, 10);
         doc.setDrawColor(...FAIL_R);
         const textLines = doc.splitTextToSize(item.text, 140);
@@ -362,7 +383,7 @@ export default function QCCheckForm() {
     }
 
     // ── CORRECTIVE ACTIONS ─────────────────────────────────────────────────────
-    if (y > 230) { doc.addPage(); y = 20; }
+    if (y > 230) { doc.addPage(); fillPageBg(); y = 20; }
 
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
@@ -389,7 +410,7 @@ export default function QCCheckForm() {
     y += caBoxH + 10;
 
     // ── SIGN-OFF SECTION ───────────────────────────────────────────────────────
-    if (y > 250) { doc.addPage(); y = 20; }
+    if (y > 250) { doc.addPage(); fillPageBg(); y = 20; }
 
     doc.setDrawColor(...CYAN_PDF);
     doc.setLineWidth(0.4);
