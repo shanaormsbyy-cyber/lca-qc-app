@@ -290,20 +290,21 @@ export default function QCCheckForm() {
 
     const tableBody = items.map((item, i2) => {
       const isPF = item.score_type === 'pass_fail';
+      const score = item.score ?? 0;
       const scoreLabel = isPF
-        ? (item.score === 1 ? 'PASS' : 'FAIL')
-        : (item.score > 0 ? `${item.score}/5` : '—');
-      const isFail = (isPF && item.score === 0) || (!isPF && item.score > 0 && item.score <= 2);
+        ? (score === 1 ? 'PASS' : 'FAIL')
+        : (score > 0 ? `${score}/5` : '—');
+      const isFail = (isPF && score === 0) || (!isPF && score > 0 && score <= 2);
       return [
         { content: String(i2 + 1), styles: { halign: 'center', fontStyle: 'normal' } },
         item.category || '—',
-        item.text,
+        item.text || '',
         { content: scoreLabel, styles: {
           halign: 'center',
           fontStyle: 'bold',
-          textColor: isFail ? FAIL_R : PASS_G,
+          textColor: isFail ? [239, 68, 68] : [34, 197, 94],
         }},
-        { content: String(item.weight) + '×', styles: { halign: 'center' } },
+        { content: String(item.weight ?? 1) + '×', styles: { halign: 'center' } },
         item.notes || '',
       ];
     });
