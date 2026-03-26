@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { fmtDate } from '../utils';
+import logoUrl from '../assets/logo.png';
 
 // RGB colour constants used in PDF — LCA brand colours
 const NAVY      = [8, 8, 12];       // near-black background
@@ -116,7 +117,7 @@ export default function QCCheckForm() {
     setSaving(false);
   };
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const W = 210;
     const H = 297;
@@ -141,41 +142,44 @@ export default function QCCheckForm() {
       doc.rect(0, 50, W, 3, 'F');
     };
 
+    // Fetch logo as base64
+    let logoB64 = null;
+    try {
+      const resp = await fetch(logoUrl);
+      const blob = await resp.blob();
+      logoB64 = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (_) { /* logo optional */ }
+
     // Page 1 background + header
     fillPageBg();
     drawHeader();
 
-    // Logo: styled text badge (replace with addImage when logo file available)
-    doc.setFillColor(...NAVY);
-    doc.roundedRect(10, 9, 26, 33, 4, 4, 'F');
-    doc.setDrawColor(...CYAN_PDF);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(10, 9, 26, 33, 4, 4, 'S');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(15);
-    doc.setFont(undefined, 'bold');
-    doc.text('LCA', 23, 24, { align: 'center' });
-    doc.setFontSize(6.5);
-    doc.setFont(undefined, 'normal');
-    doc.text('cleaning', 23, 31, { align: 'center' });
-    doc.setTextColor(...CYAN_PDF);
-    doc.setFontSize(6.5);
-    doc.text('services', 23, 37, { align: 'center' });
+    // Logo image (white bg so place inside a white rounded rect in the header)
+    if (logoB64) {
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(8, 7, 38, 38, 3, 3, 'F');
+      doc.addImage(logoB64, 'JPEG', 8, 7, 38, 38);
+    }
 
-    // Company name & subtitle
+    // Company name & subtitle — offset right of logo
+    const textX = logoB64 ? 52 : 14;
     doc.setTextColor(...WHITE);
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
-    doc.text('LCA Cleaning Services', 42, 22);
+    doc.text('LCA Cleaning Services', textX, 22);
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(...CYAN_PDF);
-    doc.text('Quality Control Inspection Report', 42, 30);
+    doc.text('Quality Control Inspection Report', textX, 30);
 
     // Report date (top-right)
     doc.setFontSize(8);
     doc.setTextColor(160, 190, 200);
-    doc.text(`Generated: ${fmtDate(today)}`, W - 14, 22, { align: 'right' });
+    doc.text(`Generated: ${fmtDate(today)}`, W - 14, 14, { align: 'right' });
 
     // ── SCORE BADGE (right side of header) ────────────────────────────────────
     const badgeX = W - 30;
