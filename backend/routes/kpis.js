@@ -224,11 +224,11 @@ router.get('/watchlist', (req, res) => {
 
     if (result.cnt > 0 && result.avg != null && result.avg < threshold) {
       const recent = db.prepare(`
-        SELECT date, score_pct, property_name
+        SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
         FROM qc_checks
         JOIN properties ON properties.id = qc_checks.property_id
-        WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-        ORDER BY date DESC LIMIT 3
+        WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+        ORDER BY qc_checks.date DESC LIMIT 3
       `).all(s.id);
 
       watchlist.push({

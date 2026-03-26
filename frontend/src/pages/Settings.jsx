@@ -15,7 +15,7 @@ export default function Settings() {
   const [qcSettings, setQcSettings] = useState({
     qc_freq_staff_days: '30',
     qc_freq_property_days: '14',
-    watchlist_threshold: '70',
+    watchlist_threshold: '90',
     flag_min_count: '3',
     flag_moderate_min: '3',
     flag_moderate_max: '4',

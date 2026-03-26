@@ -168,7 +168,7 @@ db.exec(`
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
 insertSetting.run('qc_freq_staff_days', '30');
 insertSetting.run('qc_freq_property_days', '14');
-insertSetting.run('watchlist_threshold', '70');
+insertSetting.run('watchlist_threshold', '90');
 insertSetting.run('flag_min_count', '3');
 insertSetting.run('flag_moderate_min', '3');
 insertSetting.run('flag_moderate_max', '4');

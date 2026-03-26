@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
+    // Load core data first — these must succeed for the page to work
     Promise.all([
       api.get('/scheduling/due'),
       api.get('/qc/checks'),
@@ -39,10 +40,7 @@ export default function Dashboard() {
       api.get('/staff'),
       api.get('/properties'),
       api.get('/managers'),
-      api.get('/kpis/watchlist'),
-      api.get('/kpis/flagged-items?period=week'),
-      api.get('/kpis/flagged-items?period=month'),
-    ]).then(([dueR, qcR, trainR, clR, sR, pR, mR, wR, fwR, fmR]) => {
+    ]).then(([dueR, qcR, trainR, clR, sR, pR, mR]) => {
       setDue(dueR.data);
       const qc = qcR.data;
       const train = trainR.data;
@@ -54,10 +52,12 @@ export default function Dashboard() {
       setStaff(sR.data);
       setProperties(pR.data);
       setManagers(mR.data);
-      setWatchlist(wR.data.watchlist || []);
-      setFlaggedWeek(fwR.data.items || []);
-      setFlaggedMonth(fmR.data.items || []);
     }).finally(() => setLoading(false));
+
+    // Load secondary data independently — failures here don't affect core stats
+    api.get('/kpis/watchlist').then(r => setWatchlist(r.data.watchlist || [])).catch(() => {});
+    api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
+    api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
   }, [manager.id]);
 
   const openCreate = (preselect = {}, type = 'staff') => {
@@ -265,9 +265,10 @@ export default function Dashboard() {
       </div>
 
       {/* Quick actions */}
-      <div className="flex gap-3 mb-6">
-        <button className="btn btn-primary" onClick={() => openCreate()}>+ New QC Check</button>
-        <button className="btn btn-secondary" onClick={() => navigate('/training')}>+ New Training</button>
+      <div className="flex gap-3 mb-6" style={{ flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={() => openCreate('staff')}>👤 Start Team QC Check</button>
+        <button className="btn btn-secondary" onClick={() => openCreate({}, 'property')}>🏠 Start Property Health Check</button>
+        <button className="btn btn-ghost" onClick={() => navigate('/training')}>+ New Training</button>
       </div>
 
       {/* Overdue & Due Soon */}
