@@ -42,16 +42,16 @@ export default function QCCheckForm() {
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
 
-  const load = () => {
+  const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
       setCheck(r.data);
-      setItems(r.data.items || []);
+      if (overwriteItems) setItems(r.data.items || []);
       setCorrectiveActions(r.data.notes || '');
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [id]);
-  useLiveSync(load);
+  useEffect(() => { load(true); }, [id]);
+  useLiveSync(() => load(false));
 
   const loadPhotos = () => {
     api.get(`/qc/checks/${id}/photos`).then(r => {
@@ -122,21 +122,7 @@ export default function QCCheckForm() {
   };
 
   const exportPDF = async () => {
-    try {
-      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-      const W = 210;
-      const pct = Math.round(check.score_pct || liveScore());
-      const today = new Date().toISOString().slice(0, 10);
-
-      // Fetch logo
-      let logoB64 = null;
-      try {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 3000);
-        const resp = await fetch(logoUrl, { signal: controller.signal });
-        clearTimeout(t);
-        const blob = await resp.blob();
-        logoB64 = await new Promise(resolve => {
+1111        logoB64 = await new Promise(resolve => {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.readAsDataURL(blob);
