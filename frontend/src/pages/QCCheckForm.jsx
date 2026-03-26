@@ -122,6 +122,7 @@ export default function QCCheckForm() {
   };
 
   const exportPDF = async () => {
+    try {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const W = 210;
     const H = 297;
@@ -146,17 +147,20 @@ export default function QCCheckForm() {
       doc.rect(0, 50, W, 3, 'F');
     };
 
-    // Fetch logo as base64
+    // Fetch logo as base64 (with timeout so it never blocks PDF generation)
     let logoB64 = null;
     try {
-      const resp = await fetch(logoUrl);
+      const controller = new AbortController();
+      const logoTimeout = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(logoUrl, { signal: controller.signal });
+      clearTimeout(logoTimeout);
       const blob = await resp.blob();
       logoB64 = await new Promise(resolve => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
         reader.readAsDataURL(blob);
       });
-    } catch (_) { /* logo optional */ }
+    } catch (_) { /* logo optional — PDF still generates without it */ }
 
     // Page 1 background + header
     fillPageBg();
@@ -449,6 +453,10 @@ export default function QCCheckForm() {
 
     const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
     doc.save(`LCA-QC-${safeName}-${check.date}.pdf`);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('PDF export failed: ' + err.message);
+    }
   };
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;

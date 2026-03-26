@@ -61,14 +61,33 @@ router.post('/checklists', (req, res) => {
 
 router.put('/checklists/:id', (req, res) => {
   const { name, description, items } = req.body;
+  const clId = req.params.id;
   db.exec('BEGIN');
   try {
-    db.prepare('UPDATE qc_checklists SET name=?, description=? WHERE id=?').run(name, description || '', req.params.id);
-    db.prepare('DELETE FROM qc_checklist_items WHERE checklist_id=?').run(req.params.id);
+    db.prepare('UPDATE qc_checklists SET name=?, description=? WHERE id=?').run(name, description || '', clId);
+
+    // Get existing item ids for this checklist
+    const existing = db.prepare('SELECT id FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(clId);
+
+    // Update existing rows in-place where possible; insert extras; delete removed
     (items || []).forEach((item, i) => {
-      db.prepare('INSERT INTO qc_checklist_items (checklist_id, text, category, score_type, weight, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(req.params.id, item.text, item.category || '', item.score_type || 'pass_fail', item.weight || 1, i);
+      if (existing[i]) {
+        db.prepare('UPDATE qc_checklist_items SET text=?, category=?, score_type=?, weight=?, order_idx=? WHERE id=?')
+          .run(item.text, item.category || '', item.score_type || 'pass_fail', item.weight || 1, i, existing[i].id);
+      } else {
+        db.prepare('INSERT INTO qc_checklist_items (checklist_id, text, category, score_type, weight, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(clId, item.text, item.category || '', item.score_type || 'pass_fail', item.weight || 1, i);
+      }
     });
+    // Remove any extra old rows (items were deleted by user) — only safe if not referenced
+    for (let i = (items || []).length; i < existing.length; i++) {
+      const used = db.prepare('SELECT COUNT(*) as cnt FROM qc_check_items WHERE item_id=?').get(existing[i].id);
+      if (used.cnt === 0) {
+        db.prepare('DELETE FROM qc_checklist_items WHERE id=?').run(existing[i].id);
+      }
+      // If in use, leave the row — it won't appear in future checks but historical data stays intact
+    }
+
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -78,6 +97,10 @@ router.put('/checklists/:id', (req, res) => {
 });
 
 router.delete('/checklists/:id', (req, res) => {
+  const inUse = db.prepare('SELECT COUNT(*) as cnt FROM qc_checks WHERE checklist_id=?').get(req.params.id);
+  if (inUse.cnt > 0) {
+    return res.status(409).json({ error: `This checklist is used by ${inUse.cnt} QC check(s) and cannot be deleted. Remove those checks first, or archive this checklist instead.` });
+  }
   db.prepare('DELETE FROM qc_checklists WHERE id=?').run(req.params.id);
   res.json({ ok: true });
 });
