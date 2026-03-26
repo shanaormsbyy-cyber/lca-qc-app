@@ -295,6 +295,133 @@ router.get('/flagged-items', (req, res) => {
   res.json({ items, period, settings: { minCount, modMin, modMax, majMin, majMax, urgentMin } });
 });
 
+// AI-style performance summary for a staff member
+router.get('/staff/:id/insights', (req, res) => {
+  const staffId = req.params.id;
+  const today = new Date();
+  const day30Ago = new Date(today); day30Ago.setDate(day30Ago.getDate() - 30);
+  const day30Str = day30Ago.toISOString().slice(0, 10);
+
+  // All completed checks for this staff member, ordered oldest→newest
+  const checks = db.prepare(`
+    SELECT qc.id, qc.date, qc.score_pct
+    FROM qc_checks qc
+    WHERE qc.staff_id = ? AND qc.status = 'complete'
+    ORDER BY qc.date ASC
+  `).all(staffId);
+
+  if (checks.length === 0) {
+    return res.json({ insights: [], summary: 'No completed QC checks yet — insights will appear once checks are recorded.' });
+  }
+
+  // All failed items across all checks, with date
+  const failedItems = db.prepare(`
+    SELECT qi.text, qi.category, qci.score, qi.score_type, qc.date,
+      COUNT(*) OVER (PARTITION BY qi.text) as total_fails,
+      MAX(qc.date) OVER (PARTITION BY qi.text) as last_fail,
+      MIN(qc.date) OVER (PARTITION BY qi.text) as first_fail
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE qc.staff_id = ? AND qc.status = 'complete'
+      AND (
+        (qi.score_type = 'pass_fail' AND qci.score = 0)
+        OR (qi.score_type = '1_to_5' AND qci.score <= 2)
+      )
+    ORDER BY qc.date DESC
+  `).all(staffId);
+
+  // Deduplicate by text to get unique issue summaries
+  const issueMap = {};
+  failedItems.forEach(row => {
+    if (!issueMap[row.text]) {
+      issueMap[row.text] = {
+        text: row.text,
+        category: row.category,
+        total_fails: row.total_fails,
+        last_fail: row.last_fail,
+        first_fail: row.first_fail,
+      };
+    }
+  });
+  const issues = Object.values(issueMap);
+
+  const insights = [];
+
+  // ── 1. Score trend (last 3+ checks) ───────────────────────────────────────
+  if (checks.length >= 3) {
+    const recent = checks.slice(-3);
+    const scores = recent.map(c => c.score_pct);
+    const allUp = scores[1] > scores[0] && scores[2] > scores[1];
+    const allDown = scores[1] < scores[0] && scores[2] < scores[1];
+    const latestScore = scores[scores.length - 1];
+    if (allUp) {
+      insights.push({ type: 'positive', text: `Score has improved across the last 3 checks (${scores.map(s => Math.round(s) + '%').join(' → ')}). Keep reinforcing what's working.` });
+    } else if (allDown) {
+      insights.push({ type: 'warning', text: `Score has declined across the last 3 checks (${scores.map(s => Math.round(s) + '%').join(' → ')}). Review recent check items for patterns.` });
+    }
+    if (latestScore < 70) {
+      insights.push({ type: 'alert', text: `Latest check score is ${Math.round(latestScore)}% — below the 70% threshold. Consider scheduling a follow-up check or coaching session.` });
+    } else if (latestScore >= 90) {
+      insights.push({ type: 'positive', text: `Latest check score is ${Math.round(latestScore)}% — excellent performance. Consistently strong results.` });
+    }
+  }
+
+  // ── 2. Persistent recurring issues (3+ fails, still recent) ──────────────
+  const persistent = issues.filter(i => i.total_fails >= 3 && i.last_fail >= day30Str);
+  if (persistent.length > 0) {
+    persistent.slice(0, 3).forEach(issue => {
+      insights.push({ type: 'alert', text: `"${issue.text}" has failed ${issue.total_fails} times${issue.category ? ` (${issue.category})` : ''} and was last flagged on ${issue.last_fail.split('-').reverse().join('-')}. This is a persistent pattern — consider direct coaching on this item.` });
+    });
+  }
+
+  // ── 3. Issues that dropped off (previously recurring, not seen in 30+ days) ─
+  const resolved = issues.filter(i => i.total_fails >= 2 && i.last_fail < day30Str);
+  if (resolved.length > 0) {
+    resolved.slice(0, 2).forEach(issue => {
+      insights.push({ type: 'positive', text: `"${issue.text}" was previously flagged ${issue.total_fails} times but hasn't appeared in over 30 days — showing improvement in this area.` });
+    });
+  }
+
+  // ── 4. Category patterns ──────────────────────────────────────────────────
+  const categoryCount = {};
+  issues.forEach(i => {
+    if (i.category) {
+      if (!categoryCount[i.category]) categoryCount[i.category] = { fails: 0, items: [] };
+      categoryCount[i.category].fails += i.total_fails;
+      categoryCount[i.category].items.push(i.text);
+    }
+  });
+  const weakCategories = Object.entries(categoryCount)
+    .filter(([, v]) => v.fails >= 4)
+    .sort((a, b) => b[1].fails - a[1].fails)
+    .slice(0, 2);
+  weakCategories.forEach(([cat, v]) => {
+    insights.push({ type: 'warning', text: `${cat} is a consistently weak area with ${v.fails} total fails across ${v.items.length} different items. This category may benefit from targeted retraining.` });
+  });
+
+  // ── 5. Inactivity / not enough data ──────────────────────────────────────
+  const lastCheck = checks[checks.length - 1];
+  const daysSinceCheck = Math.floor((today - new Date(lastCheck.date)) / 86400000);
+  if (daysSinceCheck > 45) {
+    insights.push({ type: 'info', text: `Last QC check was ${daysSinceCheck} days ago (${lastCheck.date.split('-').reverse().join('-')}). Regular checks help maintain consistency.` });
+  }
+
+  // ── 6. Overall summary line ───────────────────────────────────────────────
+  const avgScore = checks.reduce((s, c) => s + c.score_pct, 0) / checks.length;
+  let summary;
+  if (avgScore >= 90) summary = `Strong performer with an average score of ${Math.round(avgScore)}% across ${checks.length} checks.`;
+  else if (avgScore >= 80) summary = `Solid performer averaging ${Math.round(avgScore)}% across ${checks.length} checks, with some areas to watch.`;
+  else if (avgScore >= 70) summary = `Average performance of ${Math.round(avgScore)}% across ${checks.length} checks — room for improvement in key areas.`;
+  else summary = `Below-target average of ${Math.round(avgScore)}% across ${checks.length} checks — recommend active coaching and follow-up.`;
+
+  if (insights.length === 0) {
+    insights.push({ type: 'positive', text: 'No recurring issues detected. Performance looks consistent across recent checks.' });
+  }
+
+  res.json({ insights, summary });
+});
+
 // Common issues for a specific staff member
 router.get('/staff/:id/common-issues', (req, res) => {
   const staffId = req.params.id;

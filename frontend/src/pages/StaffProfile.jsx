@@ -12,6 +12,7 @@ export default function StaffProfile() {
   const [qcChecks, setQcChecks] = useState([]);
   const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
+  const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function StaffProfile() {
     }).finally(() => setLoading(false));
 
     api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
+    api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
   }, [id]);
 
   const deleteStaff = async () => {
@@ -109,6 +111,39 @@ export default function StaffProfile() {
           </div>
         )}
       </div>
+
+      {/* Performance Insights */}
+      {insights && (
+        <div className="card mb-6">
+          <div className="card-header">
+            <span className="card-title">Performance Insights</span>
+            <span style={{ fontSize: 12, color: 'var(--cyan)', background: 'var(--cyan-dim)', padding: '3px 8px', borderRadius: 6, fontWeight: 600 }}>AI Analysis</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 14, lineHeight: 1.6 }}>{insights.summary}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {insights.insights.map((ins, i) => {
+              const styles = {
+                alert:    { border: 'rgba(239,68,68,0.3)',    bg: 'rgba(239,68,68,0.07)',    bar: 'var(--red)',   icon: '⚠️' },
+                warning:  { border: 'rgba(245,158,11,0.3)',   bg: 'rgba(245,158,11,0.07)',   bar: 'var(--amber)', icon: '👀' },
+                positive: { border: 'rgba(34,197,94,0.3)',    bg: 'rgba(34,197,94,0.07)',    bar: 'var(--green)', icon: '✅' },
+                info:     { border: 'rgba(58,181,217,0.25)',  bg: 'rgba(58,181,217,0.07)',   bar: 'var(--cyan)',  icon: 'ℹ️' },
+              };
+              const s = styles[ins.type] || styles.info;
+              return (
+                <div key={i} style={{
+                  display: 'flex', gap: 12, padding: '10px 14px',
+                  borderRadius: 8, border: `1px solid ${s.border}`,
+                  background: s.bg, position: 'relative', overflow: 'hidden',
+                }}>
+                  <div style={{ width: 3, borderRadius: 2, background: s.bar, flexShrink: 0, alignSelf: 'stretch', marginLeft: -14, marginTop: -10, marginBottom: -10 }} />
+                  <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
+                  <p style={{ fontSize: 13, color: 'var(--t1)', lineHeight: 1.6, margin: 0 }}>{ins.text}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {chartData.length > 1 && (
         <div className="card mb-6">
