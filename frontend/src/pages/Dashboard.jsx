@@ -63,10 +63,11 @@ export default function Dashboard() {
 
   const openCreate = (preselect = {}, type = 'staff') => {
     setCreateType(type);
+    const defaultCL = checklists.find(cl => cl.default_for === type);
     setCheckForm({
       property_id: String(preselect.property_id || ''),
       staff_id: String(preselect.staff_id || ''),
-      checklist_id: '',
+      checklist_id: defaultCL ? String(defaultCL.id) : '',
       assigned_to_id: String(manager.id),
       date: today,
     });
