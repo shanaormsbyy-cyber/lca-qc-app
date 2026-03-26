@@ -52,14 +52,16 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
               <label className="form-label">Category</label>
               <input className="form-input" placeholder="e.g. Bathrooms" value={item.category} onChange={e => update(i, 'category', e.target.value)} />
             </div>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <label className="form-label">Weight</label>
-              <select className="form-select" value={item.weight} onChange={e => update(i, 'weight', parseFloat(e.target.value))}>
-                <option value="1">1 — Standard</option>
-                <option value="2">2 — Important</option>
-                <option value="3">3 — Critical</option>
-              </select>
-            </div>
+            {item.score_type === '1_to_5' && (
+              <div style={{ flex: 1, minWidth: 120 }}>
+                <label className="form-label">Weight</label>
+                <select className="form-select" value={item.weight} onChange={e => update(i, 'weight', parseFloat(e.target.value))}>
+                  <option value="1">1 — Standard</option>
+                  <option value="2">2 — Important</option>
+                  <option value="3">3 — Critical</option>
+                </select>
+              </div>
+            )}
             <div style={{ flexShrink: 0 }}>
               <button className="btn btn-danger btn-sm" onClick={() => remove(i)}>✕ Remove</button>
             </div>
