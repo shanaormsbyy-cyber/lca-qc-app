@@ -6,8 +6,23 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { fmtDate } from '../utils';
 
+// RGB colour constants used in PDF — LCA brand colours
+const NAVY      = [8, 8, 12];       // near-black background
+const NAVY_MID  = [20, 20, 32];     // slightly lighter card bg
+const CYAN_PDF  = [58, 181, 217];   // LCA teal/cyan accent #3AB5D9
+const WHITE     = [255, 255, 255];
+const GREY_TEXT = [100, 115, 130];  // muted label text
+const PASS_G    = [34, 197, 94];    // green #22c55e
+const FAIL_R    = [239, 68, 68];    // red #ef4444
+
 function scoreColor(pct) {
   return pct >= 85 ? 'var(--ok)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
+}
+
+function scoreRgb(pct) {
+  if (pct >= 85) return PASS_G;
+  if (pct >= 70) return [245, 158, 11];
+  return FAIL_R;
 }
 
 export default function QCCheckForm() {
@@ -18,20 +33,18 @@ export default function QCCheckForm() {
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  // photos keyed by item_id (string)
   const [photos, setPhotos] = useState({});
-  // which item's photo picker is open
   const [photoPickerItem, setPhotoPickerItem] = useState(null);
   const rollInputRefs = useRef({});
   const cameraInputRefs = useRef({});
-  const [emailModal, setEmailModal] = useState(false);
-  const [emailTo, setEmailTo] = useState('');
-  const [emailSending, setEmailSending] = useState(false);
+  // Corrective actions — stored in check.notes
+  const [correctiveActions, setCorrectiveActions] = useState('');
 
   useEffect(() => {
     api.get(`/qc/checks/${id}`).then(r => {
       setCheck(r.data);
       setItems(r.data.items || []);
+      setCorrectiveActions(r.data.notes || '');
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -73,22 +86,6 @@ export default function QCCheckForm() {
     loadPhotos();
   };
 
-  const sendEmail = async () => {
-    if (!emailTo.trim()) return alert('Enter an email address');
-    setEmailSending(true);
-    try {
-      await api.post(`/qc/checks/${id}/email`, { to: emailTo });
-      alert('Report sent successfully!');
-      setEmailModal(false);
-      setEmailTo('');
-    } catch (e) {
-      alert('Failed to send: ' + (e.response?.data?.error || e.message));
-    } finally {
-      setEmailSending(false);
-    }
-  };
-
-  // Calculate live score
   const liveScore = () => {
     let total = 0, max = 0;
     items.forEach(item => {
@@ -107,65 +104,322 @@ export default function QCCheckForm() {
 
   const save = async (complete = false) => {
     setSaving(true);
-    const payload = { items };
+    const payload = { items, notes: correctiveActions };
     if (complete) { payload.status = 'complete'; payload.signed_off_by = manager.name; }
     await api.put(`/qc/checks/${id}`, payload);
     if (complete) navigate('/qc');
     else {
       const r = await api.get(`/qc/checks/${id}`);
       setCheck(r.data); setItems(r.data.items || []);
+      setCorrectiveActions(r.data.notes || '');
     }
     setSaving(false);
   };
 
   const exportPDF = () => {
-    const doc = new jsPDF();
-    const pct = check.score_pct;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210;
+    const pct = Math.round(check.score_pct);
+    const failedItems = items.filter(i =>
+      (i.score_type === 'pass_fail' && i.score === 0) ||
+      (i.score_type === '1_to_5' && i.score <= 2)
+    );
 
-    doc.setFillColor(10, 22, 40);
-    doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(0, 200, 150);
-    doc.setFontSize(22); doc.setFont(undefined, 'bold');
-    doc.text('LCA Cleaning Services', 14, 16);
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(13); doc.setFont(undefined, 'normal');
-    doc.text('Quality Control Check Report', 14, 27);
+    // ── HEADER BAND ────────────────────────────────────────────────────────────
+    doc.setFillColor(...NAVY);
+    doc.rect(0, 0, W, 52, 'F');
 
-    doc.setTextColor(30, 30, 30);
-    doc.setFontSize(11);
-    const info = [
-      ['Property', check.property_name],
-      ['Staff Member', check.staff_name],
-      ['Checklist', check.checklist_name],
-      ['Date', check.date],
-      ['Assigned To', check.assigned_to_name],
-      ['Signed Off By', check.signed_off_by || '—'],
-      ['Score', `${Math.round(pct)}%`],
+    // Accent stripe
+    doc.setFillColor(...CYAN_PDF);
+    doc.rect(0, 50, W, 3, 'F');
+
+    // Logo circle
+    doc.setFillColor(...CYAN_PDF);
+    doc.circle(22, 22, 12, 'F');
+    doc.setTextColor(...NAVY);
+    doc.setFontSize(13);
+    doc.setFont(undefined, 'bold');
+    doc.text('LCA', 22, 26, { align: 'center' });
+
+    // Company name & subtitle
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text('LCA Cleaning Services', 40, 20);
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(180, 210, 200);
+    doc.text('Quality Control Inspection Report', 40, 28);
+
+    // Report date (top-right)
+    doc.setFontSize(9);
+    doc.setTextColor(160, 190, 180);
+    doc.text(`Generated: ${fmtDate(new Date().toISOString().slice(0, 10))}`, W - 14, 20, { align: 'right' });
+
+    // ── SCORE BADGE (right side of header) ────────────────────────────────────
+    const badgeX = W - 30;
+    const badgeY = 28;
+    const scoreRgbVal = scoreRgb(pct);
+    doc.setFillColor(...scoreRgbVal);
+    doc.roundedRect(badgeX - 18, badgeY - 14, 36, 18, 4, 4, 'F');
+    doc.setTextColor(...WHITE);
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(`${pct}%`, badgeX, badgeY - 1, { align: 'center' });
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'normal');
+    doc.text('OVERALL SCORE', badgeX, badgeY + 5, { align: 'center' });
+
+    // ── PAGE BODY BACKGROUND ───────────────────────────────────────────────────
+    doc.setFillColor(13, 13, 20); // dark body bg
+    doc.rect(0, 53, W, 244, 'F');
+
+    // ── INFO GRID ──────────────────────────────────────────────────────────────
+    let y = 62;
+    const col1 = 14, col2 = 75, col3 = 120, col4 = 165;
+
+    const infoBox = (label, value, x, yy, w2 = 52) => {
+      doc.setFillColor(...NAVY_MID);
+      doc.roundedRect(x, yy, w2, 14, 2, 2, 'F');
+      doc.setDrawColor(...CYAN_PDF);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(x, yy, w2, 14, 2, 2, 'S');
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...GREY_TEXT);
+      doc.text(label.toUpperCase(), x + 3, yy + 5);
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(...WHITE);
+      doc.text(String(value || '—').substring(0, 26), x + 3, yy + 11);
+    };
+
+    infoBox('Property', check.property_name, col1, y, 52);
+    infoBox('Staff Member', check.staff_name || 'N/A', col2, y, 42);
+    infoBox('Date', fmtDate(check.date), col3, y, 35);
+    infoBox('Check Type', check.check_type === 'property' ? 'Property' : 'Staff', col4, y, 32);
+
+    y += 18;
+    infoBox('Checklist', check.checklist_name, col1, y, 52);
+    infoBox('Assigned To', check.assigned_to_name, col2, y, 42);
+    infoBox('Signed Off By', check.signed_off_by || 'Pending', col3, y, 35);
+
+    // Score bar
+    const barX = col4, barY = y, barW = 32, barH = 14;
+    doc.setFillColor(...NAVY_MID);
+    doc.setDrawColor(...CYAN_PDF);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(barX, barY, barW, barH, 2, 2, 'FD');
+    const fillW = Math.round((pct / 100) * (barW - 4));
+    doc.setFillColor(...scoreRgb(pct));
+    doc.roundedRect(barX + 2, barY + 4, fillW, 6, 1, 1, 'F');
+    doc.setFontSize(7);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...CYAN_PDF);
+    doc.text('SCORE', barX + 3, barY + 5);
+
+    y += 22;
+
+    // ── SUMMARY STATS ─────────────────────────────────────────────────────────
+    const totalItems  = items.length;
+    const passCount   = items.filter(i => i.score_type === 'pass_fail' && i.score === 1).length;
+    const failCount   = items.filter(i => i.score_type === 'pass_fail' && i.score === 0).length;
+    const avgRating   = items.filter(i => i.score_type === '1_to_5' && i.score > 0);
+    const avgRatingVal = avgRating.length
+      ? (avgRating.reduce((s, i) => s + i.score, 0) / avgRating.length).toFixed(1)
+      : '—';
+
+    const statBoxW = 42;
+    const stats = [
+      { label: 'Total Items', value: totalItems, color: NAVY },
+      { label: 'Pass', value: passCount, color: PASS_G },
+      { label: 'Fail', value: failCount, color: failCount > 0 ? FAIL_R : GREY_TEXT },
+      { label: 'Avg Rating', value: avgRatingVal !== '—' ? `${avgRatingVal}/5` : '—', color: NAVY_MID },
     ];
-    let y = 50;
-    info.forEach(([k, v]) => {
-      doc.setFont(undefined, 'bold'); doc.text(k + ':', 14, y);
-      doc.setFont(undefined, 'normal'); doc.text(v || '—', 70, y);
-      y += 7;
+    stats.forEach((s, i2) => {
+      const sx = 14 + i2 * (statBoxW + 4);
+      doc.setFillColor(...NAVY);
+      doc.roundedRect(sx, y, statBoxW, 16, 3, 3, 'F');
+      doc.setTextColor(...CYAN_PDF);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(String(s.value), sx + statBoxW / 2, y + 10, { align: 'center' });
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(160, 190, 180);
+      doc.text(s.label.toUpperCase(), sx + statBoxW / 2, y + 14.5, { align: 'center' });
+    });
+
+    y += 22;
+
+    // ── CHECKLIST TABLE ────────────────────────────────────────────────────────
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...CYAN_PDF);
+    doc.text('Checklist Results', 14, y);
+    y += 4;
+
+    const tableBody = items.map((item, i2) => {
+      const isPF = item.score_type === 'pass_fail';
+      const scoreLabel = isPF
+        ? (item.score === 1 ? 'PASS' : 'FAIL')
+        : (item.score > 0 ? `${item.score}/5` : '—');
+      const isFail = (isPF && item.score === 0) || (!isPF && item.score > 0 && item.score <= 2);
+      return [
+        { content: String(i2 + 1), styles: { halign: 'center', fontStyle: 'normal' } },
+        item.category || '—',
+        item.text,
+        { content: scoreLabel, styles: {
+          halign: 'center',
+          fontStyle: 'bold',
+          textColor: isFail ? FAIL_R : PASS_G,
+        }},
+        { content: String(item.weight) + '×', styles: { halign: 'center' } },
+        item.notes || '',
+      ];
     });
 
     autoTable(doc, {
-      startY: y + 8,
-      head: [['#', 'Item', 'Category', 'Type', 'Score', 'Notes']],
-      body: items.map((item, i) => [
-        i + 1,
-        item.text,
-        item.category || '—',
-        item.score_type === 'pass_fail' ? 'Pass/Fail' : '1–5',
-        item.score_type === 'pass_fail' ? (item.score ? 'PASS' : 'FAIL') : `${item.score}/5`,
-        item.notes || '',
-      ]),
-      styles: { fontSize: 9, cellPadding: 4 },
-      headStyles: { fillColor: [10, 22, 40], textColor: [0, 200, 150] },
-      alternateRowStyles: { fillColor: [245, 248, 255] },
+      startY: y,
+      head: [['#', 'Category', 'Checklist Item', 'Result', 'Wt', 'Notes']],
+      body: tableBody,
+      theme: 'plain',
+      styles: {
+        fontSize: 8.5,
+        cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+        textColor: WHITE,
+        fillColor: NAVY_MID,
+        lineColor: [40, 44, 60],
+        lineWidth: 0.3,
+      },
+      headStyles: {
+        fillColor: NAVY,
+        textColor: CYAN_PDF,
+        fontStyle: 'bold',
+        fontSize: 8,
+        cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
+      },
+      alternateRowStyles: { fillColor: [24, 24, 36] },
+      columnStyles: {
+        0: { cellWidth: 8,  halign: 'center' },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 72 },
+        3: { cellWidth: 18, halign: 'center' },
+        4: { cellWidth: 10, halign: 'center' },
+        5: { cellWidth: 'auto' },
+      },
+      didDrawCell: (data) => {
+        // Red left border for fail rows
+        if (data.section === 'body') {
+          const row = tableBody[data.row.index];
+          const resultCell = row[3];
+          if (typeof resultCell === 'object' && String(resultCell.content).includes('FAIL')) {
+            doc.setFillColor(...FAIL_R);
+            doc.rect(data.cell.x, data.cell.y, 1.5, data.cell.height, 'F');
+          }
+        }
+      },
     });
 
-    doc.save(`QC-Check-${check.property_name}-${check.date}.pdf`);
+    y = doc.lastAutoTable.finalY + 8;
+
+    // ── FAILED ITEMS HIGHLIGHT ─────────────────────────────────────────────────
+    if (failedItems.length > 0) {
+      if (y > 240) { doc.addPage(); y = 20; }
+
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(...FAIL_R);
+      doc.text('Items Requiring Attention', 14, y);
+      y += 5;
+
+      failedItems.forEach(item => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.setFillColor(60, 10, 10);
+        doc.setDrawColor(...FAIL_R);
+        const textLines = doc.splitTextToSize(item.text, 140);
+        const boxH = Math.max(10, textLines.length * 5 + 6);
+        doc.roundedRect(14, y, W - 28, boxH, 2, 2, 'FD');
+        doc.setFillColor(...FAIL_R);
+        doc.rect(14, y, 3, boxH, 'F');
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(...FAIL_R);
+        doc.text(textLines, 20, y + 5);
+        if (item.notes) {
+          doc.setFont(undefined, 'italic');
+          doc.setTextColor(...GREY_TEXT);
+          const noteLines = doc.splitTextToSize(`Note: ${item.notes}`, 135);
+          doc.text(noteLines, 20, y + 5 + textLines.length * 5);
+          y += boxH + 3 + noteLines.length * 4;
+        } else {
+          y += boxH + 3;
+        }
+      });
+
+      y += 4;
+    }
+
+    // ── CORRECTIVE ACTIONS ─────────────────────────────────────────────────────
+    if (y > 230) { doc.addPage(); y = 20; }
+
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...CYAN_PDF);
+    doc.text('Corrective Actions', 14, y);
+    y += 5;
+
+    const caText = check.notes && check.notes.trim()
+      ? check.notes.trim()
+      : 'No corrective actions recorded.';
+    const caLines = doc.splitTextToSize(caText, W - 32);
+    const caBoxH = Math.max(22, caLines.length * 5 + 10);
+
+    doc.setFillColor(...NAVY_MID);
+    doc.setDrawColor(...CYAN_PDF);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(14, y, W - 28, caBoxH, 3, 3, 'FD');
+    doc.setFillColor(...CYAN_PDF);
+    doc.rect(14, y, 3, caBoxH, 'F');
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(...WHITE);
+    doc.text(caLines, 20, y + 7);
+    y += caBoxH + 10;
+
+    // ── SIGN-OFF SECTION ───────────────────────────────────────────────────────
+    if (y > 250) { doc.addPage(); y = 20; }
+
+    doc.setDrawColor(...CYAN_PDF);
+    doc.setLineWidth(0.4);
+    doc.line(14, y, W - 14, y);
+    y += 6;
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(...CYAN_PDF);
+    doc.text('Sign-off', 14, y);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(...GREY_TEXT);
+    doc.text(`Completed by: ${check.signed_off_by || '—'}  |  Date: ${fmtDate(check.date)}  |  Assigned to: ${check.assigned_to_name}`, 14, y + 6);
+
+    // ── FOOTER ─────────────────────────────────────────────────────────────────
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i2 = 1; i2 <= pageCount; i2++) {
+      doc.setPage(i2);
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 284, W, 13, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...CYAN_PDF);
+      doc.text('LCA Cleaning Services — Quality Control Report', 14, 291);
+      doc.setTextColor(120, 150, 140);
+      doc.text(`Page ${i2} of ${pageCount}`, W - 14, 291, { align: 'right' });
+    }
+
+    const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
+    doc.save(`LCA-QC-${safeName}-${check.date}.pdf`);
   };
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
@@ -173,7 +427,6 @@ export default function QCCheckForm() {
 
   const pct = check.status === 'complete' ? check.score_pct : liveScore();
 
-  // Group by category
   const categories = {};
   items.forEach(item => {
     const cat = item.category || 'General';
@@ -204,10 +457,7 @@ export default function QCCheckForm() {
         {check.status === 'complete' && (
           <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ color: 'var(--ok)', fontSize: 13 }}>✓ Signed off by {check.signed_off_by}</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
-              <button className="btn btn-sm btn-secondary" onClick={() => setEmailModal(true)}>📧 Email Report</button>
-            </div>
+            <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
           </div>
         )}
       </div>
@@ -269,7 +519,6 @@ export default function QCCheckForm() {
 
                   {/* Per-item photo attachment */}
                   <div style={{ marginTop: 10 }}>
-                    {/* Thumbnails */}
                     {itemPhotos.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                         {itemPhotos.map(photo => (
@@ -288,8 +537,6 @@ export default function QCCheckForm() {
                         ))}
                       </div>
                     )}
-
-                    {/* Camera button + picker */}
                     <div style={{ position: 'relative', display: 'inline-block' }}>
                       <button
                         onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
@@ -305,7 +552,6 @@ export default function QCCheckForm() {
                         <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
                         <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
                       </button>
-
                       {isPickerOpen && (
                         <div style={{
                           position: 'absolute', bottom: 64, left: 0, zIndex: 100,
@@ -318,10 +564,7 @@ export default function QCCheckForm() {
                             onMouseLeave={e => e.currentTarget.style.background = ''}
                           >
                             🖼️ Camera Roll
-                            <input
-                              type="file"
-                              accept="image/*"
-                              style={{ display: 'none' }}
+                            <input type="file" accept="image/*" style={{ display: 'none' }}
                               ref={el => rollInputRefs.current[item.id] = el}
                               onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
                             />
@@ -332,11 +575,7 @@ export default function QCCheckForm() {
                             onMouseLeave={e => e.currentTarget.style.background = ''}
                           >
                             📸 Take a Photo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              style={{ display: 'none' }}
+                            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
                               ref={el => cameraInputRefs.current[item.id] = el}
                               onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
                             />
@@ -352,6 +591,27 @@ export default function QCCheckForm() {
         </div>
       ))}
 
+      {/* Corrective Actions */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">Corrective Actions</span>
+          <span style={{ fontSize: 12, color: 'var(--t3)' }}>Appears on PDF report</span>
+        </div>
+        {check.status !== 'complete' ? (
+          <textarea
+            className="form-input"
+            style={{ minHeight: 100, resize: 'vertical', fontFamily: 'inherit' }}
+            placeholder="Describe any corrective actions required, follow-up tasks, or notes for this inspection…"
+            value={correctiveActions}
+            onChange={e => setCorrectiveActions(e.target.value)}
+          />
+        ) : (
+          <div style={{ fontSize: 14, color: correctiveActions ? 'var(--t1)' : 'var(--t3)', fontStyle: correctiveActions ? 'normal' : 'italic', lineHeight: 1.6 }}>
+            {correctiveActions || 'No corrective actions recorded.'}
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-3 mt-4" style={{ justifyContent: 'space-between' }}>
         <div className="flex gap-3">
           {check.status !== 'complete' && (
@@ -365,31 +625,6 @@ export default function QCCheckForm() {
         </div>
         <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
       </div>
-
-      {emailModal && (
-        <div className="modal-overlay" onClick={() => setEmailModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">Email QC Report</div>
-            <div className="form-group">
-              <label className="form-label">Send to</label>
-              <input
-                className="form-input"
-                type="email"
-                placeholder="recipient@example.com"
-                value={emailTo}
-                onChange={e => setEmailTo(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendEmail()}
-              />
-            </div>
-            <div className="flex gap-3">
-              <button className="btn btn-primary" onClick={sendEmail} disabled={emailSending}>
-                {emailSending ? 'Sending…' : 'Send Report'}
-              </button>
-              <button className="btn btn-ghost" onClick={() => setEmailModal(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Close photo picker on outside click */}
       {photoPickerItem !== null && (
