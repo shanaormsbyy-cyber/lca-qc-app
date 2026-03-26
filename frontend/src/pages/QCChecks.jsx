@@ -37,25 +37,25 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
       <div style={{ marginBottom: 16, fontWeight: 600, fontSize: 14, color: 'var(--t2)' }}>Checklist Items ({items.length})</div>
       {items.map((item, i) => (
         <div key={i} className="card mb-4" style={{ padding: '14px 16px' }}>
-          <div className="flex gap-2 mb-4">
-            <div style={{ flex: 2 }}>
+          <div className="flex gap-2 mb-3" style={{ alignItems: 'flex-end' }}>
+            <div style={{ flex: 3 }}>
               <label className="form-label">Item Text</label>
               <input className="form-input" placeholder="What to check…" value={item.text} onChange={e => update(i, 'text', e.target.value)} />
             </div>
-            <div style={{ flex: 1 }}>
-              <label className="form-label">Category</label>
-              <input className="form-input" placeholder="e.g. Bathrooms" value={item.category} onChange={e => update(i, 'category', e.target.value)} />
-            </div>
-          </div>
-          <div className="flex gap-2 items-center">
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 120 }}>
               <label className="form-label">Score Type</label>
               <select className="form-select" value={item.score_type} onChange={e => update(i, 'score_type', e.target.value)}>
                 <option value="pass_fail">Pass / Fail</option>
                 <option value="1_to_5">Score 1–5</option>
               </select>
             </div>
-            <div style={{ flex: 1 }}>
+          </div>
+          <div className="flex gap-2" style={{ alignItems: 'flex-end' }}>
+            <div style={{ flex: 2 }}>
+              <label className="form-label">Category</label>
+              <input className="form-input" placeholder="e.g. Bathrooms" value={item.category} onChange={e => update(i, 'category', e.target.value)} />
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
               <label className="form-label">Weight</label>
               <select className="form-select" value={item.weight} onChange={e => update(i, 'weight', parseFloat(e.target.value))}>
                 <option value="1">1 — Standard</option>
@@ -63,7 +63,7 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
                 <option value="3">3 — Critical</option>
               </select>
             </div>
-            <div style={{ alignSelf: 'flex-end' }}>
+            <div style={{ flexShrink: 0 }}>
               <button className="btn btn-danger btn-sm" onClick={() => remove(i)}>✕ Remove</button>
             </div>
           </div>

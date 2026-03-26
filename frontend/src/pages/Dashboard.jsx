@@ -61,9 +61,12 @@ export default function Dashboard() {
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
   }, [manager.id]);
 
-  const openCreate = (preselect = {}, type = 'staff') => {
+  const openCreate = async (preselect = {}, type = 'staff') => {
+    // Always reload checklists fresh so newly created ones appear
+    const freshCL = await api.get('/qc/checklists').then(r => r.data).catch(() => checklists);
+    setChecklists(freshCL);
     setCreateType(type);
-    const defaultCL = checklists.find(cl => cl.default_for === type);
+    const defaultCL = freshCL.find(cl => cl.default_for === type);
     setCheckForm({
       property_id: String(preselect.property_id || ''),
       staff_id: String(preselect.staff_id || ''),
