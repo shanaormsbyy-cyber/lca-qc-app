@@ -271,6 +271,60 @@ export default function QCCheckForm() {
       doc.text(caLines, 14, y);
       y += caLines.length * 5 + 8;
 
+      // ── PHOTOS ────────────────────────────────────────────────────────────────
+      const allPhotos = Object.values(photos).flat();
+      if (allPhotos.length > 0) {
+        // Fetch all photos as base64, skip any that fail
+        const toBase64 = (url) => fetch(url)
+          .then(r => r.blob())
+          .then(blob => new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          }))
+          .catch(() => null);
+
+        const photoData = await Promise.all(
+          allPhotos.map(p => toBase64(`/uploads/${p.filename}`).then(b64 => ({ ...p, b64 })))
+        );
+        const loaded = photoData.filter(p => p.b64);
+
+        if (loaded.length > 0) {
+          if (y > 230) { doc.addPage(); y = 20; }
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(58, 181, 217);
+          doc.text('Photos', 14, y);
+          y += 6;
+
+          const imgW = 56;
+          const imgH = 42;
+          const cols = 3;
+          const gapX = 4;
+          const gapY = 6;
+
+          loaded.forEach((photo, idx) => {
+            const col = idx % cols;
+            const x = 14 + col * (imgW + gapX);
+            if (col === 0 && idx > 0) y += imgH + gapY + 8;
+            if (y + imgH > 275) { doc.addPage(); y = 20; }
+            try {
+              doc.addImage(photo.b64, 'JPEG', x, y, imgW, imgH);
+              // Item label under photo
+              const label = photo.original_name || '';
+              if (label) {
+                doc.setFontSize(6);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(80, 80, 80);
+                doc.text(String(label).substring(0, 28), x, y + imgH + 3);
+              }
+            } catch (_) { /* skip broken image */ }
+          });
+          y += imgH + gapY + 10;
+        }
+      }
+
       // ── SIGN-OFF ──────────────────────────────────────────────────────────────
       if (y > 260) { doc.addPage(); y = 20; }
       doc.setDrawColor(58, 181, 217);
