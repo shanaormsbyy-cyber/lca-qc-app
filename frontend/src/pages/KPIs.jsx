@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
 import { ScoreBadge, ScoreBar } from '../components/Badge';
+import { fmtDate } from '../utils';
 import DateRangeFilter from '../components/DateRangeFilter';
 
 export default function KPIs() {
@@ -93,7 +94,7 @@ export default function KPIs() {
                     <td>
                       <span className={m.pending_tasks > 0 ? 'badge badge-amber' : 'badge badge-grey'}>{m.pending_tasks}</span>
                     </td>
-                    <td style={{ color: 'var(--t2)', fontSize: 12 }}>{m.last_activity || '—'}</td>
+                    <td style={{ color: 'var(--t2)', fontSize: 12 }}>{fmtDate(m.last_activity) || '—'}</td>
                     <td><button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); navigate(`/kpis/${m.id}`); }}>→</button></td>
                   </tr>
                 ))}
@@ -116,7 +117,7 @@ export default function KPIs() {
                   <td style={{ color: 'var(--t2)' }}>{t.role}</td>
                   <td>{t.trainer_name || <span style={{ color: 'var(--t3)' }}>Not trained</span>}</td>
                   <td style={{ color: 'var(--t2)', fontSize: 12 }}>{t.checklist_name || '—'}</td>
-                  <td style={{ color: 'var(--t2)' }}>{t.training_completed || '—'}</td>
+                  <td style={{ color: 'var(--t2)' }}>{fmtDate(t.training_completed) || '—'}</td>
                   <td><ScoreBadge score={t.avg_qc_score} /></td>
                   <td>{t.total_qc_checks}</td>
                 </tr>
@@ -154,7 +155,7 @@ export default function KPIs() {
                     <td style={{ color: 'var(--t2)', fontSize: 12 }}>{p.address}</td>
                     <td>{p.total_checks}</td>
                     <td><ScoreBadge score={p.avg_score} /></td>
-                    <td style={{ color: 'var(--t2)' }}>{p.last_check_date || '—'}</td>
+                    <td style={{ color: 'var(--t2)' }}>{fmtDate(p.last_check_date) || '—'}</td>
                     <td style={{ color: 'var(--t2)' }}>{p.top_manager || '—'}</td>
                   </tr>
                 ))}

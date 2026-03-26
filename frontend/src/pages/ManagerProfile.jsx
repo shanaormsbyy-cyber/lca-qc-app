@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
 import { ScoreBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 import DateRangeFilter from '../components/DateRangeFilter';
 
 export default function ManagerProfile() {
@@ -90,7 +91,7 @@ export default function ManagerProfile() {
               <tbody>
                 {data.qcChecks.map(c => (
                   <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
-                    <td>{c.date}</td>
+                    <td>{fmtDate(c.date)}</td>
                     <td style={{ fontWeight: 600 }}>{c.property_name}</td>
                     <td>{c.staff_name}</td>
                     <td><ScoreBadge score={c.score_pct} /></td>
@@ -112,7 +113,7 @@ export default function ManagerProfile() {
               <tbody>
                 {data.trainSessions.map(t => (
                   <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
-                    <td>{t.date}</td>
+                    <td>{fmtDate(t.date)}</td>
                     <td style={{ fontWeight: 600 }}>{t.trainee_name}</td>
                     <td style={{ color: 'var(--t2)' }}>{t.checklist_name}</td>
                     <td>{Math.round(t.completion_pct)}%</td>
@@ -137,7 +138,7 @@ export default function ManagerProfile() {
                   <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/team/${t.id}`)}>
                     <td style={{ fontWeight: 600 }}>{t.name}</td>
                     <td style={{ color: 'var(--t2)' }}>{t.checklist_name}</td>
-                    <td style={{ color: 'var(--t2)' }}>{t.training_completed || t.trained_at?.slice(0, 10) || '—'}</td>
+                    <td style={{ color: 'var(--t2)' }}>{fmtDate(t.training_completed || t.trained_at?.slice(0, 10)) || '—'}</td>
                     <td><ScoreBadge score={t.avg_score_since_training} /></td>
                   </tr>
                 ))}

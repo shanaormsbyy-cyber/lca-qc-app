@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { DueBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 export default function Scheduling() {
   const navigate = useNavigate();
@@ -85,8 +86,8 @@ export default function Scheduling() {
                 <tr key={s.id}>
                   <td style={{ fontWeight: 600 }}>{s.name}</td>
                   <td style={{ color: 'var(--t2)' }}>{s.role}</td>
-                  <td style={{ color: 'var(--t2)' }}>{s.last_check_date || 'Never'}</td>
-                  <td style={{ color: 'var(--t2)' }}>{s.next_due}</td>
+                  <td style={{ color: 'var(--t2)' }}>{fmtDate(s.last_check_date) || 'Never'}</td>
+                  <td style={{ color: 'var(--t2)' }}>{fmtDate(s.next_due)}</td>
                   <td><DueBadge status={s.status} daysLeft={s.days_left} /></td>
                   <td>{s.total_checks}</td>
                   <td>
@@ -115,8 +116,8 @@ export default function Scheduling() {
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.name}</td>
                   <td style={{ color: 'var(--t2)', fontSize: 12 }}>{p.address}</td>
-                  <td style={{ color: 'var(--t2)' }}>{p.last_check_date || 'Never'}</td>
-                  <td style={{ color: 'var(--t2)' }}>{p.next_due}</td>
+                  <td style={{ color: 'var(--t2)' }}>{fmtDate(p.last_check_date) || 'Never'}</td>
+                  <td style={{ color: 'var(--t2)' }}>{fmtDate(p.next_due)}</td>
                   <td><DueBadge status={p.status} daysLeft={p.days_left} /></td>
                   <td>{p.total_checks}</td>
                   <td>

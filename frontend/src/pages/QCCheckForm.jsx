@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { fmtDate } from '../utils';
 
 function scoreColor(pct) {
   return pct >= 85 ? 'var(--ok)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
@@ -187,7 +188,7 @@ export default function QCCheckForm() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{check.checklist_name}</h1>
         <p style={{ color: 'var(--t2)' }}>
-          {check.property_name} · {check.staff_name} · {check.date}
+          {check.property_name} · {check.staff_name} · {fmtDate(check.date)}
           {check.assigned_to_name && <> · Assigned to: <strong style={{ color: 'var(--t1)' }}>{check.assigned_to_name}</strong></>}
         </p>
       </div>

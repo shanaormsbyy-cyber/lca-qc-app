@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { StatusBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 function ChecklistBuilder({ checklist, onSave, onCancel }) {
   const [name, setName] = useState(checklist?.name || '');
@@ -67,7 +68,7 @@ function ChecklistBuilder({ checklist, onSave, onCancel }) {
 }
 
 export default function Training() {
-  const { manager } = useAuth();
+  useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState('sessions');
   const [sessions, setSessions] = useState([]);
@@ -126,7 +127,7 @@ export default function Training() {
       <div className="tab-row">
         <button className={`tab-btn${tab === 'sessions' ? ' active' : ''}`} onClick={() => setTab('sessions')}>Sessions</button>
         <button className={`tab-btn${tab === 'checklists' ? ' active' : ''}`} onClick={() => setTab('checklists')}>Checklists</button>
-        <button className="tab-btn" onClick={() => navigate('/training/induction')}>Induction Plan</button>
+        <button className="tab-btn" onClick={() => navigate('/training/induction')}>New Hire Induction</button>
       </div>
 
       {tab === 'sessions' && (
@@ -142,7 +143,7 @@ export default function Training() {
                 <tbody>
                   {sessions.map(s => (
                     <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${s.id}`)}>
-                      <td>{s.date}</td>
+                      <td>{fmtDate(s.date)}</td>
                       <td style={{ fontWeight: 600 }}>{s.trainee_name}</td>
                       <td style={{ color: 'var(--t2)' }}>{s.checklist_name}</td>
                       <td>{s.assigned_to_name}</td>

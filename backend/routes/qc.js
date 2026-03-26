@@ -95,7 +95,7 @@ router.get('/checks', (req, res) => {
       m2.name as assigned_to_name
     FROM qc_checks qc
     JOIN properties p ON p.id = qc.property_id
-    JOIN staff s ON s.id = qc.staff_id
+    LEFT JOIN staff s ON s.id = qc.staff_id
     JOIN qc_checklists cl ON cl.id = qc.checklist_id
     JOIN managers m1 ON m1.id = qc.scheduled_by_id
     JOIN managers m2 ON m2.id = qc.assigned_to_id
@@ -114,7 +114,7 @@ router.get('/checks/:id', (req, res) => {
       m2.name as assigned_to_name
     FROM qc_checks qc
     JOIN properties p ON p.id = qc.property_id
-    JOIN staff s ON s.id = qc.staff_id
+    LEFT JOIN staff s ON s.id = qc.staff_id
     JOIN qc_checklists cl ON cl.id = qc.checklist_id
     JOIN managers m1 ON m1.id = qc.scheduled_by_id
     JOIN managers m2 ON m2.id = qc.assigned_to_id
@@ -257,7 +257,7 @@ router.post('/checks/:id/email', async (req, res) => {
       m2.name as assigned_to_name
     FROM qc_checks qc
     JOIN properties p ON p.id = qc.property_id
-    JOIN staff s ON s.id = qc.staff_id
+    LEFT JOIN staff s ON s.id = qc.staff_id
     JOIN qc_checklists cl ON cl.id = qc.checklist_id
     JOIN managers m1 ON m1.id = qc.scheduled_by_id
     JOIN managers m2 ON m2.id = qc.assigned_to_id
@@ -329,6 +329,10 @@ router.post('/checks/:id/email', async (req, res) => {
 </body>
 </html>`;
 
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return res.status(500).json({ error: 'Email is not configured on the server. Set SMTP_USER and SMTP_PASS environment variables.' });
+  }
+
   try {
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -338,6 +342,9 @@ router.post('/checks/:id/email', async (req, res) => {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
 
     await transporter.sendMail({

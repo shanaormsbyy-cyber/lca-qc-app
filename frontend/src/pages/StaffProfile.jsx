@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import api from '../api';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 export default function StaffProfile() {
   const { id } = useParams();
@@ -10,6 +11,7 @@ export default function StaffProfile() {
   const [staff, setStaff] = useState(null);
   const [qcChecks, setQcChecks] = useState([]);
   const [trainSessions, setTrainSessions] = useState([]);
+  const [commonIssues, setCommonIssues] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +24,8 @@ export default function StaffProfile() {
       setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete'));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
+
+    api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
   }, [id]);
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
@@ -54,6 +58,49 @@ export default function StaffProfile() {
         <div className="stat-card"><div className="stat-label">Service Time</div><div className="stat-value" style={{ fontSize: 28, letterSpacing: -1 }}>{(() => { const days = Math.floor((new Date() - new Date(staff.start_date)) / 86400000); return days >= 365 ? `${Math.floor(days/365)}y ${Math.floor((days%365)/30)}m` : days >= 30 ? `${Math.floor(days/30)}m` : `${days}d`; })()}</div></div>
       </div>
 
+      {/* Most Common Issues */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">Most Common Issues</span>
+          <span style={{ fontSize: 12, color: 'var(--t3)' }}>Failed 3+ times across all checks</span>
+        </div>
+        {commonIssues.length === 0 ? (
+          <p style={{ color: 'var(--t3)', fontSize: 13 }}>No recurring issues found. Keep it up!</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {commonIssues.map((issue, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 8,
+                background: 'var(--navy2)', border: '1px solid var(--border)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{issue.text}</div>
+                  {issue.category && (
+                    <div style={{ fontSize: 12, color: 'var(--t3)' }}>{issue.category}</div>
+                  )}
+                </div>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  marginLeft: 12, flexShrink: 0,
+                }}>
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, color: 'var(--red)',
+                    background: 'rgba(239,68,68,0.12)', borderRadius: 6,
+                    padding: '3px 8px',
+                  }}>
+                    {issue.flag_count}× flagged
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--t3)' }}>
+                    Last: {fmtDate(issue.last_flagged)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {chartData.length > 1 && (
         <div className="card mb-6">
           <div className="card-title" style={{ marginBottom: 16 }}>QC Score Trend</div>
@@ -80,7 +127,7 @@ export default function StaffProfile() {
               <tbody>
                 {[...qcChecks].sort((a, b) => b.date.localeCompare(a.date)).map(c => (
                   <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
-                    <td>{c.date}</td>
+                    <td>{fmtDate(c.date)}</td>
                     <td>{c.property_name}</td>
                     <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>
                     <td><ScoreBadge score={c.score_pct} /></td>
@@ -102,7 +149,7 @@ export default function StaffProfile() {
               <tbody>
                 {trainSessions.map(t => (
                   <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
-                    <td>{t.date}</td>
+                    <td>{fmtDate(t.date)}</td>
                     <td>{t.checklist_name}</td>
                     <td>{Math.round(t.completion_pct)}%</td>
                     <td><StatusBadge status={t.status} /></td>

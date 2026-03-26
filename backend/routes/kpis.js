@@ -295,4 +295,31 @@ router.get('/flagged-items', (req, res) => {
   res.json({ items, period, settings: { minCount, modMin, modMax, majMin, majMax, urgentMin } });
 });
 
+// Common issues for a specific staff member
+router.get('/staff/:id/common-issues', (req, res) => {
+  const staffId = req.params.id;
+  const minCount = 3;
+
+  const rows = db.prepare(`
+    SELECT qi.text, qi.category, qi.score_type,
+      COUNT(*) as flag_count,
+      MAX(qc.date) as last_flagged
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE qc.status = 'complete'
+      AND qc.staff_id = ?
+      AND (
+        (qi.score_type = 'pass_fail' AND qci.score = 0)
+        OR
+        (qi.score_type = '1_to_5' AND qci.score <= 2)
+      )
+    GROUP BY qi.text
+    HAVING COUNT(*) >= ?
+    ORDER BY flag_count DESC
+  `).all(staffId, minCount);
+
+  res.json(rows);
+});
+
 module.exports = router;

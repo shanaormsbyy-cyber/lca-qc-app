@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, DueBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -245,7 +246,7 @@ export default function Dashboard() {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 12, cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>QC Check — {q.property_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{q.staff_name} · {q.date}</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{q.staff_name} · {fmtDate(q.date)}</div>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); navigate(`/qc/checks/${q.id}`); }}>Start</button>
               </div>
@@ -255,7 +256,7 @@ export default function Dashboard() {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 12, cursor: 'pointer' }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>Training — {t.trainee_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{t.checklist_name} · {t.date}</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{t.checklist_name} · {fmtDate(t.date)}</div>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); navigate(`/training/sessions/${t.id}`); }}>Start</button>
               </div>
@@ -269,6 +270,7 @@ export default function Dashboard() {
         <button className="btn btn-primary" onClick={() => openCreate('staff')}>👤 Start Team QC Check</button>
         <button className="btn btn-secondary" onClick={() => openCreate({}, 'property')}>🏠 Start Property Health Check</button>
         <button className="btn btn-ghost" onClick={() => navigate('/training')}>+ New Training</button>
+        <button className="btn btn-ghost" onClick={() => navigate('/training/induction')}>📋 New Hire Induction</button>
       </div>
 
       {/* Overdue & Due Soon */}
@@ -348,7 +350,7 @@ export default function Dashboard() {
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{q.property_name}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t2)' }}>{q.date}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)' }}>{fmtDate(q.date)}</div>
                     <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{q.assigned_to_name}</div>
                   </div>
                 </div>
@@ -369,7 +371,7 @@ export default function Dashboard() {
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{q.staff_name}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, color: 'var(--t2)' }}>{q.date}</div>
+                    <div style={{ fontSize: 13, color: 'var(--t2)' }}>{fmtDate(q.date)}</div>
                     <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{q.assigned_to_name}</div>
                   </div>
                 </div>
@@ -393,7 +395,7 @@ export default function Dashboard() {
               <tbody>
                 {recentQC.map(q => (
                   <tr key={q.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${q.id}`)}>
-                    <td style={{ color: 'var(--t3)' }}>{q.date}</td>
+                    <td style={{ color: 'var(--t3)' }}>{fmtDate(q.date)}</td>
                     <td style={{ fontWeight: 600 }}>{q.property_name}</td>
                     <td>{q.staff_name}</td>
                     <td><ScoreBadge score={q.score_pct} /></td>

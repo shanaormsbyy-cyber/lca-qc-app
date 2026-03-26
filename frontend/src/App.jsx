@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
@@ -9,6 +8,7 @@ import StaffProfile from './pages/StaffProfile';
 import Properties from './pages/Properties';
 import Training from './pages/Training';
 import TrainingSession from './pages/TrainingSession';
+import QCChecks from './pages/QCChecks';
 import QCCheckForm from './pages/QCCheckForm';
 import KPIs from './pages/KPIs';
 import ManagerProfile from './pages/ManagerProfile';
@@ -39,6 +39,7 @@ export default function App() {
         <Route path="training" element={<Training />} />
         <Route path="training/sessions/:id" element={<TrainingSession />} />
         <Route path="training/induction" element={<InductionTraining />} />
+        <Route path="qc" element={<QCChecks />} />
         <Route path="qc/checks/:id" element={<QCCheckForm />} />
         <Route path="kpis" element={<KPIs />} />
         <Route path="kpis/:managerId" element={<ManagerProfile />} />

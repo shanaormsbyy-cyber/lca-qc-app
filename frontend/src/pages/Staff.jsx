@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 export default function Staff() {
   const navigate = useNavigate();
@@ -158,7 +159,7 @@ export default function Staff() {
                   <tbody>
                     {filteredChecks.map(c => (
                       <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
-                        <td style={{ color: 'var(--t3)' }}>{c.date}</td>
+                        <td style={{ color: 'var(--t3)' }}>{fmtDate(c.date)}</td>
                         <td style={{ fontWeight: 700 }}>{c.staff_name}</td>
                         <td style={{ color: 'var(--t2)' }}>{c.property_name}</td>
                         <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>

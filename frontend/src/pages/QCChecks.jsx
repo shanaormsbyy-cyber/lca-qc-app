@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
+import { fmtDate } from '../utils';
 
 function QCChecklistBuilder({ checklist, onSave, onCancel }) {
   const [name, setName] = useState(checklist?.name || '');
@@ -192,7 +193,7 @@ export default function QCChecks() {
                 <tbody>
                   {filteredChecks.map(c => (
                     <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
-                      <td>{c.date}</td>
+                      <td>{fmtDate(c.date)}</td>
                       <td style={{ fontWeight: 600 }}>{c.property_name}</td>
                       <td>{c.staff_name}</td>
                       <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>
