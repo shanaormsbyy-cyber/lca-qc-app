@@ -602,56 +602,84 @@ const NAV = [
 export default function InductionTraining() {
   const [staffList, setStaffList] = useState([]);
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [sessionId, setSessionId] = useState(null);
   const [state, setState] = useState(initState);
   const [page, setPage] = useState('overview');
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => { api.get('/staff').then(r => setStaffList(r.data)); }, []);
 
+  // Save to localStorage and sync completion % to training session
   useEffect(() => {
-    if (selectedStaffId) {
-      localStorage.setItem('lca-induction-' + selectedStaffId, JSON.stringify(state));
-    }
-  }, [state, selectedStaffId]);
+    if (!selectedStaffId) return;
+    localStorage.setItem('lca-induction-' + selectedStaffId, JSON.stringify(state));
 
-  function handleSelectStaff(id) {
+    if (sessionId) {
+      const allProgress = NAV.map(n => getProgressForState(n.id, state));
+      const total = allProgress.reduce((s, p) => s + p.total, 0);
+      const done  = allProgress.reduce((s, p) => s + p.done,  0);
+      const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+      const status = pct >= 100 ? 'complete' : 'pending';
+      api.patch(`/training/sessions/${sessionId}/progress`, { completion_pct: pct, status }).catch(() => {});
+    }
+  }, [state, selectedStaffId, sessionId]);
+
+  async function handleSelectStaff(id) {
     setSelectedStaffId(id);
+    setSessionId(null);
     if (!id) return;
+
+    // Restore local state
     const saved = localStorage.getItem('lca-induction-' + id);
-    if (saved) { try { setState(JSON.parse(saved)); return; } catch {} }
-    const member = staffList.find(s => String(s.id) === id);
-    const fresh = initState();
-    if (member) fresh.employeeName = member.name;
-    setState(fresh);
+    if (saved) { try { setState(JSON.parse(saved)); } catch { setState(initState()); } }
+    else {
+      const member = staffList.find(s => String(s.id) === id);
+      const fresh = initState();
+      if (member) fresh.employeeName = member.name;
+      setState(fresh);
+    }
     setPage('overview');
+
+    // Ensure a training session exists for this staff member
+    try {
+      const r = await api.post('/training/sessions/induction/ensure', { trainee_id: parseInt(id) });
+      setSessionId(r.data.id);
+    } catch (e) {
+      console.warn('Could not link induction to training session:', e.message);
+    }
   }
 
-  function getProgress(id) {
+  // Helper: compute progress from any state snapshot (used for sync)
+  function getProgressForState(id, st) {
     if (id === 'overview') {
-      const ov = state.overview;
+      const ov = st.overview;
       const items = [ov.contractSigned, ov.policiesSigned, ...ov.shifts, ov.processesAndSystems, ov.valuesAndGuidelines, ov.signOff];
       return { done: items.filter(Boolean).length, total: items.length };
     }
     if (id === 'processes') {
-      const d = state.processes.filter(t => t.checked).length + Object.values(state.cleaningAreas).filter(Boolean).length;
+      const d = st.processes.filter(t => t.checked).length + Object.values(st.cleaningAreas).filter(Boolean).length;
       return { done: d, total: PROCESSES_TASKS.length + CLEANING_AREAS.length };
     }
     if (id === 'values') {
-      return { done: state.values.filter(t => t.checked).length, total: VALUES_TASKS.length };
+      return { done: st.values.filter(t => t.checked).length, total: VALUES_TASKS.length };
     }
     if (id.startsWith('shift')) {
       const n = parseInt(id.replace('shift', ''));
-      const sh = state.shifts[n];
+      const sh = st.shifts[n];
       const fd = (sh.tasks || []).filter(t => t.checked).length;
       const cd = (sh.custom || []).filter(t => t.checked).length;
       return { done: fd + cd, total: (sh.tasks || []).length + (sh.custom || []).length };
     }
     if (id === 'signoff') {
-      const so = state.signOff;
+      const so = st.signOff;
       const d = [so.supervisorName, so.company, so.employeePrint, so.trainerPrint].filter(Boolean).length + (so.employeeSigned ? 1 : 0) + (so.trainerSigned ? 1 : 0);
       return { done: d, total: 6 };
     }
     return { done: 0, total: 0 };
+  }
+
+  function getProgress(id) {
+    return getProgressForState(id, state);
   }
 
   const pageIdx = NAV.findIndex(n => n.id === page);

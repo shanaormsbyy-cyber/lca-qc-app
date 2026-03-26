@@ -195,4 +195,45 @@ router.delete('/sessions/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// Find or create an induction session for a staff member
+router.post('/sessions/induction/ensure', (req, res) => {
+  const { trainee_id } = req.body;
+  if (!trainee_id) return res.status(400).json({ error: 'trainee_id required' });
+
+  // Find the "New Hire Induction" checklist
+  const checklist = db.prepare("SELECT id FROM training_checklists WHERE name LIKE '%Induction%' ORDER BY id LIMIT 1").get();
+  if (!checklist) return res.status(404).json({ error: 'New Hire Induction checklist not found' });
+
+  // Check for existing induction session for this trainee
+  const existing = db.prepare(`
+    SELECT id, completion_pct, status FROM training_sessions
+    WHERE trainee_id = ? AND checklist_id = ?
+    ORDER BY date DESC LIMIT 1
+  `).get(trainee_id, checklist.id);
+
+  if (existing) return res.json({ id: existing.id, completion_pct: existing.completion_pct, status: existing.status, created: false });
+
+  // Create new session
+  const today = new Date().toISOString().slice(0, 10);
+  const result = db.prepare(`
+    INSERT INTO training_sessions (trainee_id, checklist_id, scheduled_by_id, assigned_to_id, date, notes)
+    VALUES (?, ?, ?, ?, ?, '')
+  `).run(trainee_id, checklist.id, req.manager.id, req.manager.id, today);
+
+  res.json({ id: result.lastInsertRowid, completion_pct: 0, status: 'pending', created: true });
+});
+
+// Update induction session completion %
+router.patch('/sessions/:id/progress', (req, res) => {
+  const { completion_pct, status } = req.body;
+  const updates = [];
+  const params = [];
+  if (completion_pct !== undefined) { updates.push('completion_pct=?'); params.push(completion_pct); }
+  if (status) { updates.push('status=?'); params.push(status); }
+  if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
+  params.push(req.params.id);
+  db.prepare(`UPDATE training_sessions SET ${updates.join(',')} WHERE id=?`).run(...params);
+  res.json({ ok: true });
+});
+
 module.exports = router;
