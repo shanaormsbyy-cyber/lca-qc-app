@@ -11,9 +11,29 @@ export default function Settings() {
   const [mgrMsg, setMgrMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const load = () => Promise.all([api.get('/properties'), api.get('/managers')])
-    .then(([p, m]) => { setProperties(p.data); setManagers(m.data); })
-    .finally(() => setLoading(false));
+  // QC / Alert settings
+  const [qcSettings, setQcSettings] = useState({
+    qc_freq_staff_days: '30',
+    qc_freq_property_days: '14',
+    watchlist_threshold: '70',
+    flag_min_count: '3',
+    flag_moderate_min: '3',
+    flag_moderate_max: '4',
+    flag_major_min: '5',
+    flag_major_max: '7',
+    flag_urgent_min: '8',
+  });
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  const load = () => Promise.all([
+    api.get('/properties'),
+    api.get('/managers'),
+    api.get('/scheduling/settings'),
+  ]).then(([p, m, s]) => {
+    setProperties(p.data);
+    setManagers(m.data);
+    setQcSettings(prev => ({ ...prev, ...s.data }));
+  }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
 
@@ -56,11 +76,97 @@ export default function Settings() {
     }
   };
 
+  const saveQcSettings = async () => {
+    await api.put('/scheduling/settings', qcSettings);
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2500);
+  };
+
+  const setSetting = (key, val) => setQcSettings(s => ({ ...s, [key]: val }));
+
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   return (
     <div className="page">
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 28 }}>Settings</h1>
+
+      {/* QC Frequency & Alert Settings */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">QC Frequency & Alert Settings</span>
+        </div>
+
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>Check Frequency</div>
+        <div className="form-row mb-6">
+          <div className="form-group">
+            <label className="form-label">Staff QC Frequency (days)</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.qc_freq_staff_days}
+              onChange={e => setSetting('qc_freq_staff_days', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>How often each staff member needs a QC check</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Property QC Frequency (days)</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.qc_freq_property_days}
+              onChange={e => setSetting('qc_freq_property_days', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>How often each property needs a QC check</div>
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>Performance Watchlist</div>
+        <div className="form-row mb-6">
+          <div className="form-group">
+            <label className="form-label">Watchlist Threshold (%)</label>
+            <input className="form-input" type="number" min="1" max="100" value={qcSettings.watchlist_threshold}
+              onChange={e => setSetting('watchlist_threshold', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Cleaners with avg QC score below this % appear on the watchlist</div>
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>Commonly Flagged Issues</div>
+        <div className="form-row mb-4">
+          <div className="form-group">
+            <label className="form-label">Minimum times flagged to appear</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_min_count}
+              onChange={e => setSetting('flag_min_count', e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10, fontWeight: 600 }}>Severity Labels (by number of times flagged)</div>
+        <div className="form-row mb-4">
+          <div className="form-group">
+            <label className="form-label">Moderate — min times</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_moderate_min}
+              onChange={e => setSetting('flag_moderate_min', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Moderate — max times</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_moderate_max}
+              onChange={e => setSetting('flag_moderate_max', e.target.value)} />
+          </div>
+        </div>
+        <div className="form-row mb-4">
+          <div className="form-group">
+            <label className="form-label">Major — min times</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_major_min}
+              onChange={e => setSetting('flag_major_min', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Major — max times</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_major_max}
+              onChange={e => setSetting('flag_major_max', e.target.value)} />
+          </div>
+        </div>
+        <div className="form-row mb-6">
+          <div className="form-group">
+            <label className="form-label">Urgent — min times (no upper limit)</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.flag_urgent_min}
+              onChange={e => setSetting('flag_urgent_min', e.target.value)} />
+          </div>
+        </div>
+
+        {settingsSaved && <p style={{ color: 'var(--green)', marginBottom: 12, fontSize: 13 }}>✓ Settings saved</p>}
+        <button className="btn btn-primary" onClick={saveQcSettings}>Save Settings</button>
+      </div>
 
       {/* Properties */}
       <div className="card mb-6">

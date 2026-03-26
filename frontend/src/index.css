@@ -487,3 +487,73 @@ th.sortable:hover { color: var(--cyan); }
   .page { overflow-x: hidden; }
   .main-area { overflow-x: hidden; }
 }
+
+/* ── Card row layout (side-by-side → stack on mobile) ──────────────────────── */
+.card-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+@media (max-width: 768px) {
+  /* Stack side-by-side card rows */
+  .card-row {
+    flex-direction: column;
+  }
+  .card-row > .card {
+    width: 100%;
+  }
+
+  /* Tab row: horizontal scroll instead of wrapping */
+  .tab-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tab-row::-webkit-scrollbar { display: none; }
+  .tab-btn { white-space: nowrap; }
+
+  /* Larger touch targets for QC score buttons */
+  .score-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 15px;
+  }
+  .pf-btn {
+    min-height: 52px;
+    font-size: 15px;
+  }
+
+  /* Section block header wraps for add photo button */
+  .section-block-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Modals: full width on small screens */
+  .modal {
+    border-radius: 12px;
+    padding: 20px 16px;
+  }
+
+  /* Form rows stack on mobile */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Page header */
+  .page-header h1 { font-size: 22px; }
+
+  /* Quick action buttons: full width on mobile */
+  .quick-actions { flex-direction: column; }
+  .quick-actions .btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  /* Single column stat grid on very small screens */
+  .stat-grid { grid-template-columns: 1fr; }
+  .stat-value { font-size: 44px; }
+  .stat-card { min-height: 110px; padding: 16px; }
+}

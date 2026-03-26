@@ -155,7 +155,7 @@ router.get('/trainees', (req, res) => {
   `).all();
 
   trainees.forEach(t => {
-    let where = `staff_id=${t.id} AND status='complete'`;
+    let where = `staff_id=${t.id} AND status='complete' AND (check_type='staff' OR check_type IS NULL)`;
     if (t.training_completed) where += ` AND date >= '${t.training_completed}'`;
     if (dateFrom) where += ` AND date >= '${dateFrom}'`;
     if (dateTo) where += ` AND date <= '${dateTo}'`;
@@ -175,7 +175,7 @@ router.get('/properties', (req, res) => {
   const dateFrom = from || rangeFrom;
   const dateTo = to || rangeTo;
 
-  let where = `qc.status='complete'`;
+  let where = `qc.status='complete' AND (qc.check_type='property' OR qc.check_type IS NULL)`;
   if (dateFrom) where += ` AND qc.date >= '${dateFrom}'`;
   if (dateTo) where += ` AND qc.date <= '${dateTo}'`;
 
@@ -203,6 +203,96 @@ router.get('/properties', (req, res) => {
   });
 
   res.json(props);
+});
+
+// Performance watchlist
+router.get('/watchlist', (req, res) => {
+  const settingsRows = db.prepare('SELECT * FROM settings').all();
+  const settings = {};
+  settingsRows.forEach(s => { settings[s.key] = s.value; });
+  const threshold = parseFloat(settings.watchlist_threshold || '70');
+
+  const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
+  const watchlist = [];
+
+  staff.forEach(s => {
+    const result = db.prepare(`
+      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+      FROM qc_checks
+      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+    `).get(s.id);
+
+    if (result.cnt > 0 && result.avg != null && result.avg < threshold) {
+      const recent = db.prepare(`
+        SELECT date, score_pct, property_name
+        FROM qc_checks
+        JOIN properties ON properties.id = qc_checks.property_id
+        WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+        ORDER BY date DESC LIMIT 3
+      `).all(s.id);
+
+      watchlist.push({
+        ...s,
+        avg_score: Math.round(result.avg),
+        total_checks: result.cnt,
+        recent_checks: recent,
+        threshold,
+      });
+    }
+  });
+
+  watchlist.sort((a, b) => a.avg_score - b.avg_score);
+  res.json({ watchlist, threshold });
+});
+
+// Commonly flagged items
+router.get('/flagged-items', (req, res) => {
+  const { period = 'week' } = req.query;
+
+  const settingsRows = db.prepare('SELECT * FROM settings').all();
+  const settings = {};
+  settingsRows.forEach(s => { settings[s.key] = s.value; });
+
+  const minCount    = parseInt(settings.flag_min_count    || '3');
+  const modMin      = parseInt(settings.flag_moderate_min || '3');
+  const modMax      = parseInt(settings.flag_moderate_max || '4');
+  const majMin      = parseInt(settings.flag_major_min    || '5');
+  const majMax      = parseInt(settings.flag_major_max    || '7');
+  const urgentMin   = parseInt(settings.flag_urgent_min   || '8');
+
+  const days = period === 'month' ? 30 : 7;
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().slice(0, 10);
+
+  const rows = db.prepare(`
+    SELECT qi.text, qi.category, qi.score_type,
+      COUNT(*) as flag_count,
+      MAX(qc.date) as last_flagged
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE qc.status = 'complete'
+      AND qc.date >= ?
+      AND (
+        (qi.score_type = 'pass_fail' AND qci.score = 0)
+        OR
+        (qi.score_type = '1_to_5' AND qci.score <= 2)
+      )
+    GROUP BY qi.text
+    HAVING COUNT(*) >= ?
+    ORDER BY flag_count DESC
+  `).all(sinceStr, minCount);
+
+  const getLabel = count => {
+    if (count >= urgentMin) return { label: 'Urgent', color: 'red' };
+    if (count >= majMin && count <= majMax) return { label: 'Major', color: 'amber' };
+    if (count >= modMin && count <= modMax) return { label: 'Moderate', color: 'blue' };
+    return { label: 'Noted', color: 'grey' };
+  };
+
+  const items = rows.map(r => ({ ...r, ...getLabel(r.flag_count) }));
+  res.json({ items, period, settings: { minCount, modMin, modMax, majMin, majMax, urgentMin } });
 });
 
 module.exports = router;

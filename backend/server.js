@@ -42,6 +42,17 @@ const db = require('./db');
   }
 }
 
+// Auto-migrate: add check_type column to qc_checks
+{
+  const s = db.prepare('PRAGMA table_info(qc_checks)');
+  const cols = s.all([]);
+  s.finalize();
+  if (!cols.find(c => c.name === 'check_type')) {
+    db.exec("ALTER TABLE qc_checks ADD COLUMN check_type TEXT DEFAULT 'staff'");
+    console.log('Migration complete: added check_type column to qc_checks.');
+  }
+}
+
 // Auto-seed if this is a fresh database
 {
   const s = db.prepare('SELECT COUNT(*) as cnt FROM managers');
@@ -123,6 +134,11 @@ const lcaStaff = [
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const UPLOADS_DIR = process.env.NODE_ENV === 'production'
+  ? '/app/data/uploads'
+  : path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));

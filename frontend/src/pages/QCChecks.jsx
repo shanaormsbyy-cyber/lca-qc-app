@@ -15,6 +15,8 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
 
   const handleSave = () => {
     if (!name.trim()) return alert('Checklist name required');
+    const emptyItems = items.filter(it => !it.text.trim());
+    if (emptyItems.length > 0) return alert('All checklist items must have text before saving');
     onSave({ name, description: desc, items });
   };
 
@@ -89,7 +91,7 @@ export default function QCChecks() {
   const [loading, setLoading] = useState(true);
   const [editingCL, setEditingCL] = useState(null);
   const [showNewCheck, setShowNewCheck] = useState(false);
-  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '', check_type: 'staff' });
   const [filter, setFilter] = useState('all');
 
   const load = () => Promise.all([
@@ -120,9 +122,14 @@ export default function QCChecks() {
   }, [loading]);
 
   const saveCL = async data => {
-    if (editingCL && editingCL !== 'new') await api.put(`/qc/checklists/${editingCL.id}`, data);
-    else await api.post('/qc/checklists', data);
-    await load(); setEditingCL(null);
+    try {
+        if (editingCL && editingCL !== 'new') await api.put(`/qc/checklists/${editingCL.id}`, data);
+        else await api.post('/qc/checklists', data);
+        await load();
+        setEditingCL(null);
+    } catch (e) {
+        alert('Failed to save checklist: ' + (e.response?.data?.error || e.message));
+    }
   };
 
   const deleteCL = async id => {
@@ -266,6 +273,13 @@ export default function QCChecks() {
             <div className="form-group">
               <label className="form-label">Date</label>
               <input className="form-input" type="date" value={checkForm.date} onChange={e => setCheckForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Check Type</label>
+              <select className="form-select" value={checkForm.check_type} onChange={e => setCheckForm(f => ({ ...f, check_type: e.target.value }))}>
+                <option value="staff">Staff Check — evaluates team member performance</option>
+                <option value="property">Property Check — evaluates property cleanliness</option>
+              </select>
             </div>
             <div className="flex gap-3">
               <button className="btn btn-primary" onClick={createCheck}>Create & Open</button>

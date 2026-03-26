@@ -15,10 +15,14 @@ export default function Dashboard() {
   const [recentQC, setRecentQC] = useState([]);
   const [allQC, setAllQC] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [watchlist, setWatchlist] = useState([]);
+  const [flaggedWeek, setFlaggedWeek] = useState([]);
+  const [flaggedMonth, setFlaggedMonth] = useState([]);
+  const [flagTab, setFlagTab] = useState('week');
 
   // Create check modal
   const [showCreate, setShowCreate] = useState(false);
-  const [createType, setCreateType] = useState('staff'); // 'staff' | 'property'
+  const [createType, setCreateType] = useState('staff');
   const [checklists, setChecklists] = useState([]);
   const [staff, setStaff] = useState([]);
   const [properties, setProperties] = useState([]);
@@ -35,7 +39,10 @@ export default function Dashboard() {
       api.get('/staff'),
       api.get('/properties'),
       api.get('/managers'),
-    ]).then(([dueR, qcR, trainR, clR, sR, pR, mR]) => {
+      api.get('/kpis/watchlist'),
+      api.get('/kpis/flagged-items?period=week'),
+      api.get('/kpis/flagged-items?period=month'),
+    ]).then(([dueR, qcR, trainR, clR, sR, pR, mR, wR, fwR, fmR]) => {
       setDue(dueR.data);
       const qc = qcR.data;
       const train = trainR.data;
@@ -47,6 +54,9 @@ export default function Dashboard() {
       setStaff(sR.data);
       setProperties(pR.data);
       setManagers(mR.data);
+      setWatchlist(wR.data.watchlist || []);
+      setFlaggedWeek(fwR.data.items || []);
+      setFlaggedMonth(fmR.data.items || []);
     }).finally(() => setLoading(false));
   }, [manager.id]);
 
@@ -89,25 +99,37 @@ export default function Dashboard() {
 
   const completeQC = allQC.filter(q => q.status === 'complete');
 
-  const staffIds = [...new Set(completeQC.map(q => q.staff_id))];
+  // Staff avg: only checks tagged as staff-type (evaluating the cleaner's performance)
+  const staffChecks = completeQC.filter(q => q.check_type === 'staff' || !q.check_type);
+  const staffIds = [...new Set(staffChecks.map(q => q.staff_id))];
   const staffAvg = staffIds.length
     ? Math.round(staffIds.reduce((sum, sid) => {
-        const c = completeQC.filter(q => q.staff_id === sid);
+        const c = staffChecks.filter(q => q.staff_id === sid);
         return sum + c.reduce((s, q) => s + q.score_pct, 0) / c.length;
       }, 0) / staffIds.length)
     : null;
 
-  const propIds = [...new Set(completeQC.map(q => q.property_id))];
+  // Property avg: only checks tagged as property-type (evaluating the property's health)
+  const propertyChecks = completeQC.filter(q => q.check_type === 'property');
+  const propIds = [...new Set(propertyChecks.map(q => q.property_id))];
   const propAvg = propIds.length
     ? Math.round(propIds.reduce((sum, pid) => {
-        const c = completeQC.filter(q => q.property_id === pid);
+        const c = propertyChecks.filter(q => q.property_id === pid);
         return sum + c.reduce((s, q) => s + q.score_pct, 0) / c.length;
       }, 0) / propIds.length)
     : null;
 
   const scoreColor = v => v == null ? '' : v >= 80 ? ' green' : v >= 60 ? '' : ' red';
-
   const pendingQC = allQC.filter(q => q.status === 'pending').sort((a, b) => a.date.localeCompare(b.date));
+
+  const flagSeverityStyle = color => {
+    if (color === 'red')   return { background: 'var(--red-dim)',   color: 'var(--red)',   border: '1px solid rgba(239,68,68,0.3)' };
+    if (color === 'amber') return { background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid rgba(245,158,11,0.3)' };
+    if (color === 'blue')  return { background: 'var(--cyan-dim)',  color: 'var(--cyan)',  border: '1px solid rgba(58,181,217,0.3)' };
+    return { background: 'var(--glass)', color: 'var(--t2)', border: '1px solid var(--glass-border)' };
+  };
+
+  const currentFlagged = flagTab === 'week' ? flaggedWeek : flaggedMonth;
 
   return (
     <div className="page">
@@ -142,6 +164,69 @@ export default function Dashboard() {
           <div className="stat-label">My Pending Tasks</div>
           <div className={`stat-value${totalPending > 0 ? ' cyan' : ''}`}>{totalPending}</div>
           <div className="stat-sub">{myQC.length} QC · {myTrain.length} training</div>
+        </div>
+      </div>
+
+      {/* Watchlist + Flagged Issues — side by side */}
+      <div className="card-row mb-6">
+        {/* Performance Watchlist */}
+        <div className="card" style={{ flex: 1, marginBottom: 0 }}>
+          <div className="card-header">
+            <span className="card-title">⚠️ Performance Watchlist</span>
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/settings')}>Settings</button>
+          </div>
+          {watchlist.length === 0 ? (
+            <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>
+              ✓ All team members are performing above the threshold.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {watchlist.map(w => (
+                <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{w.total_checks} check{w.total_checks !== 1 ? 's' : ''} completed</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--red)' }}>{w.avg_score}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>below {w.threshold}% threshold</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Commonly Flagged Issues */}
+        <div className="card" style={{ flex: 1, marginBottom: 0 }}>
+          <div className="card-header">
+            <span className="card-title">🚩 Commonly Flagged Issues</span>
+          </div>
+          <div className="tab-row" style={{ marginBottom: 16 }}>
+            <button className={`tab-btn${flagTab === 'week' ? ' active' : ''}`} onClick={() => setFlagTab('week')}>This Week</button>
+            <button className={`tab-btn${flagTab === 'month' ? ' active' : ''}`} onClick={() => setFlagTab('month')}>This Month</button>
+          </div>
+          {currentFlagged.length === 0 ? (
+            <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>
+              No issues flagged enough times to appear yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {currentFlagged.map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 14px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</div>
+                    {item.category && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{item.category}</div>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, color: 'var(--t3)' }}>×{item.flag_count}</span>
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, ...flagSeverityStyle(item.color) }}>{item.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -185,9 +270,9 @@ export default function Dashboard() {
         <button className="btn btn-secondary" onClick={() => navigate('/training')}>+ New Training</button>
       </div>
 
-      {/* Overdue & Due Soon — two cards */}
+      {/* Overdue & Due Soon */}
       {(overdueStaff > 0 || dueSoonStaff > 0 || overdueProps > 0 || dueSoonProps > 0) && (
-        <div className="flex gap-4 mb-6" style={{ alignItems: 'flex-start' }}>
+        <div className="card-row mb-6">
           {(overdueStaff > 0 || dueSoonStaff > 0) && (
             <div className="card" style={{ flex: 1, marginBottom: 0 }}>
               <div className="card-header">
@@ -245,10 +330,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Upcoming QC checks — two cards side by side */}
+      {/* Upcoming QC checks */}
       {pendingQC.length > 0 && (
-        <div className="flex gap-4 mb-6" style={{ alignItems: 'flex-start' }}>
-          {/* By cleaner */}
+        <div className="card-row mb-6">
           <div className="card" style={{ flex: 1, marginBottom: 0 }}>
             <div className="card-header">
               <span className="card-title">Upcoming — By Cleaner</span>
@@ -270,8 +354,6 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-
-          {/* By property */}
           <div className="card" style={{ flex: 1, marginBottom: 0 }}>
             <div className="card-header">
               <span className="card-title">Upcoming — By Property</span>

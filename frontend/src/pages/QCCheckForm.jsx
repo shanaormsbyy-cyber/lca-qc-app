@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -18,6 +18,11 @@ export default function QCCheckForm() {
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [photos, setPhotos] = useState({});
+  const fileInputRef = useRef({});
+  const [emailModal, setEmailModal] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
 
   useEffect(() => {
     api.get(`/qc/checks/${id}`).then(r => {
@@ -26,12 +31,55 @@ export default function QCCheckForm() {
     }).finally(() => setLoading(false));
   }, [id]);
 
+  const loadPhotos = () => {
+    api.get(`/qc/checks/${id}/photos`).then(r => {
+      const grouped = {};
+      r.data.forEach(p => {
+        const cat = p.category || 'General';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(p);
+      });
+      setPhotos(grouped);
+    });
+  };
+
+  useEffect(() => { if (!loading) loadPhotos(); }, [loading]);
+
   const setScore = (itemId, score) => {
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, score } : i));
   };
 
   const setNote = (itemId, notes) => {
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, notes } : i));
+  };
+
+  const uploadPhoto = async (cat, file) => {
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('category', cat);
+    await api.post(`/qc/checks/${id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    loadPhotos();
+  };
+
+  const deletePhoto = async (photoId) => {
+    if (!confirm('Delete this photo?')) return;
+    await api.delete(`/qc/photos/${photoId}`);
+    loadPhotos();
+  };
+
+  const sendEmail = async () => {
+    if (!emailTo.trim()) return alert('Enter an email address');
+    setEmailSending(true);
+    try {
+      await api.post(`/qc/checks/${id}/email`, { to: emailTo });
+      alert('Report sent successfully!');
+      setEmailModal(false);
+      setEmailTo('');
+    } catch (e) {
+      alert('Failed to send: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   // Calculate live score
@@ -150,7 +198,10 @@ export default function QCCheckForm() {
         {check.status === 'complete' && (
           <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--ok)', fontSize: 13 }}>✓ Signed off by {check.signed_off_by}</span>
-            <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
+              <button className="btn btn-sm btn-secondary" onClick={() => setEmailModal(true)}>📧 Email Report</button>
+            </div>
           </div>
         )}
       </div>
@@ -159,9 +210,16 @@ export default function QCCheckForm() {
         <div key={cat} className="section-block mb-4">
           <div className="section-block-header">
             <span style={{ fontWeight: 700 }}>{cat}</span>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>
-              {catItems.filter(i => i.score > 0).length}/{catItems.length} scored
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--t3)' }}>
+                {catItems.filter(i => i.score > 0).length}/{catItems.length} scored
+              </span>
+              <label style={{ cursor: 'pointer', fontSize: 12, color: 'var(--cyan)', fontWeight: 600 }}>
+                📷 Add Photo
+                <input type="file" accept="image/*" style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files[0]) { uploadPhoto(cat, e.target.files[0]); e.target.value = ''; } }} />
+              </label>
+            </div>
           </div>
           <div className="section-block-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {catItems.map(item => (
@@ -209,6 +267,24 @@ export default function QCCheckForm() {
               </div>
             ))}
           </div>
+          {(photos[cat] || []).length > 0 && (
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(photos[cat] || []).map(photo => (
+                <div key={photo.id} style={{ position: 'relative' }}>
+                  <img
+                    src={`/uploads/${photo.filename}`}
+                    alt={photo.original_name}
+                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}
+                    onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')}
+                  />
+                  <button
+                    onClick={() => deletePhoto(photo.id)}
+                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 
@@ -225,6 +301,31 @@ export default function QCCheckForm() {
         </div>
         <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
       </div>
+
+      {emailModal && (
+        <div className="modal-overlay" onClick={() => setEmailModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Email QC Report</div>
+            <div className="form-group">
+              <label className="form-label">Send to</label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="recipient@example.com"
+                value={emailTo}
+                onChange={e => setEmailTo(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendEmail()}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button className="btn btn-primary" onClick={sendEmail} disabled={emailSending}>
+                {emailSending ? 'Sending…' : 'Send Report'}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setEmailModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

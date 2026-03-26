@@ -153,11 +153,27 @@ db.exec(`
     score REAL DEFAULT 0,
     notes TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS qc_check_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_id INTEGER NOT NULL REFERENCES qc_checks(id) ON DELETE CASCADE,
+    category TEXT,
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    uploaded_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Default settings
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
 insertSetting.run('qc_freq_staff_days', '30');
 insertSetting.run('qc_freq_property_days', '14');
+insertSetting.run('watchlist_threshold', '70');
+insertSetting.run('flag_min_count', '3');
+insertSetting.run('flag_moderate_min', '3');
+insertSetting.run('flag_moderate_max', '4');
+insertSetting.run('flag_major_min', '5');
+insertSetting.run('flag_major_max', '7');
+insertSetting.run('flag_urgent_min', '8');
 
 module.exports = db;
