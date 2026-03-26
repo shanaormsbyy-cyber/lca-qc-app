@@ -28,6 +28,12 @@ export default function StaffProfile() {
     api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
   }, [id]);
 
+  const deleteStaff = async () => {
+    if (!confirm(`Are you sure you wish to delete this team member?\n\n"${staff.name}" will be permanently removed along with all their QC checks and training records. This cannot be undone.`)) return;
+    await api.delete(`/staff/${id}`);
+    navigate('/staff');
+  };
+
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!staff) return <div className="page"><p>Staff not found.</p></div>;
 
@@ -39,7 +45,10 @@ export default function StaffProfile() {
 
   return (
     <div className="page">
-      <button className="btn btn-ghost btn-sm mb-4" onClick={() => navigate('/staff')}>← Back</button>
+      <div className="flex" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => navigate('/staff')}>← Back</button>
+        <button className="btn btn-danger btn-sm" onClick={deleteStaff}>🗑 Delete Team Member</button>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 22 }}>
