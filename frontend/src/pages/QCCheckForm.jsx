@@ -317,14 +317,14 @@ export default function QCCheckForm() {
       styles: {
         fontSize: 8.5,
         cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
-        textColor: WHITE,
-        fillColor: NAVY_MID,
+        textColor: [255, 255, 255],
+        fillColor: [20, 20, 32],
         lineColor: [40, 44, 60],
         lineWidth: 0.3,
       },
       headStyles: {
-        fillColor: NAVY,
-        textColor: CYAN_PDF,
+        fillColor: [8, 8, 12],
+        textColor: [58, 181, 217],
         fontStyle: 'bold',
         fontSize: 8,
         cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
