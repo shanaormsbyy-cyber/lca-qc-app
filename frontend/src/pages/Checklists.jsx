@@ -198,6 +198,21 @@ export default function Checklists() {
     setTrainingCL(c => c.filter(x => x.id !== id));
   };
 
+  const copyToQC = async cl => {
+    // Flatten sections → items for the QC checklist format
+    const items = (cl.sections || []).flatMap(sec =>
+      (sec.items || []).map(it => ({ text: it.text, category: sec.name || '', score_type: 'pass_fail', weight: 1 }))
+    );
+    try {
+      await api.post('/qc/checklists', { name: cl.name, description: cl.description || '', items });
+      await load();
+      setTab('qc');
+      alert(`"${cl.name}" has been added to QC Checklists.`);
+    } catch (e) {
+      alert('Failed: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   // QC editing full-page view
@@ -319,6 +334,7 @@ export default function Checklists() {
                       </div>
                     </div>
                     <div className="flex gap-2">
+                      <button className="btn btn-sm btn-ghost" onClick={() => copyToQC(cl)}>Add to QC Checklists</button>
                       <button className="btn btn-sm btn-secondary" onClick={() => setEditingTrain(cl)}>Edit</button>
                       <button className="btn btn-sm btn-danger" onClick={() => delTrain(cl.id)}>Delete</button>
                     </div>
