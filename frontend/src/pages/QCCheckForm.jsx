@@ -123,337 +123,170 @@ export default function QCCheckForm() {
 
   const exportPDF = async () => {
     try {
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const W = 210;
-    const H = 297;
-    const pct = Math.round(check.score_pct || liveScore());
-    const today = new Date().toISOString().slice(0, 10);
-    const failedItems = items.filter(i =>
-      (i.score_type === 'pass_fail' && i.score === 0) ||
-      (i.score_type === '1_to_5' && i.score <= 2)
-    );
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const W = 210;
+      const pct = Math.round(check.score_pct || liveScore());
+      const today = new Date().toISOString().slice(0, 10);
 
-    // Helper: fill full dark background on the current page
-    const fillPageBg = () => {
-      doc.setFillColor(13, 13, 20);
-      doc.rect(0, 0, W, H, 'F');
-    };
+      // Fetch logo
+      let logoB64 = null;
+      try {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 3000);
+        const resp = await fetch(logoUrl, { signal: controller.signal });
+        clearTimeout(t);
+        const blob = await resp.blob();
+        logoB64 = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      } catch (_) {}
 
-    // Helper: draw header band on current page
-    const drawHeader = () => {
-      doc.setFillColor(...NAVY);
-      doc.rect(0, 0, W, 52, 'F');
-      doc.setFillColor(...CYAN_PDF);
-      doc.rect(0, 50, W, 3, 'F');
-    };
+      // ── HEADER ────────────────────────────────────────────────────────────────
+      doc.setFillColor(8, 8, 12);
+      doc.rect(0, 0, W, 40, 'F');
+      doc.setFillColor(58, 181, 217);
+      doc.rect(0, 38, W, 2, 'F');
 
-    // Fetch logo as base64 (with timeout so it never blocks PDF generation)
-    let logoB64 = null;
-    try {
-      const controller = new AbortController();
-      const logoTimeout = setTimeout(() => controller.abort(), 3000);
-      const resp = await fetch(logoUrl, { signal: controller.signal });
-      clearTimeout(logoTimeout);
-      const blob = await resp.blob();
-      logoB64 = await new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (_) { /* logo optional — PDF still generates without it */ }
+      if (logoB64) {
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(8, 5, 30, 30, 2, 2, 'F');
+        doc.addImage(logoB64, 'JPEG', 8, 5, 30, 30);
+      }
 
-    // Page 1 background + header
-    fillPageBg();
-    drawHeader();
-
-    // Logo image (white bg so place inside a white rounded rect in the header)
-    if (logoB64) {
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(8, 7, 38, 38, 3, 3, 'F');
-      doc.addImage(logoB64, 'JPEG', 8, 7, 38, 38);
-    }
-
-    // Company name & subtitle — offset right of logo
-    const textX = logoB64 ? 52 : 14;
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text('LCA Cleaning Services', textX, 22);
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(...CYAN_PDF);
-    doc.text('Quality Control Inspection Report', textX, 30);
-
-    // Report date (top-right)
-    doc.setFontSize(8);
-    doc.setTextColor(160, 190, 200);
-    doc.text(`Generated: ${fmtDate(today)}`, W - 14, 14, { align: 'right' });
-
-    // ── SCORE BADGE (right side of header) ────────────────────────────────────
-    const badgeX = W - 30;
-    const badgeY = 28;
-    const scoreRgbVal = scoreRgb(pct);
-    doc.setFillColor(...scoreRgbVal);
-    doc.roundedRect(badgeX - 18, badgeY - 12, 36, 18, 4, 4, 'F');
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(18);
-    doc.setFont(undefined, 'bold');
-    doc.text(`${pct}%`, badgeX, badgeY - 1, { align: 'center' });
-    doc.setFontSize(7);
-    doc.setFont(undefined, 'normal');
-    doc.text('OVERALL SCORE', badgeX, badgeY + 5, { align: 'center' });
-
-    // ── INFO GRID ──────────────────────────────────────────────────────────────
-    let y = 62;
-    const col1 = 14, col2 = 75, col3 = 120, col4 = 165;
-
-    const infoBox = (label, value, x, yy, w2 = 52) => {
-      doc.setFillColor(...NAVY_MID);
-      doc.roundedRect(x, yy, w2, 14, 2, 2, 'F');
-      doc.setDrawColor(...CYAN_PDF);
-      doc.setLineWidth(0.2);
-      doc.roundedRect(x, yy, w2, 14, 2, 2, 'S');
-      doc.setFontSize(7);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(...GREY_TEXT);
-      doc.text(label.toUpperCase(), x + 3, yy + 5);
+      const textX = logoB64 ? 44 : 14;
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('LCA Cleaning Services', textX, 18);
       doc.setFontSize(9);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(...WHITE);
-      doc.text(String(value || '—').substring(0, 26), x + 3, yy + 11);
-    };
-
-    infoBox('Property', check.property_name, col1, y, 52);
-    infoBox('Staff Member', check.staff_name || 'N/A', col2, y, 42);
-    infoBox('Date', fmtDate(check.date), col3, y, 35);
-    infoBox('Check Type', check.check_type === 'property' ? 'Property' : 'Staff', col4, y, 32);
-
-    y += 18;
-    infoBox('Checklist', check.checklist_name, col1, y, 52);
-    infoBox('Assigned To', check.assigned_to_name, col2, y, 42);
-    infoBox('Signed Off By', check.signed_off_by || 'Pending', col3, y, 35);
-
-    // Score bar
-    const barX = col4, barY = y, barW = 32, barH = 14;
-    doc.setFillColor(...NAVY_MID);
-    doc.setDrawColor(...CYAN_PDF);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(barX, barY, barW, barH, 2, 2, 'FD');
-    const fillW = Math.round((pct / 100) * (barW - 4));
-    doc.setFillColor(...scoreRgb(pct));
-    doc.roundedRect(barX + 2, barY + 4, fillW, 6, 1, 1, 'F');
-    doc.setFontSize(7);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(...CYAN_PDF);
-    doc.text('SCORE', barX + 3, barY + 5);
-
-    y += 22;
-
-    // ── SUMMARY STATS ─────────────────────────────────────────────────────────
-    const totalItems  = items.length;
-    const passCount   = items.filter(i => i.score_type === 'pass_fail' && i.score === 1).length;
-    const failCount   = items.filter(i => i.score_type === 'pass_fail' && i.score === 0).length;
-    const avgRating   = items.filter(i => i.score_type === '1_to_5' && i.score > 0);
-    const avgRatingVal = avgRating.length
-      ? (avgRating.reduce((s, i) => s + i.score, 0) / avgRating.length).toFixed(1)
-      : '—';
-
-    const statBoxW = 42;
-    const stats = [
-      { label: 'Total Items', value: totalItems, color: NAVY },
-      { label: 'Pass', value: passCount, color: PASS_G },
-      { label: 'Fail', value: failCount, color: failCount > 0 ? FAIL_R : GREY_TEXT },
-      { label: 'Avg Rating', value: avgRatingVal !== '—' ? `${avgRatingVal}/5` : '—', color: NAVY_MID },
-    ];
-    stats.forEach((s, i2) => {
-      const sx = 14 + i2 * (statBoxW + 4);
-      doc.setFillColor(...NAVY);
-      doc.roundedRect(sx, y, statBoxW, 16, 3, 3, 'F');
-      doc.setTextColor(...CYAN_PDF);
-      doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
-      doc.text(String(s.value), sx + statBoxW / 2, y + 10, { align: 'center' });
-      doc.setFontSize(7);
       doc.setFont(undefined, 'normal');
-      doc.setTextColor(160, 190, 180);
-      doc.text(s.label.toUpperCase(), sx + statBoxW / 2, y + 14.5, { align: 'center' });
-    });
+      doc.setTextColor(58, 181, 217);
+      doc.text('Quality Control Inspection Report', textX, 26);
+      doc.setFontSize(8);
+      doc.setTextColor(160, 190, 200);
+      doc.text(`Generated: ${fmtDate(today)}`, W - 14, 12, { align: 'right' });
 
-    y += 22;
+      // Score badge
+      const [sr, sg, sb] = pct >= 85 ? [34, 197, 94] : pct >= 70 ? [245, 158, 11] : [239, 68, 68];
+      doc.setFillColor(sr, sg, sb);
+      doc.roundedRect(W - 46, 8, 32, 22, 3, 3, 'F');
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text(`${pct}%`, W - 30, 22, { align: 'center' });
 
-    // ── CHECKLIST TABLE ────────────────────────────────────────────────────────
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(...CYAN_PDF);
-    doc.text('Checklist Results', 14, y);
-    y += 4;
-
-    const tableBody = items.map((item, i2) => {
-      const isPF = item.score_type === 'pass_fail';
-      const score = item.score ?? 0;
-      const scoreLabel = isPF
-        ? (score === 1 ? 'PASS' : 'FAIL')
-        : (score > 0 ? `${score}/5` : '—');
-      const isFail = (isPF && score === 0) || (!isPF && score > 0 && score <= 2);
-      return [
-        { content: String(i2 + 1), styles: { halign: 'center', fontStyle: 'normal' } },
-        item.category || '—',
-        item.text || '',
-        { content: scoreLabel, styles: {
-          halign: 'center',
-          fontStyle: 'bold',
-          textColor: isFail ? [239, 68, 68] : [34, 197, 94],
-        }},
-        { content: String(item.weight ?? 1) + '×', styles: { halign: 'center' } },
-        item.notes || '',
+      // ── INFO ──────────────────────────────────────────────────────────────────
+      let y = 50;
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(80, 80, 80);
+      const info = [
+        ['Property', check.property_name || '—'],
+        ['Staff Member', check.staff_name || 'N/A'],
+        ['Date', fmtDate(check.date)],
+        ['Check Type', check.check_type === 'property' ? 'Property Health Check' : 'Team QC Check'],
+        ['Checklist', check.checklist_name || '—'],
+        ['Assigned To', check.assigned_to_name || '—'],
+        ['Signed Off By', check.signed_off_by || '—'],
       ];
-    });
+      info.forEach(([label, value], i2) => {
+        const x = i2 % 2 === 0 ? 14 : 110;
+        if (i2 % 2 === 0 && i2 > 0) y += 10;
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(58, 181, 217);
+        doc.text(label + ':', x, y);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(30, 30, 30);
+        doc.text(String(value).substring(0, 35), x + 30, y);
+      });
+      y += 14;
 
-    autoTable(doc, {
-      startY: y,
-      head: [['#', 'Category', 'Checklist Item', 'Result', 'Wt', 'Notes']],
-      body: tableBody,
-      theme: 'plain',
-      styles: {
-        fontSize: 8.5,
-        cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
-        textColor: [255, 255, 255],
-        fillColor: [20, 20, 32],
-        lineColor: [40, 44, 60],
-        lineWidth: 0.3,
-      },
-      headStyles: {
-        fillColor: [8, 8, 12],
-        textColor: [58, 181, 217],
-        fontStyle: 'bold',
-        fontSize: 8,
-        cellPadding: { top: 4, bottom: 4, left: 3, right: 3 },
-      },
-      alternateRowStyles: { fillColor: [24, 24, 36] },
-      columnStyles: {
-        0: { cellWidth: 8,  halign: 'center' },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 72 },
-        3: { cellWidth: 18, halign: 'center' },
-        4: { cellWidth: 10, halign: 'center' },
-        5: { cellWidth: 'auto' },
-      },
-      didDrawPage: () => {
-        // Redraw dark bg on every new page autoTable creates
-        const pg = doc.internal.getCurrentPageInfo().pageNumber;
-        if (pg > 1) { fillPageBg(); }
-      },
-      didDrawCell: (data) => {
-        // Red left border for fail rows
-        if (data.section === 'body') {
-          const row = tableBody[data.row.index];
-          const resultCell = row[3];
-          if (typeof resultCell === 'object' && String(resultCell.content).includes('FAIL')) {
-            doc.setFillColor(...FAIL_R);
-            doc.rect(data.cell.x, data.cell.y, 1.5, data.cell.height, 'F');
-          }
-        }
-      },
-    });
+      // Divider
+      doc.setDrawColor(58, 181, 217);
+      doc.setLineWidth(0.4);
+      doc.line(14, y, W - 14, y);
+      y += 8;
 
-    y = doc.lastAutoTable.finalY + 8;
-
-    // ── FAILED ITEMS HIGHLIGHT ─────────────────────────────────────────────────
-    if (failedItems.length > 0) {
-      if (y > 240) { doc.addPage(); fillPageBg(); y = 20; }
-
+      // ── CHECKLIST TABLE ────────────────────────────────────────────────────────
       doc.setFontSize(11);
       doc.setFont(undefined, 'bold');
-      doc.setTextColor(...FAIL_R);
-      doc.text('Items Requiring Attention', 14, y);
-      y += 5;
+      doc.setTextColor(58, 181, 217);
+      doc.text('Checklist Results', 14, y);
+      y += 4;
 
-      failedItems.forEach(item => {
-        if (y > 270) { doc.addPage(); fillPageBg(); y = 20; }
-        doc.setFillColor(60, 10, 10);
-        doc.setDrawColor(...FAIL_R);
-        const textLines = doc.splitTextToSize(item.text, 140);
-        const boxH = Math.max(10, textLines.length * 5 + 6);
-        doc.roundedRect(14, y, W - 28, boxH, 2, 2, 'FD');
-        doc.setFillColor(...FAIL_R);
-        doc.rect(14, y, 3, boxH, 'F');
-        doc.setFontSize(8.5);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(...FAIL_R);
-        doc.text(textLines, 20, y + 5);
-        if (item.notes) {
-          doc.setFont(undefined, 'italic');
-          doc.setTextColor(...GREY_TEXT);
-          const noteLines = doc.splitTextToSize(`Note: ${item.notes}`, 135);
-          doc.text(noteLines, 20, y + 5 + textLines.length * 5);
-          y += boxH + 3 + noteLines.length * 4;
-        } else {
-          y += boxH + 3;
-        }
+      const tableBody = items.map((item, i2) => {
+        const isPF = (item.score_type || 'pass_fail') === 'pass_fail';
+        const score = item.score ?? 0;
+        const scoreLabel = isPF ? (score === 1 ? 'PASS' : 'FAIL') : (score > 0 ? `${score}/5` : '—');
+        return [
+          String(i2 + 1),
+          String(item.category || '—'),
+          String(item.text || ''),
+          scoreLabel,
+          String(item.weight ?? 1) + (isPF ? '' : '×'),
+          String(item.notes || ''),
+        ];
       });
 
-      y += 4;
-    }
+      autoTable(doc, {
+        startY: y,
+        head: [['#', 'Category', 'Checklist Item', 'Result', 'Wt', 'Notes']],
+        body: tableBody,
+        theme: 'striped',
+        headStyles: { fillColor: [8, 8, 12], textColor: [58, 181, 217], fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 28 },
+          2: { cellWidth: 72 },
+          3: { cellWidth: 16, halign: 'center' },
+          4: { cellWidth: 10, halign: 'center' },
+          5: { cellWidth: 'auto' },
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 3) {
+            const val = String(data.cell.raw);
+            if (val === 'FAIL') { data.cell.styles.textColor = [220, 50, 50]; data.cell.styles.fontStyle = 'bold'; }
+            if (val === 'PASS') { data.cell.styles.textColor = [30, 160, 80]; data.cell.styles.fontStyle = 'bold'; }
+          }
+        },
+      });
 
-    // ── CORRECTIVE ACTIONS ─────────────────────────────────────────────────────
-    if (y > 230) { doc.addPage(); fillPageBg(); y = 20; }
+      y = doc.lastAutoTable.finalY + 10;
 
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(...CYAN_PDF);
-    doc.text('Corrective Actions', 14, y);
-    y += 5;
-
-    const caText = check.notes && check.notes.trim()
-      ? check.notes.trim()
-      : 'No corrective actions recorded.';
-    const caLines = doc.splitTextToSize(caText, W - 32);
-    const caBoxH = Math.max(22, caLines.length * 5 + 10);
-
-    doc.setFillColor(...NAVY_MID);
-    doc.setDrawColor(...CYAN_PDF);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(14, y, W - 28, caBoxH, 3, 3, 'FD');
-    doc.setFillColor(...CYAN_PDF);
-    doc.rect(14, y, 3, caBoxH, 'F');
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(...WHITE);
-    doc.text(caLines, 20, y + 7);
-    y += caBoxH + 10;
-
-    // ── SIGN-OFF SECTION ───────────────────────────────────────────────────────
-    if (y > 250) { doc.addPage(); fillPageBg(); y = 20; }
-
-    doc.setDrawColor(...CYAN_PDF);
-    doc.setLineWidth(0.4);
-    doc.line(14, y, W - 14, y);
-    y += 6;
-
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(...CYAN_PDF);
-    doc.text('Sign-off', 14, y);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(...GREY_TEXT);
-    doc.text(`Completed by: ${check.signed_off_by || '—'}  |  Date: ${fmtDate(check.date)}  |  Assigned to: ${check.assigned_to_name}`, 14, y + 6);
-
-    // ── FOOTER ─────────────────────────────────────────────────────────────────
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i2 = 1; i2 <= pageCount; i2++) {
-      doc.setPage(i2);
-      doc.setFillColor(...NAVY);
-      doc.rect(0, 284, W, 13, 'F');
-      doc.setFontSize(7.5);
+      // ── CORRECTIVE ACTIONS ────────────────────────────────────────────────────
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(58, 181, 217);
+      doc.text('Corrective Actions', 14, y);
+      y += 6;
+      const caText = (check.notes || '').trim() || 'No corrective actions recorded.';
+      doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
-      doc.setTextColor(...CYAN_PDF);
-      doc.text('LCA Cleaning Services — Quality Control Report', 14, 291);
-      doc.setTextColor(120, 150, 140);
-      doc.text(`Page ${i2} of ${pageCount}`, W - 14, 291, { align: 'right' });
-    }
+      doc.setTextColor(30, 30, 30);
+      const caLines = doc.splitTextToSize(caText, W - 28);
+      doc.text(caLines, 14, y);
+      y += caLines.length * 5 + 8;
 
-    const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
-    doc.save(`LCA-QC-${safeName}-${check.date}.pdf`);
+      // ── SIGN-OFF ──────────────────────────────────────────────────────────────
+      if (y > 260) { doc.addPage(); y = 20; }
+      doc.setDrawColor(58, 181, 217);
+      doc.setLineWidth(0.4);
+      doc.line(14, y, W - 14, y);
+      y += 6;
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(58, 181, 217);
+      doc.text('Sign-off', 14, y);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text(`${check.signed_off_by || '—'}  |  ${fmtDate(check.date)}  |  ${check.assigned_to_name || '—'}`, 14, y + 5);
+
+      const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
+      doc.save(`LCA-QC-${safeName}-${check.date}.pdf`);
     } catch (err) {
       console.error('PDF export failed:', err);
       alert('PDF export failed: ' + err.message);
