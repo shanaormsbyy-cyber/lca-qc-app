@@ -139,12 +139,22 @@ export default function QCChecks() {
     setChecklists(c => c.filter(x => x.id !== id));
   };
 
+  const setDefault = async (id, defaultFor) => {
+    await api.put(`/qc/checklists/${id}/set-default`, { default_for: defaultFor });
+    await load();
+  };
+
   const createCheck = async () => {
     const { property_id, staff_id, checklist_id, assigned_to_id, date } = checkForm;
     if (!property_id || !staff_id || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
     const r = await api.post('/qc/checks', checkForm);
     setShowNewCheck(false);
     navigate(`/qc/checks/${r.data.id}`);
+  };
+
+  const handleCheckTypeChange = (type) => {
+    const defaultCL = checklists.find(cl => cl.default_for === type);
+    setCheckForm(f => ({ ...f, check_type: type, checklist_id: defaultCL ? String(defaultCL.id) : f.checklist_id }));
   };
 
   const deleteCheck = async (id, e) => {
@@ -165,7 +175,11 @@ export default function QCChecks() {
       <div className="section-header">
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>QC Checks</h1>
         <div className="flex gap-3">
-          {tab === 'checks' && <button className="btn btn-primary" onClick={() => setShowNewCheck(true)}>+ New QC Check</button>}
+          {tab === 'checks' && <button className="btn btn-primary" onClick={() => {
+            const defaultCL = checklists.find(cl => cl.default_for === 'staff');
+            setCheckForm(f => ({ ...f, checklist_id: defaultCL ? String(defaultCL.id) : '' }));
+            setShowNewCheck(true);
+          }}>+ New QC Check</button>}
           {tab === 'checklists' && <button className="btn btn-primary" onClick={() => setEditingCL('new')}>+ New Checklist</button>}
         </div>
       </div>
@@ -222,11 +236,18 @@ export default function QCChecks() {
                 <div key={cl.id} className="card">
                   <div className="card-header">
                     <div>
-                      <div style={{ fontWeight: 700 }}>{cl.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700 }}>{cl.name}</span>
+                        {cl.default_for === 'staff' && <span className="badge badge-blue">Default: Staff Check</span>}
+                        {cl.default_for === 'property' && <span className="badge badge-accent">Default: Property Check</span>}
+                      </div>
                       {cl.description && <div style={{ color: 'var(--t2)', fontSize: 13, marginTop: 2 }}>{cl.description}</div>}
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 4 }}>{cl.items?.length || 0} items</div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      {cl.default_for !== 'staff' && <button className="btn btn-sm btn-ghost" onClick={() => setDefault(cl.id, 'staff')}>Set Staff Default</button>}
+                      {cl.default_for !== 'property' && <button className="btn btn-sm btn-ghost" onClick={() => setDefault(cl.id, 'property')}>Set Property Default</button>}
+                      {cl.default_for && <button className="btn btn-sm btn-ghost" onClick={() => setDefault(cl.id, null)}>Clear Default</button>}
                       <button className="btn btn-sm btn-secondary" onClick={() => setEditingCL(cl)}>Edit</button>
                       <button className="btn btn-sm btn-danger" onClick={() => deleteCL(cl.id)}>Delete</button>
                     </div>
@@ -277,7 +298,7 @@ export default function QCChecks() {
             </div>
             <div className="form-group">
               <label className="form-label">Check Type</label>
-              <select className="form-select" value={checkForm.check_type} onChange={e => setCheckForm(f => ({ ...f, check_type: e.target.value }))}>
+              <select className="form-select" value={checkForm.check_type} onChange={e => handleCheckTypeChange(e.target.value)}>
                 <option value="staff">Staff Check — evaluates team member performance</option>
                 <option value="property">Property Check — evaluates property cleanliness</option>
               </select>

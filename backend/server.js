@@ -64,6 +64,17 @@ const db = require('./db');
   }
 }
 
+// Auto-migrate: add default_for column to qc_checklists
+{
+  const s = db.prepare('PRAGMA table_info(qc_checklists)');
+  const cols = s.all([]);
+  s.finalize();
+  if (!cols.find(c => c.name === 'default_for')) {
+    db.exec('ALTER TABLE qc_checklists ADD COLUMN default_for TEXT');
+    console.log('Migration complete: added default_for column to qc_checklists.');
+  }
+}
+
 // Auto-seed if this is a fresh database
 {
   const s = db.prepare('SELECT COUNT(*) as cnt FROM managers');

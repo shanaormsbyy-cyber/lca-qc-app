@@ -82,6 +82,19 @@ router.delete('/checklists/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+router.put('/checklists/:id/set-default', (req, res) => {
+  const { default_for } = req.body; // 'staff', 'property', or null to clear
+  if (default_for && !['staff', 'property'].includes(default_for)) {
+    return res.status(400).json({ error: 'default_for must be staff, property, or null' });
+  }
+  // Clear any existing default for this type
+  if (default_for) {
+    db.prepare("UPDATE qc_checklists SET default_for=NULL WHERE default_for=?").run(default_for);
+  }
+  db.prepare("UPDATE qc_checklists SET default_for=? WHERE id=?").run(default_for || null, req.params.id);
+  res.json({ ok: true });
+});
+
 // ─── Checks ───────────────────────────────────────────────────────────────────
 
 router.get('/checks', (req, res) => {
