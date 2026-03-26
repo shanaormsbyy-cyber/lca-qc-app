@@ -75,6 +75,50 @@ const db = require('./db');
   }
 }
 
+// Migrate user-created training checklists into qc_checklists (flatten sections → items)
+// Skips "New Hire Induction" (induction-only) and any already present in qc_checklists by name.
+{
+  const trainingCLs = db.prepare(
+    "SELECT * FROM training_checklists WHERE name NOT LIKE '%Induction%'"
+  ).all();
+  const existingQC = new Set(
+    db.prepare('SELECT name FROM qc_checklists').all().map(r => r.name)
+  );
+  for (const tcl of trainingCLs) {
+    if (existingQC.has(tcl.name)) continue;
+    const sections = db.prepare(
+      'SELECT * FROM training_checklist_sections WHERE checklist_id=? ORDER BY order_idx'
+    ).all(tcl.id);
+    const allItems = [];
+    for (const sec of sections) {
+      const items = db.prepare(
+        'SELECT * FROM training_checklist_items WHERE section_id=? ORDER BY order_idx'
+      ).all(sec.id);
+      for (const item of items) {
+        allItems.push({ text: item.text, category: sec.name || '', score_type: 'pass_fail', weight: 1 });
+      }
+    }
+    db.exec('BEGIN');
+    try {
+      const res = db.prepare(
+        'INSERT INTO qc_checklists (name, description) VALUES (?, ?)'
+      ).run(tcl.name, tcl.description || '');
+      const qcId = res.lastInsertRowid;
+      for (let i = 0; i < allItems.length; i++) {
+        const it = allItems[i];
+        db.prepare(
+          'INSERT INTO qc_checklist_items (checklist_id, text, category, score_type, weight, order_idx) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(qcId, it.text, it.category, it.score_type, it.weight, i);
+      }
+      db.exec('COMMIT');
+      console.log(`Migrated training checklist "${tcl.name}" into qc_checklists (${allItems.length} items).`);
+    } catch (e) {
+      db.exec('ROLLBACK');
+      console.error(`Failed to migrate checklist "${tcl.name}":`, e.message);
+    }
+  }
+}
+
 // Auto-seed if this is a fresh database
 {
   const s = db.prepare('SELECT COUNT(*) as cnt FROM managers');
