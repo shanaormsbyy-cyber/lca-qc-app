@@ -53,6 +53,17 @@ const db = require('./db');
   }
 }
 
+// Auto-migrate: add item_id column to qc_check_photos
+{
+  const s = db.prepare('PRAGMA table_info(qc_check_photos)');
+  const cols = s.all([]);
+  s.finalize();
+  if (!cols.find(c => c.name === 'item_id')) {
+    db.exec('ALTER TABLE qc_check_photos ADD COLUMN item_id INTEGER');
+    console.log('Migration complete: added item_id column to qc_check_photos.');
+  }
+}
+
 // Auto-seed if this is a fresh database
 {
   const s = db.prepare('SELECT COUNT(*) as cnt FROM managers');

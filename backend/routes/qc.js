@@ -227,9 +227,9 @@ router.get('/checks/:id/photos', (req, res) => {
 
 router.post('/checks/:id/photos', upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const { category } = req.body;
-  const result = db.prepare('INSERT INTO qc_check_photos (check_id, category, filename, original_name) VALUES (?, ?, ?, ?)')
-    .run(req.params.id, category || '', req.file.filename, req.file.originalname);
+  const { category, item_id } = req.body;
+  const result = db.prepare('INSERT INTO qc_check_photos (check_id, category, item_id, filename, original_name) VALUES (?, ?, ?, ?, ?)')
+    .run(req.params.id, category || '', item_id ? parseInt(item_id) : null, req.file.filename, req.file.originalname);
   res.json({ id: result.lastInsertRowid, filename: req.file.filename });
 });
 

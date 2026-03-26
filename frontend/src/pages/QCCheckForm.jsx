@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
-import { ScoreBadge } from '../components/Badge';
 
 function scoreColor(pct) {
   return pct >= 85 ? 'var(--ok)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
@@ -18,8 +17,12 @@ export default function QCCheckForm() {
   const [items, setItems] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // photos keyed by item_id (string)
   const [photos, setPhotos] = useState({});
-  const fileInputRef = useRef({});
+  // which item's photo picker is open
+  const [photoPickerItem, setPhotoPickerItem] = useState(null);
+  const rollInputRefs = useRef({});
+  const cameraInputRefs = useRef({});
   const [emailModal, setEmailModal] = useState(false);
   const [emailTo, setEmailTo] = useState('');
   const [emailSending, setEmailSending] = useState(false);
@@ -35,9 +38,9 @@ export default function QCCheckForm() {
     api.get(`/qc/checks/${id}/photos`).then(r => {
       const grouped = {};
       r.data.forEach(p => {
-        const cat = p.category || 'General';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(p);
+        const key = p.item_id != null ? String(p.item_id) : `cat_${p.category || 'general'}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(p);
       });
       setPhotos(grouped);
     });
@@ -53,12 +56,14 @@ export default function QCCheckForm() {
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, notes } : i));
   };
 
-  const uploadPhoto = async (cat, file) => {
+  const uploadPhoto = async (itemId, category, file) => {
     const fd = new FormData();
     fd.append('photo', file);
-    fd.append('category', cat);
+    fd.append('category', category || '');
+    fd.append('item_id', String(itemId));
     await api.post(`/qc/checks/${id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     loadPhotos();
+    setPhotoPickerItem(null);
   };
 
   const deletePhoto = async (photoId) => {
@@ -196,7 +201,7 @@ export default function QCCheckForm() {
           <div className={`score-fill ${pct >= 85 ? 'green' : pct >= 70 ? 'amber' : 'red'}`} style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
         {check.status === 'complete' && (
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ color: 'var(--ok)', fontSize: 13 }}>✓ Signed off by {check.signed_off_by}</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
@@ -210,81 +215,139 @@ export default function QCCheckForm() {
         <div key={cat} className="section-block mb-4">
           <div className="section-block-header">
             <span style={{ fontWeight: 700 }}>{cat}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 12, color: 'var(--t3)' }}>
-                {catItems.filter(i => i.score > 0).length}/{catItems.length} scored
-              </span>
-              <label style={{ cursor: 'pointer', fontSize: 12, color: 'var(--cyan)', fontWeight: 600 }}>
-                📷 Add Photo
-                <input type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => { if (e.target.files[0]) { uploadPhoto(cat, e.target.files[0]); e.target.value = ''; } }} />
-              </label>
-            </div>
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>
+              {catItems.filter(i => i.score > 0).length}/{catItems.length} scored
+            </span>
           </div>
           <div className="section-block-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {catItems.map(item => (
-              <div key={item.id} className="check-item">
-                <div className="check-item-text">{item.text}</div>
-                <div className="check-item-meta">
-                  {item.score_type === 'pass_fail' ? 'Pass / Fail' : 'Score 1–5'} · Weight: {item.weight}×
-                </div>
-                {item.score_type === 'pass_fail' ? (
-                  <div className="pass-fail-btns">
-                    <button
-                      className={`pf-btn pass${item.score === 1 ? ' active' : ''}`}
-                      disabled={check.status === 'complete'}
-                      onClick={() => setScore(item.id, 1)}
-                    >✓ Pass</button>
-                    <button
-                      className={`pf-btn fail${item.score === 0 && item.score !== null && item.score !== undefined ? ' active' : ''}`}
-                      disabled={check.status === 'complete'}
-                      onClick={() => setScore(item.id, 0)}
-                    >✕ Fail</button>
+            {catItems.map(item => {
+              const itemPhotos = photos[String(item.id)] || [];
+              const isPickerOpen = photoPickerItem === item.id;
+              return (
+                <div key={item.id} className="check-item">
+                  <div className="check-item-text">{item.text}</div>
+                  <div className="check-item-meta">
+                    {item.score_type === 'pass_fail' ? 'Pass / Fail' : 'Score 1–5'} · Weight: {item.weight}×
                   </div>
-                ) : (
-                  <div className="score-buttons">
-                    {[1, 2, 3, 4, 5].map(n => (
+                  {item.score_type === 'pass_fail' ? (
+                    <div className="pass-fail-btns">
                       <button
-                        key={n}
-                        className={`score-btn${item.score === n ? ' active' : ''}`}
+                        className={`pf-btn pass${item.score === 1 ? ' active' : ''}`}
                         disabled={check.status === 'complete'}
-                        onClick={() => setScore(item.id, n)}
-                      >{n}</button>
-                    ))}
+                        onClick={() => setScore(item.id, 1)}
+                      >✓ Pass</button>
+                      <button
+                        className={`pf-btn fail${item.score === 0 && item.score !== null && item.score !== undefined ? ' active' : ''}`}
+                        disabled={check.status === 'complete'}
+                        onClick={() => setScore(item.id, 0)}
+                      >✕ Fail</button>
+                    </div>
+                  ) : (
+                    <div className="score-buttons">
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <button
+                          key={n}
+                          className={`score-btn${item.score === n ? ' active' : ''}`}
+                          disabled={check.status === 'complete'}
+                          onClick={() => setScore(item.id, n)}
+                        >{n}</button>
+                      ))}
+                    </div>
+                  )}
+                  {check.status !== 'complete' && (
+                    <input
+                      className="form-input" style={{ marginTop: 10 }}
+                      placeholder="Notes (optional)…"
+                      value={item.notes || ''}
+                      onChange={e => setNote(item.id, e.target.value)}
+                    />
+                  )}
+                  {item.notes && check.status === 'complete' && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
+                  )}
+
+                  {/* Per-item photo attachment */}
+                  <div style={{ marginTop: 10 }}>
+                    {/* Thumbnails */}
+                    {itemPhotos.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                        {itemPhotos.map(photo => (
+                          <div key={photo.id} style={{ position: 'relative' }}>
+                            <img
+                              src={`/uploads/${photo.filename}`}
+                              alt={photo.original_name}
+                              style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }}
+                              onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')}
+                            />
+                            <button
+                              onClick={() => deletePhoto(photo.id)}
+                              style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                            >✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Camera button + picker */}
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <button
+                        onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
+                        style={{
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          width: 56, height: 56, borderRadius: 12,
+                          border: '2px dashed var(--border)',
+                          background: 'var(--card)', cursor: 'pointer',
+                          gap: 3, color: 'var(--cyan)', padding: 0,
+                        }}
+                        title="Add photo"
+                      >
+                        <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
+                      </button>
+
+                      {isPickerOpen && (
+                        <div style={{
+                          position: 'absolute', bottom: 64, left: 0, zIndex: 100,
+                          background: 'var(--card)', border: '1px solid var(--border)',
+                          borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+                          minWidth: 180, overflow: 'hidden',
+                        }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                            onMouseLeave={e => e.currentTarget.style.background = ''}
+                          >
+                            🖼️ Camera Roll
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              ref={el => rollInputRefs.current[item.id] = el}
+                              onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
+                            />
+                          </label>
+                          <div style={{ borderTop: '1px solid var(--border)' }} />
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                            onMouseLeave={e => e.currentTarget.style.background = ''}
+                          >
+                            📸 Take a Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              style={{ display: 'none' }}
+                              ref={el => cameraInputRefs.current[item.id] = el}
+                              onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-                {check.status !== 'complete' && (
-                  <input
-                    className="form-input" style={{ marginTop: 10 }}
-                    placeholder="Notes (optional)…"
-                    value={item.notes || ''}
-                    onChange={e => setNote(item.id, e.target.value)}
-                  />
-                )}
-                {item.notes && check.status === 'complete' && (
-                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
-                )}
-              </div>
-            ))}
-          </div>
-          {(photos[cat] || []).length > 0 && (
-            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(photos[cat] || []).map(photo => (
-                <div key={photo.id} style={{ position: 'relative' }}>
-                  <img
-                    src={`/uploads/${photo.filename}`}
-                    alt={photo.original_name}
-                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer' }}
-                    onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')}
-                  />
-                  <button
-                    onClick={() => deletePhoto(photo.id)}
-                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                  >✕</button>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
       ))}
 
@@ -325,6 +388,14 @@ export default function QCCheckForm() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Close photo picker on outside click */}
+      {photoPickerItem !== null && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+          onClick={() => setPhotoPickerItem(null)}
+        />
       )}
     </div>
   );
