@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 
 export default function Properties() {
@@ -34,10 +35,11 @@ export default function Properties() {
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
+  useLiveSync(load);
 
   const dueInfo = id => due?.properties.find(p => p.id === id);
   const avgScore = id => {
-    const c = checks.filter(c => c.property_id === id && c.status === 'complete');
+    const c = checks.filter(c => c.property_id === id && c.status === 'complete' && c.check_type === 'property');
     return c.length ? c.reduce((s, c) => s + c.score_pct, 0) / c.length : null;
   };
 
@@ -68,12 +70,12 @@ export default function Properties() {
           <h1 style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px' }}>Properties</h1>
           <p style={{ color: 'var(--t2)', marginTop: 4 }}>{properties.length} properties</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New QC Check</button>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ New Property Health Check</button>
       </div>
 
       <div className="tab-row">
         <button className={`tab-btn${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
-        <button className={`tab-btn${tab === 'qc' ? ' active' : ''}`} onClick={() => setTab('qc')}>QC Checks</button>
+        <button className={`tab-btn${tab === 'qc' ? ' active' : ''}`} onClick={() => setTab('qc')}>Health Checks</button>
       </div>
 
       {tab === 'overview' && (
@@ -86,7 +88,7 @@ export default function Properties() {
               {properties.map(p => {
                 const d = dueInfo(p.id);
                 const avg = avgScore(p.id);
-                const total = checks.filter(c => c.property_id === p.id && c.status === 'complete').length;
+                const total = checks.filter(c => c.property_id === p.id && c.status === 'complete' && c.check_type === 'property').length;
                 return (
                   <tr key={p.id}>
                     <td style={{ fontWeight: 700 }}>{p.name}</td>
@@ -111,7 +113,7 @@ export default function Properties() {
             ))}
           </div>
           {filteredChecks.length === 0
-            ? <div className="empty-state"><div className="icon">🏠</div>No QC checks found.</div>
+            ? <div className="empty-state"><div className="icon">🏠</div>No property health checks found.</div>
             : (
               <div className="table-wrap">
                 <table>
@@ -143,7 +145,7 @@ export default function Properties() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">New QC Check</div>
+            <div className="modal-title">New Property Health Check</div>
             <div className="form-group">
               <label className="form-label">Property</label>
               <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 
 export default function Settings() {
   const [properties, setProperties] = useState([]);
@@ -36,6 +37,7 @@ export default function Settings() {
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
+  useLiveSync(load);
 
   const openAddProp = () => { setEditingProp(null); setPropForm({ name: '' }); setShowPropModal(true); };
   const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name }); setShowPropModal(true); };

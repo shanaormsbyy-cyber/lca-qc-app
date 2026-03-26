@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
 
@@ -15,7 +16,7 @@ export default function StaffProfile() {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
     Promise.all([
       api.get('/staff'),
       api.get('/qc/checks'),
@@ -25,10 +26,12 @@ export default function StaffProfile() {
       setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete'));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
-
     api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
-  }, [id]);
+  };
+
+  useEffect(() => { load(); }, [id]);
+  useLiveSync(load);
 
   const deleteStaff = async () => {
     if (!confirm(`Are you sure you wish to delete this team member?\n\n"${staff.name}" will be permanently removed along with all their QC checks and training records. This cannot be undone.`)) return;

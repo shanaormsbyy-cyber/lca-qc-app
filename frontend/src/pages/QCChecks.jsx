@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
@@ -31,6 +32,7 @@ export default function QCChecks() {
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
+  useLiveSync(load);
 
   useEffect(() => {
     if (!loading && searchParams.get('openNew')) {

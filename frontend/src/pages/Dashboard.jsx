@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
@@ -31,8 +32,7 @@ export default function Dashboard() {
   const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: today });
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    // Load core data first — these must succeed for the page to work
+  const load = () => {
     Promise.all([
       api.get('/scheduling/due'),
       api.get('/qc/checks'),
@@ -54,12 +54,13 @@ export default function Dashboard() {
       setProperties(pR.data);
       setManagers(mR.data);
     }).finally(() => setLoading(false));
-
-    // Load secondary data independently — failures here don't affect core stats
     api.get('/kpis/watchlist').then(r => setWatchlist(r.data.watchlist || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
-  }, [manager.id]);
+  };
+
+  useEffect(() => { load(); }, [manager.id]);
+  useLiveSync(load);
 
   const openCreate = async (preselect = {}, type = 'staff') => {
     // Always reload checklists fresh so newly created ones appear
@@ -249,7 +250,7 @@ export default function Dashboard() {
               <div key={q.id} onClick={() => navigate(`/qc/checks/${q.id}`)}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 12, cursor: 'pointer' }}>
                 <div>
-                  <div style={{ fontWeight: 700 }}>QC Check — {q.property_name}</div>
+                  <div style={{ fontWeight: 700 }}>{q.check_type === 'property' ? 'Property Health Check' : 'Team QC Check'} — {q.property_name}</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{q.staff_name} · {fmtDate(q.date)}</div>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); navigate(`/qc/checks/${q.id}`); }}>Start</button>
@@ -283,7 +284,7 @@ export default function Dashboard() {
           {(overdueStaff > 0 || dueSoonStaff > 0) && (
             <div className="card" style={{ flex: 1, marginBottom: 0 }}>
               <div className="card-header">
-                <span className="card-title">Staff QC Due</span>
+                <span className="card-title">Team QC Due</span>
                 <button className="btn btn-sm btn-ghost" onClick={() => navigate('/staff')}>View all →</button>
               </div>
               <div style={{ textAlign: 'center', padding: '12px 0 16px' }}>
@@ -310,7 +311,7 @@ export default function Dashboard() {
           {(overdueProps > 0 || dueSoonProps > 0) && (
             <div className="card" style={{ flex: 1, marginBottom: 0 }}>
               <div className="card-header">
-                <span className="card-title">Properties QC Due</span>
+                <span className="card-title">Property Health Checks Due</span>
                 <button className="btn btn-sm btn-ghost" onClick={() => navigate('/properties')}>View all →</button>
               </div>
               <div style={{ textAlign: 'center', padding: '12px 0 16px' }}>
@@ -416,7 +417,7 @@ export default function Dashboard() {
       {showCreate && (
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{createType === 'property' ? 'Property Health Check' : 'New QC Check'}</div>
+            <div className="modal-title">{createType === 'property' ? 'New Property Health Check' : 'New Team QC Check'}</div>
             <div className="form-group">
               <label className="form-label">Property</label>
               <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>

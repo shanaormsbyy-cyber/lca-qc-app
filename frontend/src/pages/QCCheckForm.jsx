@@ -6,6 +6,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { fmtDate } from '../utils';
 import logoUrl from '../assets/logo.png';
+import useLiveSync from '../hooks/useLiveSync';
 
 // RGB colour constants used in PDF — LCA brand colours
 const NAVY      = [8, 8, 12];       // near-black background
@@ -41,13 +42,16 @@ export default function QCCheckForm() {
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
 
-  useEffect(() => {
+  const load = () => {
     api.get(`/qc/checks/${id}`).then(r => {
       setCheck(r.data);
       setItems(r.data.items || []);
       setCorrectiveActions(r.data.notes || '');
     }).finally(() => setLoading(false));
-  }, [id]);
+  };
+
+  useEffect(() => { load(); }, [id]);
+  useLiveSync(load);
 
   const loadPhotos = () => {
     api.get(`/qc/checks/${id}/photos`).then(r => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, ScoreBar } from '../components/Badge';
 import { fmtDate } from '../utils';
 import DateRangeFilter from '../components/DateRangeFilter';
@@ -29,6 +30,7 @@ export default function KPIs() {
   };
 
   useEffect(() => { load(range); }, [range]);
+  useLiveSync(() => load(range));
 
   const sort = key => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');

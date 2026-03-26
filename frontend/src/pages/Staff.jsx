@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
 
@@ -38,6 +39,7 @@ export default function Staff() {
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
+  useLiveSync(load);
 
   const dueInfo = id => due?.staff.find(s => s.id === id);
   const avgScore = id => {

@@ -1,4 +1,4 @@
-const express = require('express');
+mconst express = require('express');
 const cors = require('cors');
 const path = require('path');
 const os = require('os');
@@ -153,9 +153,35 @@ const lcaStaff = [
   }
 }
 
+const { addClient, removeClient, emit } = require('./emitter');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// SSE live-sync endpoint — clients subscribe here
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+  // Send initial heartbeat so the connection is established
+  res.write(': connected\n\n');
+  addClient(res);
+  req.on('close', () => removeClient(res));
+});
+
+// After any mutating API call, broadcast a change event to all connected clients
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const orig = res.json.bind(res);
+    res.json = (body) => {
+      orig(body);
+      emit('change');
+    };
+  }
+  next();
+});
 
 const UPLOADS_DIR = process.env.NODE_ENV === 'production'
   ? '/app/data/uploads'
