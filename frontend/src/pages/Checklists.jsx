@@ -204,8 +204,12 @@ export default function Checklists() {
   };
   const delQC = async id => {
     if (!confirm('Delete this checklist?')) return;
-    await api.delete(`/qc/checklists/${id}`);
-    setChecklists(c => c.filter(x => x.id !== id));
+    try {
+      await api.delete(`/qc/checklists/${id}`);
+      setChecklists(c => c.filter(x => x.id !== id));
+    } catch (e) {
+      alert(e.response?.data?.error || 'Failed to delete checklist');
+    }
   };
   const setDefault = async (id, defaultFor) => {
     await api.put(`/qc/checklists/${id}/set-default`, { default_for: defaultFor });

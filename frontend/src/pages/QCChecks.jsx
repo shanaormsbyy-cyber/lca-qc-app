@@ -90,7 +90,8 @@ export default function QCChecks() {
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>QC Checks</h1>
         <button className="btn btn-primary" onClick={() => {
           const defaultCL = checklists.find(cl => cl.default_for === 'staff');
-          setCheckForm(f => ({ ...f, checklist_id: defaultCL ? String(defaultCL.id) : '' }));
+          if (defaultCL) handleChecklistChange(String(defaultCL.id));
+          else setCheckForm(f => ({ ...f, checklist_id: '' }));
           setShowNewCheck(true);
         }}>+ New QC Check</button>
       </div>
