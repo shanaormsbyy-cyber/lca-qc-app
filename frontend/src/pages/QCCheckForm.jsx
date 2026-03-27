@@ -42,6 +42,7 @@ export default function QCCheckForm() {
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
   const [editingComplete, setEditingComplete] = useState(false);
+  const [openSections, setOpenSections] = useState(new Set());
 
   const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
@@ -76,6 +77,27 @@ export default function QCCheckForm() {
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, notes } : i));
   };
 
+  const setNA = (itemId, na) => {
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, na, score: na ? null : i.score } : i));
+  };
+
+  const toggleSection = (cat) => {
+    setOpenSections(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  };
+
+  const markSectionNA = (catItems, e) => {
+    e.stopPropagation();
+    const allNA = catItems.every(i => i.na);
+    const newNA = !allNA;
+    setItems(prev => prev.map(i =>
+      catItems.some(ci => ci.id === i.id) ? { ...i, na: newNA, score: newNA ? null : i.score } : i
+    ));
+  };
+
   const uploadPhoto = async (itemId, category, file) => {
     const fd = new FormData();
     fd.append('photo', file);
@@ -95,6 +117,7 @@ export default function QCCheckForm() {
   const liveScore = () => {
     let total = 0, max = 0;
     items.forEach(item => {
+      if (item.na) return; // N/A items excluded from scoring
       const w = item.weight || 1;
       if (item.score_type === 'pass_fail') { total += (item.score || 0) * w; max += w; }
       else { total += (item.score || 0) * w; max += 5 * w; }
@@ -220,7 +243,7 @@ export default function QCCheckForm() {
       const tableBody = items.map((item, i2) => {
         const isPF = (item.score_type || 'pass_fail') === 'pass_fail';
         const score = item.score ?? 0;
-        const scoreLabel = isPF ? (score === 1 ? 'PASS' : 'FAIL') : (score > 0 ? `${score}/5` : '—');
+        const scoreLabel = item.na ? 'N/A' : isPF ? (score === 1 ? 'PASS' : 'FAIL') : (score > 0 ? `${score}/5` : '—');
         return [
           String(i2 + 1),
           String(item.category || '—'),
@@ -251,6 +274,7 @@ export default function QCCheckForm() {
             const val = String(data.cell.raw);
             if (val === 'FAIL') { data.cell.styles.textColor = [220, 50, 50]; data.cell.styles.fontStyle = 'bold'; }
             if (val === 'PASS') { data.cell.styles.textColor = [30, 160, 80]; data.cell.styles.fontStyle = 'bold'; }
+            if (val === 'N/A') { data.cell.styles.textColor = [150, 150, 150]; data.cell.styles.fontStyle = 'italic'; }
           }
         },
       });
@@ -394,133 +418,166 @@ export default function QCCheckForm() {
         </div>
       </div>
 
-      {Object.entries(categories).map(([cat, catItems]) => (
-        <div key={cat} className="section-block mb-4">
-          <div className="section-block-header">
-            <span style={{ fontWeight: 700 }}>{cat}</span>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>
-              {catItems.filter(i => i.score > 0).length}/{catItems.length} scored
-            </span>
-          </div>
-          <div className="section-block-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {catItems.map(item => {
-              const itemPhotos = photos[String(item.id)] || [];
-              const isPickerOpen = photoPickerItem === item.id;
-              return (
-                <div key={item.id} className="check-item">
-                  <div className="check-item-text">{item.text}</div>
-                  <div className="check-item-meta">
-                    {item.score_type === 'pass_fail' ? 'Pass / Fail' : 'Score 1–5'} · Weight: {item.weight}×
-                  </div>
-                  {item.score_type === 'pass_fail' ? (
-                    <div className="pass-fail-btns">
+      <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
+        {Object.entries(categories).map(([cat, catItems], sectionIdx, arr) => {
+          const isOpen = openSections.has(cat);
+          const allNA = catItems.every(i => i.na);
+          const activeItems = catItems.filter(i => !i.na);
+          const scoredCount = activeItems.filter(i => i.score !== null && i.score !== undefined).length;
+          const isLast = sectionIdx === arr.length - 1;
+          return (
+            <div key={cat}>
+              {/* Section header row */}
+              <div
+                onClick={() => toggleSection(cat)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '16px 20px', cursor: 'pointer', userSelect: 'none',
+                  borderBottom: isLast && !isOpen ? 'none' : '1px solid var(--border)',
+                  background: isOpen ? 'var(--hover)' : 'transparent',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = 'var(--hover)'; }}
+                onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{cat}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {allNA
+                    ? <span style={{ fontSize: 13, color: 'var(--t3)', fontStyle: 'italic' }}>N/A</span>
+                    : <span style={{ fontSize: 13, color: 'var(--cyan)', fontWeight: 600 }}>{scoredCount} of {activeItems.length}</span>
+                  }
+                  <span style={{
+                    color: 'var(--t3)', fontSize: 12, fontWeight: 700,
+                    display: 'inline-block', transition: 'transform 0.2s',
+                    transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}>▶</span>
+                </div>
+              </div>
+
+              {/* Expanded items */}
+              {isOpen && (
+                <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
+                  {/* N/A section button */}
+                  {!isLocked && (
+                    <div style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
                       <button
-                        className={`pf-btn pass${item.score === 1 ? ' active' : ''}`}
-                        disabled={isLocked}
-                        onClick={() => setScore(item.id, 1)}
-                      >✓ Pass</button>
-                      <button
-                        className={`pf-btn fail${item.score === 0 && item.score !== null && item.score !== undefined ? ' active' : ''}`}
-                        disabled={isLocked}
-                        onClick={() => setScore(item.id, 0)}
-                      >✕ Fail</button>
+                        onClick={e => markSectionNA(catItems, e)}
+                        style={{
+                          fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
+                          border: '1px solid var(--border)',
+                          background: allNA ? 'var(--border)' : 'transparent',
+                          color: allNA ? 'var(--t2)' : 'var(--t3)',
+                          cursor: 'pointer',
+                        }}
+                      >{allNA ? '↩ Undo N/A for section' : 'Mark entire section N/A'}</button>
                     </div>
-                  ) : (
-                    <div className="score-buttons">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <button
-                          key={n}
-                          className={`score-btn${item.score === n ? ' active' : ''}`}
-                          disabled={isLocked}
-                          onClick={() => setScore(item.id, n)}
-                        >{n}</button>
-                      ))}
-                    </div>
-                  )}
-                  {!isLocked ? (
-                    <input
-                      className="form-input" style={{ marginTop: 10 }}
-                      placeholder="Notes (optional)…"
-                      value={item.notes || ''}
-                      onChange={e => setNote(item.id, e.target.value)}
-                    />
-                  ) : (
-                    item.notes && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
                   )}
 
-                  {/* Per-item photo attachment */}
-                  <div style={{ marginTop: 10 }}>
-                    {itemPhotos.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                        {itemPhotos.map(photo => (
-                          <div key={photo.id} style={{ position: 'relative' }}>
-                            <img
-                              src={`/uploads/${photo.filename}`}
-                              alt={photo.original_name}
-                              style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }}
-                              onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')}
-                            />
-                            <button
-                              onClick={() => deletePhoto(photo.id)}
-                              style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                            >✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <button
-                        onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
-                        style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          width: 56, height: 56, borderRadius: 12,
-                          border: '2px dashed var(--border)',
-                          background: 'var(--card)', cursor: 'pointer',
-                          gap: 3, color: 'var(--cyan)', padding: 0,
-                        }}
-                        title="Add photo"
-                      >
-                        <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
-                      </button>
-                      {isPickerOpen && (
-                        <div style={{
-                          position: 'absolute', bottom: 64, left: 0, zIndex: 100,
-                          background: 'var(--card)', border: '1px solid var(--border)',
-                          borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-                          minWidth: 180, overflow: 'hidden',
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {catItems.map((item, itemIdx) => {
+                      const itemPhotos = photos[String(item.id)] || [];
+                      const isPickerOpen = photoPickerItem === item.id;
+                      const isLastItem = itemIdx === catItems.length - 1;
+                      return (
+                        <div key={item.id} style={{
+                          padding: '16px 20px',
+                          borderBottom: isLastItem ? 'none' : '1px solid var(--border)',
+                          opacity: item.na ? 0.45 : 1,
+                          background: item.na ? 'var(--bg)' : 'transparent',
                         }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-                            onMouseLeave={e => e.currentTarget.style.background = ''}
-                          >
-                            🖼️ Camera Roll
-                            <input type="file" accept="image/*" style={{ display: 'none' }}
-                              ref={el => rollInputRefs.current[item.id] = el}
-                              onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
-                            />
-                          </label>
-                          <div style={{ borderTop: '1px solid var(--border)' }} />
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-                            onMouseLeave={e => e.currentTarget.style.background = ''}
-                          >
-                            📸 Take a Photo
-                            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                              ref={el => cameraInputRefs.current[item.id] = el}
-                              onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }}
-                            />
-                          </label>
+                          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{item.text}</div>
+                          <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10 }}>
+                            {item.score_type === 'pass_fail' ? 'Pass / Fail' : 'Score 1–5'} · Weight: {item.weight}×
+                            {item.na && <span style={{ marginLeft: 8, fontStyle: 'italic' }}>— Not applicable</span>}
+                          </div>
+
+                          {item.score_type === 'pass_fail' ? (
+                            <div className="pass-fail-btns">
+                              <button className={`pf-btn pass${item.score === 1 ? ' active' : ''}`} disabled={isLocked} onClick={() => setScore(item.id, 1)}>✓ Pass</button>
+                              <button className={`pf-btn fail${item.score === 0 && item.score !== null && item.score !== undefined ? ' active' : ''}`} disabled={isLocked} onClick={() => setScore(item.id, 0)}>✕ Fail</button>
+                              <button
+                                disabled={isLocked}
+                                onClick={() => setNA(item.id, !item.na)}
+                                style={{
+                                  padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+                                  border: '1px solid var(--border)', cursor: isLocked ? 'default' : 'pointer',
+                                  background: item.na ? 'var(--border)' : 'transparent',
+                                  color: item.na ? 'var(--t2)' : 'var(--t3)',
+                                }}
+                              >N/A</button>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                              <div className="score-buttons">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                  <button key={n} className={`score-btn${item.score === n ? ' active' : ''}`} disabled={isLocked} onClick={() => setScore(item.id, n)}>{n}</button>
+                                ))}
+                              </div>
+                              <button
+                                disabled={isLocked}
+                                onClick={() => setNA(item.id, !item.na)}
+                                style={{
+                                  padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+                                  border: '1px solid var(--border)', cursor: isLocked ? 'default' : 'pointer',
+                                  background: item.na ? 'var(--border)' : 'transparent',
+                                  color: item.na ? 'var(--t2)' : 'var(--t3)',
+                                }}
+                              >N/A</button>
+                            </div>
+                          )}
+
+                          {!isLocked ? (
+                            <input className="form-input" style={{ marginTop: 10 }} placeholder="Notes (optional)…" value={item.notes || ''} onChange={e => setNote(item.id, e.target.value)} />
+                          ) : (
+                            item.notes && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
+                          )}
+
+                          {/* Photos */}
+                          <div style={{ marginTop: 10 }}>
+                            {itemPhotos.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                                {itemPhotos.map(photo => (
+                                  <div key={photo.id} style={{ position: 'relative' }}>
+                                    <img src={`/uploads/${photo.filename}`} alt={photo.original_name} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')} />
+                                    <button onClick={() => deletePhoto(photo.id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                              <button
+                                onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
+                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--card)', cursor: 'pointer', gap: 3, color: 'var(--cyan)', padding: 0 }}
+                                title="Add photo"
+                              >
+                                <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
+                                <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
+                              </button>
+                              {isPickerOpen && (
+                                <div style={{ position: 'absolute', bottom: 64, left: 0, zIndex: 100, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', minWidth: 180, overflow: 'hidden' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
+                                    🖼️ Camera Roll
+                                    <input type="file" accept="image/*" style={{ display: 'none' }} ref={el => rollInputRefs.current[item.id] = el} onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }} />
+                                  </label>
+                                  <div style={{ borderTop: '1px solid var(--border)' }} />
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
+                                    📸 Take a Photo
+                                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} ref={el => cameraInputRefs.current[item.id] = el} onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }} />
+                                  </label>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Corrective Actions */}
       <div className="card mb-6">
