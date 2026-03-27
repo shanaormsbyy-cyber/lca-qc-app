@@ -25,9 +25,15 @@ router.use(requireAuth);
 
 // ─── Checklists ───────────────────────────────────────────────────────────────
 
+const parseRS = cl => {
+  try { cl.repeatable_sections = JSON.parse(cl.repeatable_sections || '[]'); } catch { cl.repeatable_sections = []; }
+  return cl;
+};
+
 router.get('/checklists', (req, res) => {
   const checklists = db.prepare('SELECT * FROM qc_checklists ORDER BY name').all();
   checklists.forEach(cl => {
+    parseRS(cl);
     cl.items = db.prepare('SELECT * FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(cl.id);
   });
   res.json(checklists);
@@ -36,16 +42,17 @@ router.get('/checklists', (req, res) => {
 router.get('/checklists/:id', (req, res) => {
   const cl = db.prepare('SELECT * FROM qc_checklists WHERE id=?').get(req.params.id);
   if (!cl) return res.status(404).json({ error: 'Not found' });
+  parseRS(cl);
   cl.items = db.prepare('SELECT * FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(cl.id);
   res.json(cl);
 });
 
 router.post('/checklists', (req, res) => {
-  const { name, description, items } = req.body;
+  const { name, description, items, repeatable_sections } = req.body;
   let clId;
   db.exec('BEGIN');
   try {
-    const result = db.prepare('INSERT INTO qc_checklists (name, description) VALUES (?, ?)').run(name, description || '');
+    const result = db.prepare('INSERT INTO qc_checklists (name, description, repeatable_sections) VALUES (?, ?, ?)').run(name, description || '', JSON.stringify(repeatable_sections || []));
     clId = result.lastInsertRowid;
     (items || []).forEach((item, i) => {
       db.prepare('INSERT INTO qc_checklist_items (checklist_id, text, category, score_type, weight, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
@@ -60,11 +67,11 @@ router.post('/checklists', (req, res) => {
 });
 
 router.put('/checklists/:id', (req, res) => {
-  const { name, description, items } = req.body;
+  const { name, description, items, repeatable_sections } = req.body;
   const clId = req.params.id;
   db.exec('BEGIN');
   try {
-    db.prepare('UPDATE qc_checklists SET name=?, description=? WHERE id=?').run(name, description || '', clId);
+    db.prepare('UPDATE qc_checklists SET name=?, description=?, repeatable_sections=? WHERE id=?').run(name, description || '', JSON.stringify(repeatable_sections || []), clId);
 
     // Get existing item ids for this checklist
     const existing = db.prepare('SELECT id FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(clId);
@@ -158,18 +165,20 @@ router.get('/checks/:id', (req, res) => {
   if (!check) return res.status(404).json({ error: 'Not found' });
 
   const items = db.prepare(`
-    SELECT qci.*, qi.text, qi.category, qi.score_type, qi.weight, qi.order_idx
+    SELECT qci.id, qci.check_id, qci.item_id, qci.score, qci.notes, qci.na,
+           qi.text, qi.score_type, qi.weight, qi.order_idx,
+           COALESCE(qci.room_label, qi.category) as category
     FROM qc_check_items qci
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     WHERE qci.check_id = ?
-    ORDER BY qi.order_idx
+    ORDER BY qci.id
   `).all(req.params.id);
   check.items = items;
   res.json(check);
 });
 
 router.post('/checks', (req, res) => {
-  const { property_id, staff_id, checklist_id, assigned_to_id, date, notes, check_type } = req.body;
+  const { property_id, staff_id, checklist_id, assigned_to_id, date, notes, check_type, room_counts } = req.body;
   let checkId;
   db.exec('BEGIN');
   try {
@@ -179,10 +188,39 @@ router.post('/checks', (req, res) => {
     `).run(property_id, staff_id, checklist_id, req.manager.id, assigned_to_id, date, notes || '', check_type || 'staff');
     checkId = result.lastInsertRowid;
 
-    const items = db.prepare('SELECT * FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(checklist_id);
-    items.forEach(item => {
-      db.prepare('INSERT INTO qc_check_items (check_id, item_id) VALUES (?, ?)').run(checkId, item.id);
+    const checklist = db.prepare('SELECT * FROM qc_checklists WHERE id=?').get(checklist_id);
+    let repeatableSections = [];
+    try { repeatableSections = JSON.parse(checklist.repeatable_sections || '[]'); } catch { repeatableSections = []; }
+
+    const templateItems = db.prepare('SELECT * FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(checklist_id);
+
+    // Group template items by category, preserving first-appearance order
+    const categoryOrder = [];
+    const itemsByCategory = {};
+    templateItems.forEach(item => {
+      const cat = item.category || '';
+      if (!itemsByCategory[cat]) { categoryOrder.push(cat); itemsByCategory[cat] = []; }
+      itemsByCategory[cat].push(item);
     });
+
+    // Insert items, expanding repeatable sections by room_counts
+    categoryOrder.forEach(cat => {
+      const catItems = itemsByCategory[cat];
+      if (repeatableSections.includes(cat)) {
+        const count = Math.min(Math.max(parseInt(room_counts?.[cat]) || 1, 1), 20);
+        for (let n = 1; n <= count; n++) {
+          const label = count > 1 ? `${cat} ${n}` : null;
+          catItems.forEach(item => {
+            db.prepare('INSERT INTO qc_check_items (check_id, item_id, room_label) VALUES (?, ?, ?)').run(checkId, item.id, label);
+          });
+        }
+      } else {
+        catItems.forEach(item => {
+          db.prepare('INSERT INTO qc_check_items (check_id, item_id, room_label) VALUES (?, ?, ?)').run(checkId, item.id, null);
+        });
+      }
+    });
+
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -197,13 +235,13 @@ router.put('/checks/:id', (req, res) => {
   try {
     if (items) {
       items.forEach(item => {
-        db.prepare('UPDATE qc_check_items SET score=?, notes=? WHERE id=?')
-          .run(item.score, item.notes || '', item.id);
+        db.prepare('UPDATE qc_check_items SET score=?, notes=?, na=? WHERE id=?')
+          .run(item.score ?? 0, item.notes || '', item.na ? 1 : 0, item.id);
       });
 
-      // Recalculate score
+      // Recalculate score — N/A items excluded from both total and max
       const checkItems = db.prepare(`
-        SELECT qci.score, qi.score_type, qi.weight
+        SELECT qci.score, qci.na, qi.score_type, qi.weight
         FROM qc_check_items qci
         JOIN qc_checklist_items qi ON qi.id = qci.item_id
         WHERE qci.check_id = ?
@@ -211,12 +249,13 @@ router.put('/checks/:id', (req, res) => {
 
       let total = 0, max = 0;
       checkItems.forEach(ci => {
+        if (ci.na) return;
         const w = ci.weight || 1;
         if (ci.score_type === 'pass_fail') {
-          total += ci.score * w;
+          total += (ci.score || 0) * w;
           max += w;
         } else {
-          total += ci.score * w;
+          total += (ci.score || 0) * w;
           max += 5 * w;
         }
       });

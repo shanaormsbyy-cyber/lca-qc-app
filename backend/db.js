@@ -164,6 +164,16 @@ db.exec(`
   );
 `);
 
+// ── Migrations — safe ALTER TABLE (no-op if column already exists) ─────────────
+const migrations = [
+  "ALTER TABLE qc_checklists  ADD COLUMN repeatable_sections TEXT DEFAULT '[]'",
+  "ALTER TABLE qc_check_items ADD COLUMN room_label TEXT DEFAULT NULL",
+  "ALTER TABLE qc_check_items ADD COLUMN na INTEGER DEFAULT 0",
+];
+migrations.forEach(sql => {
+  try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
+});
+
 // Default settings
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
 insertSetting.run('qc_freq_staff_days', '30');

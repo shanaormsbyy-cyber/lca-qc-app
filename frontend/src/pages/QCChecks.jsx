@@ -18,7 +18,7 @@ export default function QCChecks() {
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewCheck, setShowNewCheck] = useState(false);
-  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '', check_type: 'staff' });
+  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '', check_type: 'staff', room_counts: {} });
   const [filter, setFilter] = useState('all');
 
   const load = () => Promise.all([
@@ -57,9 +57,18 @@ export default function QCChecks() {
     navigate(`/qc/checks/${r.data.id}`);
   };
 
+  const handleChecklistChange = (checklist_id) => {
+    const cl = checklists.find(c => String(c.id) === String(checklist_id));
+    const rs = cl?.repeatable_sections || [];
+    const room_counts = Object.fromEntries(rs.map(s => [s, 1]));
+    setCheckForm(f => ({ ...f, checklist_id, room_counts }));
+  };
+
   const handleCheckTypeChange = (type) => {
     const defaultCL = checklists.find(cl => cl.default_for === type);
-    setCheckForm(f => ({ ...f, check_type: type, checklist_id: defaultCL ? String(defaultCL.id) : f.checklist_id }));
+    if (defaultCL) handleChecklistChange(String(defaultCL.id));
+    else setCheckForm(f => ({ ...f, check_type: type }));
+    setCheckForm(f => ({ ...f, check_type: type }));
   };
 
   const deleteCheck = async (id, e) => {
@@ -141,11 +150,36 @@ export default function QCChecks() {
             </div>
             <div className="form-group">
               <label className="form-label">Checklist</label>
-              <select className="form-select" value={checkForm.checklist_id} onChange={e => setCheckForm(f => ({ ...f, checklist_id: e.target.value }))}>
+              <select className="form-select" value={checkForm.checklist_id} onChange={e => handleChecklistChange(e.target.value)}>
                 <option value="">Select checklist…</option>
                 {checklists.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+
+            {/* Room counts — shown when selected checklist has repeatable sections */}
+            {checkForm.checklist_id && (() => {
+              const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+              const rs = cl?.repeatable_sections || [];
+              if (rs.length === 0) return null;
+              return (
+                <div className="card mb-2" style={{ padding: '14px 16px', background: 'var(--bg)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--t2)' }}>Property room counts</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                    {rs.map(section => (
+                      <div key={section}>
+                        <label className="form-label" style={{ fontSize: 12 }}>{section}s</label>
+                        <input
+                          type="number" min="1" max="20"
+                          className="form-input"
+                          value={checkForm.room_counts[section] ?? 1}
+                          onChange={e => setCheckForm(f => ({ ...f, room_counts: { ...f.room_counts, [section]: parseInt(e.target.value) || 1 } }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="form-group">
               <label className="form-label">Assign To</label>
               <select className="form-select" value={checkForm.assigned_to_id} onChange={e => setCheckForm(f => ({ ...f, assigned_to_id: e.target.value }))}>

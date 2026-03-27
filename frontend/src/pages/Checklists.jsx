@@ -7,15 +7,27 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
   const [name, setName] = useState(checklist?.name || '');
   const [desc, setDesc] = useState(checklist?.description || '');
   const [items, setItems] = useState(checklist?.items || []);
+  const [repeatableSections, setRepeatableSections] = useState(checklist?.repeatable_sections || []);
 
   const addItem = () => setItems(i => [...i, { text: '', category: '', score_type: 'pass_fail', weight: 1 }]);
   const update = (idx, field, val) => setItems(i => i.map((it, j) => j === idx ? { ...it, [field]: val } : it));
   const remove = idx => setItems(i => i.filter((_, j) => j !== idx));
 
+  const toggleRepeatable = (cat) => {
+    setRepeatableSections(prev =>
+      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+    );
+  };
+
+  // Unique non-empty categories from current items
+  const uniqueCategories = [...new Set(items.map(it => it.category).filter(Boolean))];
+
   const handleSave = () => {
     if (!name.trim()) return alert('Checklist name required');
     if (items.filter(it => !it.text.trim()).length > 0) return alert('All items must have text');
-    onSave({ name, description: desc, items });
+    // Remove repeatable entries for categories that no longer exist
+    const cleanRS = repeatableSections.filter(c => uniqueCategories.includes(c));
+    onSave({ name, description: desc, items, repeatable_sections: cleanRS });
   };
 
   return (
@@ -49,8 +61,8 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
           </div>
           <div className="flex gap-2" style={{ alignItems: 'flex-end' }}>
             <div style={{ flex: 2 }}>
-              <label className="form-label">Category</label>
-              <input className="form-input" placeholder="e.g. Bathrooms" value={item.category} onChange={e => update(i, 'category', e.target.value)} />
+              <label className="form-label">Section / Room</label>
+              <input className="form-input" placeholder="e.g. Bedroom" value={item.category} onChange={e => update(i, 'category', e.target.value)} />
             </div>
             {item.score_type === '1_to_5' && (
               <div style={{ flex: 1, minWidth: 120 }}>
@@ -69,6 +81,25 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
         </div>
       ))}
       <button className="btn btn-secondary mb-6" onClick={addItem}>+ Add Item</button>
+
+      {/* Repeatable sections */}
+      {uniqueCategories.length > 0 && (
+        <div className="card mb-6" style={{ padding: '16px 20px' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Repeatable Sections</div>
+          <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 14 }}>
+            Tick any sections that can appear multiple times per property (e.g. Bedroom, Bathroom). When creating a QC check you'll enter how many of each the property has.
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {uniqueCategories.map(cat => (
+              <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 8, border: `1px solid ${repeatableSections.includes(cat) ? 'var(--cyan)' : 'var(--border)'}`, background: repeatableSections.includes(cat) ? 'var(--cyan-dim)' : 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+                <input type="checkbox" checked={repeatableSections.includes(cat)} onChange={() => toggleRepeatable(cat)} style={{ accentColor: 'var(--cyan)' }} />
+                {cat}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button className="btn btn-primary" onClick={handleSave}>Save Checklist</button>
         <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
