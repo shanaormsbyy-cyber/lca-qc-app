@@ -41,6 +41,7 @@ export default function QCCheckForm() {
   const cameraInputRefs = useRef({});
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
+  const [editingComplete, setEditingComplete] = useState(false);
 
   const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
@@ -350,7 +351,8 @@ export default function QCCheckForm() {
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!check) return <div className="page"><p>Check not found.</p></div>;
 
-  const pct = check.status === 'complete' ? check.score_pct : liveScore();
+  const isLocked = check.status === 'complete' && !editingComplete;
+  const pct = check.status === 'complete' && !editingComplete ? check.score_pct : liveScore();
 
   const categories = {};
   items.forEach(item => {
@@ -379,12 +381,17 @@ export default function QCCheckForm() {
         <div className="score-bar">
           <div className={`score-fill ${pct >= 85 ? 'green' : pct >= 70 ? 'amber' : 'red'}`} style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
-        {check.status === 'complete' && (
-          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          {check.status === 'complete' && (
             <span style={{ color: 'var(--ok)', fontSize: 13 }}>✓ Signed off by {check.signed_off_by}</span>
+          )}
+          <div className="flex gap-2" style={{ marginLeft: 'auto' }}>
+            {check.status === 'complete' && !editingComplete && (
+              <button className="btn btn-sm btn-secondary" onClick={() => setEditingComplete(true)}>✏️ Edit Check</button>
+            )}
             <button className="btn btn-sm btn-secondary" onClick={exportPDF}>📄 Export PDF</button>
           </div>
-        )}
+        </div>
       </div>
 
       {Object.entries(categories).map(([cat, catItems]) => (
@@ -409,12 +416,12 @@ export default function QCCheckForm() {
                     <div className="pass-fail-btns">
                       <button
                         className={`pf-btn pass${item.score === 1 ? ' active' : ''}`}
-                        disabled={check.status === 'complete'}
+                        disabled={isLocked}
                         onClick={() => setScore(item.id, 1)}
                       >✓ Pass</button>
                       <button
                         className={`pf-btn fail${item.score === 0 && item.score !== null && item.score !== undefined ? ' active' : ''}`}
-                        disabled={check.status === 'complete'}
+                        disabled={isLocked}
                         onClick={() => setScore(item.id, 0)}
                       >✕ Fail</button>
                     </div>
@@ -424,22 +431,21 @@ export default function QCCheckForm() {
                         <button
                           key={n}
                           className={`score-btn${item.score === n ? ' active' : ''}`}
-                          disabled={check.status === 'complete'}
+                          disabled={isLocked}
                           onClick={() => setScore(item.id, n)}
                         >{n}</button>
                       ))}
                     </div>
                   )}
-                  {check.status !== 'complete' && (
+                  {!isLocked ? (
                     <input
                       className="form-input" style={{ marginTop: 10 }}
                       placeholder="Notes (optional)…"
                       value={item.notes || ''}
                       onChange={e => setNote(item.id, e.target.value)}
                     />
-                  )}
-                  {item.notes && check.status === 'complete' && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
+                  ) : (
+                    item.notes && <div style={{ marginTop: 8, fontSize: 12, color: 'var(--t3)', fontStyle: 'italic' }}>{item.notes}</div>
                   )}
 
                   {/* Per-item photo attachment */}
@@ -522,7 +528,7 @@ export default function QCCheckForm() {
           <span className="card-title">Corrective Actions</span>
           <span style={{ fontSize: 12, color: 'var(--t3)' }}>Appears on PDF report</span>
         </div>
-        {check.status !== 'complete' ? (
+        {!isLocked ? (
           <textarea
             className="form-input"
             style={{ minHeight: 100, resize: 'vertical', fontFamily: 'inherit' }}
@@ -545,6 +551,14 @@ export default function QCCheckForm() {
               <button className="btn btn-primary" onClick={() => save(true)} disabled={saving}>
                 {saving ? <><span className="spinner" /> Saving…</> : '✓ Sign Off & Complete'}
               </button>
+            </>
+          )}
+          {editingComplete && (
+            <>
+              <button className="btn btn-primary" onClick={() => save(false)} disabled={saving}>
+                {saving ? <><span className="spinner" /> Saving…</> : '💾 Save Changes'}
+              </button>
+              <button className="btn btn-ghost" onClick={() => { setEditingComplete(false); load(true); }} disabled={saving}>Cancel</button>
             </>
           )}
         </div>
