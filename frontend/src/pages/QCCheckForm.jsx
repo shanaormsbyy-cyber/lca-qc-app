@@ -98,14 +98,46 @@ export default function QCCheckForm() {
     ));
   };
 
+  const compressImage = (file) => new Promise(resolve => {
+    const MAX = 1400;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+
   const uploadPhoto = async (itemId, category, file) => {
-    const fd = new FormData();
-    fd.append('photo', file);
-    fd.append('category', category || '');
-    fd.append('item_id', String(itemId));
-    await api.post(`/qc/checks/${id}/photos`, fd);
-    loadPhotos();
+    // Close picker and show preview immediately
     setPhotoPickerItem(null);
+    const blobUrl = URL.createObjectURL(file);
+    const tempId  = `temp_${Date.now()}`;
+    const key     = String(itemId);
+    setPhotos(prev => ({ ...prev, [key]: [...(prev[key] || []), { id: tempId, blobUrl, uploading: true }] }));
+    try {
+      const compressed = await compressImage(file);
+      const fd = new FormData();
+      fd.append('photo', compressed, file.name);
+      fd.append('category', category || '');
+      fd.append('item_id', key);
+      const r = await api.post(`/qc/checks/${id}/photos`, fd);
+      setPhotos(prev => ({
+        ...prev,
+        [key]: (prev[key] || []).map(p => p.id === tempId ? { id: r.data.id, filename: r.data.filename, blobUrl } : p),
+      }));
+    } catch {
+      setPhotos(prev => ({ ...prev, [key]: (prev[key] || []).filter(p => p.id !== tempId) }));
+      URL.revokeObjectURL(blobUrl);
+      alert('Photo upload failed — please try again.');
+    }
   };
 
   const deletePhoto = async (photoId) => {
@@ -538,8 +570,16 @@ export default function QCCheckForm() {
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                                 {itemPhotos.map(photo => (
                                   <div key={photo.id} style={{ position: 'relative' }}>
-                                    <img src={`/uploads/${photo.filename}`} alt={photo.original_name} style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => window.open(`/uploads/${photo.filename}`, '_blank')} />
-                                    <button onClick={() => deletePhoto(photo.id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+                                    <img
+                                      src={photo.blobUrl || `/uploads/${photo.filename}`}
+                                      alt={photo.original_name}
+                                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: photo.uploading ? 'default' : 'pointer', opacity: photo.uploading ? 0.5 : 1 }}
+                                      onClick={() => { if (!photo.uploading) window.open(`/uploads/${photo.filename}`, '_blank'); }}
+                                    />
+                                    {photo.uploading
+                                      ? <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}><span className="spinner" /></div>
+                                      : <button onClick={() => deletePhoto(photo.id)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'var(--red)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+                                    }
                                   </div>
                                 ))}
                               </div>
