@@ -37,8 +37,8 @@ export default function QCCheckForm() {
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState({});
   const [photoPickerItem, setPhotoPickerItem] = useState(null);
-  const rollInputRefs = useRef({});
-  const cameraInputRefs = useRef({});
+  const rollInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
   const [editingComplete, setEditingComplete] = useState(false);
@@ -103,7 +103,7 @@ export default function QCCheckForm() {
     fd.append('photo', file);
     fd.append('category', category || '');
     fd.append('item_id', String(itemId));
-    await api.post(`/qc/checks/${id}/photos`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    await api.post(`/qc/checks/${id}/photos`, fd);
     loadPhotos();
     setPhotoPickerItem(null);
   };
@@ -544,29 +544,14 @@ export default function QCCheckForm() {
                                 ))}
                               </div>
                             )}
-                            <div style={{ position: 'relative', display: 'inline-block' }}>
-                              <button
-                                onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
-                                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--card)', cursor: 'pointer', gap: 3, color: 'var(--cyan)', padding: 0 }}
-                                title="Add photo"
-                              >
-                                <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
-                                <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
-                              </button>
-                              {isPickerOpen && (
-                                <div style={{ position: 'absolute', bottom: 64, left: 0, zIndex: 100, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', minWidth: 180, overflow: 'hidden' }}>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
-                                    🖼️ Camera Roll
-                                    <input type="file" accept="image/*" style={{ display: 'none' }} ref={el => rollInputRefs.current[item.id] = el} onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }} />
-                                  </label>
-                                  <div style={{ borderTop: '1px solid var(--border)' }} />
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 500 }} onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'} onMouseLeave={e => e.currentTarget.style.background = ''}>
-                                    📸 Take a Photo
-                                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} ref={el => cameraInputRefs.current[item.id] = el} onChange={e => { if (e.target.files[0]) { uploadPhoto(item.id, item.category, e.target.files[0]); e.target.value = ''; } }} />
-                                  </label>
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              onClick={() => setPhotoPickerItem(isPickerOpen ? null : item.id)}
+                              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--card)', cursor: 'pointer', gap: 3, color: 'var(--cyan)', padding: 0 }}
+                              title="Add photo"
+                            >
+                              <span style={{ fontSize: 20, lineHeight: 1 }}>📷</span>
+                              <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1 }}>Add</span>
+                            </button>
                           </div>
                         </div>
                       );
@@ -622,12 +607,25 @@ export default function QCCheckForm() {
         <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
       </div>
 
-      {/* Close photo picker on outside click */}
+      {/* Photo picker bottom sheet */}
       {photoPickerItem !== null && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
-          onClick={() => setPhotoPickerItem(null)}
-        />
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.5)' }} onClick={() => setPhotoPickerItem(null)} />
+          <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 200, background: 'var(--card)', borderTop: '1px solid var(--border)', borderRadius: '16px 16px 0 0', paddingBottom: 'env(safe-area-inset-bottom, 16px)', boxShadow: '0 -4px 24px rgba(0,0,0,0.3)' }}>
+            <div style={{ textAlign: 'center', padding: '12px 16px 8px', fontWeight: 600, fontSize: 14, color: 'var(--t2)' }}>Add Photo</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px', cursor: 'pointer', fontSize: 15, fontWeight: 500, borderTop: '1px solid var(--border)' }}>
+              🖼️ Camera Roll
+              <input ref={rollInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px', cursor: 'pointer', fontSize: 15, fontWeight: 500, borderTop: '1px solid var(--border)' }}>
+              📸 Take a Photo
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
+            </label>
+            <button onClick={() => setPhotoPickerItem(null)} style={{ display: 'block', width: '100%', padding: '14px 24px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--t3)', background: 'transparent', border: 'none', borderTop: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </>
       )}
     </div>
   );
