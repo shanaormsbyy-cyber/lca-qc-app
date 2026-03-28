@@ -647,23 +647,28 @@ export default function QCCheckForm() {
         <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
       </div>
 
-      {/* Photo picker bottom sheet */}
+      {/* Photo picker modal */}
       {photoPickerItem !== null && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.5)' }} onClick={() => setPhotoPickerItem(null)} />
-          <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 200, background: 'var(--card)', borderTop: '1px solid var(--border)', borderRadius: '16px 16px 0 0', paddingBottom: 'env(safe-area-inset-bottom, 16px)', boxShadow: '0 -4px 24px rgba(0,0,0,0.3)' }}>
-            <div style={{ textAlign: 'center', padding: '12px 16px 8px', fontWeight: 600, fontSize: 14, color: 'var(--t2)' }}>Add Photo</div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px', cursor: 'pointer', fontSize: 15, fontWeight: 500, borderTop: '1px solid var(--border)' }}>
-              🖼️ Camera Roll
-              <input ref={rollInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 24px', cursor: 'pointer', fontSize: 15, fontWeight: 500, borderTop: '1px solid var(--border)' }}>
-              📸 Take a Photo
-              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
-            </label>
-            <button onClick={() => setPhotoPickerItem(null)} style={{ display: 'block', width: '100%', padding: '14px 24px', textAlign: 'center', fontSize: 15, fontWeight: 600, color: 'var(--t3)', background: 'transparent', border: 'none', borderTop: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.6)' }} onClick={() => setPhotoPickerItem(null)} />
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 200, background: 'var(--card)', borderRadius: 20, boxShadow: '0 8px 40px rgba(0,0,0,0.5)', width: 'min(320px, 90vw)', padding: '28px 24px 20px', textAlign: 'center' }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>Add Photo</div>
+            <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 24 }}>Choose a source</div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '20px 12px', borderRadius: 14, border: '2px solid var(--cyan)', background: 'var(--cyan-dim)', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: 'var(--cyan)' }}>
+                <span style={{ fontSize: 32, lineHeight: 1 }}>📸</span>
+                Camera
+                <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
+              </label>
+              <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '20px 12px', borderRadius: 14, border: '2px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: 'var(--t1)' }}>
+                <span style={{ fontSize: 32, lineHeight: 1 }}>🖼️</span>
+                Gallery
+                <input ref={rollInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                  onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
+              </label>
+            </div>
+            <button onClick={() => setPhotoPickerItem(null)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', fontSize: 15, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Cancel</button>
           </div>
         </>
       )}
