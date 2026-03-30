@@ -9,6 +9,12 @@ router.get('/', (req, res) => {
   res.json(db.prepare('SELECT * FROM properties ORDER BY name').all());
 });
 
+router.get('/:id', (req, res) => {
+  const property = db.prepare('SELECT * FROM properties WHERE id=?').get(req.params.id);
+  if (!property) return res.status(404).json({ error: 'Not found' });
+  res.json(property);
+});
+
 router.post('/', (req, res) => {
   const { name } = req.body;
   const result = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)').run(name, '', '');

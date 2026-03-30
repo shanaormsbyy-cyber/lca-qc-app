@@ -478,6 +478,142 @@ router.get('/staff/:id/insights', (req, res) => {
   res.json({ insights, summary });
 });
 
+// AI-style insights for a property
+router.get('/properties/:id/insights', (req, res) => {
+  const propId = req.params.id;
+  const today = new Date();
+  const day30Ago = new Date(today); day30Ago.setDate(day30Ago.getDate() - 30);
+  const day30Str = day30Ago.toISOString().slice(0, 10);
+
+  const checks = db.prepare(`
+    SELECT qc.id, qc.date, qc.score_pct
+    FROM qc_checks qc
+    WHERE qc.property_id = ? AND qc.status = 'complete' AND qc.check_type = 'property'
+    ORDER BY qc.date ASC
+  `).all(propId);
+
+  if (checks.length === 0) {
+    return res.json({ insights: [], summary: 'No completed property health checks yet — insights will appear once checks are recorded.' });
+  }
+
+  const failedItems = db.prepare(`
+    SELECT qi.text, qi.category, qci.score, qi.score_type, qc.date,
+      COUNT(*) OVER (PARTITION BY qi.text) as total_fails,
+      MAX(qc.date) OVER (PARTITION BY qi.text) as last_fail,
+      MIN(qc.date) OVER (PARTITION BY qi.text) as first_fail
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE qc.property_id = ? AND qc.status = 'complete' AND qc.check_type = 'property'
+      AND (
+        (qi.score_type = 'pass_fail' AND qci.score = 0)
+        OR (qi.score_type = '1_to_5' AND qci.score <= 2)
+      )
+    ORDER BY qc.date DESC
+  `).all(propId);
+
+  const issueMap = {};
+  failedItems.forEach(row => {
+    if (!issueMap[row.text]) {
+      issueMap[row.text] = { text: row.text, category: row.category, total_fails: row.total_fails, last_fail: row.last_fail, first_fail: row.first_fail };
+    }
+  });
+  const issues = Object.values(issueMap);
+
+  const insights = [];
+
+  // Score trend
+  if (checks.length >= 3) {
+    const recent = checks.slice(-3);
+    const scores = recent.map(c => c.score_pct);
+    const allUp = scores[1] > scores[0] && scores[2] > scores[1];
+    const allDown = scores[1] < scores[0] && scores[2] < scores[1];
+    const latestScore = scores[scores.length - 1];
+    if (allUp) {
+      insights.push({ type: 'positive', text: `Property score has improved across the last 3 checks (${scores.map(s => Math.round(s) + '%').join(' → ')}). Maintenance actions are having a positive effect.` });
+    } else if (allDown) {
+      insights.push({ type: 'warning', text: `Property score has declined across the last 3 checks (${scores.map(s => Math.round(s) + '%').join(' → ')}). Consider a targeted inspection or deep clean.` });
+    }
+    if (latestScore < 70) {
+      insights.push({ type: 'alert', text: `Latest health check score is ${Math.round(latestScore)}% — below the 70% threshold. Recommend scheduling a deep clean or maintenance visit.` });
+    } else if (latestScore >= 90) {
+      insights.push({ type: 'positive', text: `Latest health check score is ${Math.round(latestScore)}% — the property is in excellent condition.` });
+    }
+  }
+
+  // Persistent recurring issues
+  const persistent = issues.filter(i => i.total_fails >= 2 && i.last_fail >= day30Str);
+  persistent.slice(0, 4).forEach(issue => {
+    const rec = getRecommendation(issue.text, issue.category);
+    insights.push({ type: 'alert', text: `"${issue.text}" has been flagged ${issue.total_fails} times${issue.category ? ` (${issue.category})` : ''} and was last noted on ${fmtDate(issue.last_fail)}. ${rec}` });
+  });
+
+  // Resolved issues
+  const resolved = issues.filter(i => i.total_fails >= 2 && i.last_fail < day30Str);
+  resolved.slice(0, 2).forEach(issue => {
+    insights.push({ type: 'positive', text: `"${issue.text}" was previously flagged ${issue.total_fails} times but hasn't appeared in over 30 days — good improvement in this area.` });
+  });
+
+  // Category patterns
+  const categoryCount = {};
+  issues.forEach(i => {
+    if (i.category) {
+      if (!categoryCount[i.category]) categoryCount[i.category] = { fails: 0, items: [] };
+      categoryCount[i.category].fails += i.total_fails;
+      categoryCount[i.category].items.push(i.text);
+    }
+  });
+  const weakCategories = Object.entries(categoryCount)
+    .filter(([, v]) => v.fails >= 3)
+    .sort((a, b) => b[1].fails - a[1].fails)
+    .slice(0, 2);
+  weakCategories.forEach(([cat, v]) => {
+    insights.push({ type: 'warning', text: `${cat} is a recurring problem area with ${v.fails} total failures across ${v.items.length} different items. This area may need a dedicated maintenance response.` });
+  });
+
+  // Inactivity
+  const lastCheck = checks[checks.length - 1];
+  const daysSince = Math.floor((today - new Date(lastCheck.date)) / 86400000);
+  if (daysSince > 30) {
+    insights.push({ type: 'info', text: `Last health check was ${daysSince} days ago (${fmtDate(lastCheck.date)}). Regular checks help catch issues before they escalate.` });
+  }
+
+  const avgScore = checks.reduce((s, c) => s + c.score_pct, 0) / checks.length;
+  let summary;
+  if (avgScore >= 90) summary = `Excellent property condition with an average score of ${Math.round(avgScore)}% across ${checks.length} health checks.`;
+  else if (avgScore >= 80) summary = `Good property condition averaging ${Math.round(avgScore)}% across ${checks.length} checks, with some maintenance areas to watch.`;
+  else if (avgScore >= 70) summary = `Average property health of ${Math.round(avgScore)}% across ${checks.length} checks — targeted maintenance recommended.`;
+  else summary = `Below-target average of ${Math.round(avgScore)}% across ${checks.length} checks — property requires active maintenance attention.`;
+
+  if (insights.length === 0) {
+    insights.push({ type: 'positive', text: 'No recurring issues detected. Property is well maintained.' });
+  }
+
+  res.json({ insights, summary });
+});
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.slice(0, 10).split('-');
+  return `${day}-${m}-${y}`;
+}
+
+function getRecommendation(text, category) {
+  const t = (text || '').toLowerCase();
+  const c = (category || '').toLowerCase();
+  if (t.includes('mould') || t.includes('mold')) return 'Recommend a mould treatment and improved ventilation.';
+  if (t.includes('grout') || t.includes('tile')) return 'Recommend re-grouting or tile cleaning.';
+  if (t.includes('stain')) return 'Recommend professional stain removal or surface replacement.';
+  if (t.includes('silicon') || t.includes('sealant')) return 'Recommend re-sealing affected surfaces.';
+  if (t.includes('dust') || t.includes('dusty')) return 'Recommend a thorough deep clean of surfaces and fixtures.';
+  if (t.includes('broken') || t.includes('damage') || t.includes('cracked')) return 'Recommend repair or replacement of the affected item.';
+  if (t.includes('light') || t.includes('bulb')) return 'Recommend replacing light fittings or bulbs.';
+  if (t.includes('drain') || t.includes('plumb')) return 'Recommend a plumber inspection.';
+  if (c.includes('bathroom') || c.includes('shower')) return 'Recommend a deep clean of bathroom surfaces and fixtures.';
+  if (c.includes('kitchen')) return 'Recommend a deep clean of kitchen surfaces and appliances.';
+  return 'Recommend a targeted maintenance inspection.';
+}
+
 // Common issues for a specific staff member
 router.get('/staff/:id/common-issues', (req, res) => {
   const staffId = req.params.id;

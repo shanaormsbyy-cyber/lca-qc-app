@@ -87,7 +87,7 @@ export default function Properties() {
                 const avg = avgScore(p.id);
                 const total = checks.filter(c => c.property_id === p.id && c.status === 'complete' && c.check_type === 'property').length;
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/properties/${p.id}`)}>
                     <td style={{ fontWeight: 700 }}>{p.name}</td>
                     <td>{d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>

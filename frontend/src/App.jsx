@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Staff from './pages/Staff';
 import StaffProfile from './pages/StaffProfile';
 import Properties from './pages/Properties';
+import PropertyProfile from './pages/PropertyProfile';
 import Training from './pages/Training';
 import TrainingSession from './pages/TrainingSession';
 import QCChecks from './pages/QCChecks';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="team" element={<Navigate to="/staff" replace />} />
         <Route path="team/:id" element={<StaffProfile />} />
         <Route path="properties" element={<Properties />} />
+        <Route path="properties/:id" element={<PropertyProfile />} />
         <Route path="training" element={<Training />} />
         <Route path="training/sessions/:id" element={<TrainingSession />} />
         <Route path="training/induction" element={<InductionTraining />} />
