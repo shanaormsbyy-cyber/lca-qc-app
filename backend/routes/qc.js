@@ -31,7 +31,11 @@ const parseRS = cl => {
 };
 
 router.get('/checklists', (req, res) => {
-  const checklists = db.prepare('SELECT * FROM qc_checklists ORDER BY name').all();
+  const { includeArchived } = req.query;
+  const checklists = db.prepare(
+    includeArchived ? 'SELECT * FROM qc_checklists ORDER BY name'
+                    : 'SELECT * FROM qc_checklists WHERE archived=0 OR archived IS NULL ORDER BY name'
+  ).all();
   checklists.forEach(cl => {
     parseRS(cl);
     cl.items = db.prepare('SELECT * FROM qc_checklist_items WHERE checklist_id=? ORDER BY order_idx').all(cl.id);
@@ -100,6 +104,12 @@ router.put('/checklists/:id', (req, res) => {
     db.exec('ROLLBACK');
     return res.status(500).json({ error: e.message });
   }
+  res.json({ ok: true });
+});
+
+router.put('/checklists/:id/archive', (req, res) => {
+  const { archived } = req.body;
+  db.prepare('UPDATE qc_checklists SET archived=? WHERE id=?').run(archived ? 1 : 0, req.params.id);
   res.json({ ok: true });
 });
 

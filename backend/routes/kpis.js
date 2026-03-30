@@ -309,6 +309,48 @@ router.get('/flagged-items', (req, res) => {
   res.json({ items, period, settings: { minCount, modMin, modMax, majMin, majMax, urgentMin } });
 });
 
+// Trend breakdown for a specific flagged category
+router.get('/flagged-items/trend', (req, res) => {
+  const { category, weeks = 8 } = req.query;
+  if (!category) return res.status(400).json({ error: 'category required' });
+
+  const now = new Date();
+  const trend = [];
+  for (let w = parseInt(weeks) - 1; w >= 0; w--) {
+    const end = new Date(now); end.setDate(end.getDate() - w * 7);
+    const start = new Date(end); start.setDate(start.getDate() - 7);
+    const fromStr = start.toISOString().slice(0, 10);
+    const toStr   = end.toISOString().slice(0, 10);
+    const row = db.prepare(`
+      SELECT COUNT(*) as flag_count
+      FROM qc_check_items qci
+      JOIN qc_checklist_items qi ON qi.id = qci.item_id
+      JOIN qc_checks qc ON qc.id = qci.check_id
+      WHERE COALESCE(qi.category, 'General') = ?
+        AND qc.status = 'complete'
+        AND qc.date >= ? AND qc.date < ?
+        AND (qci.na IS NULL OR qci.na = 0)
+        AND ((qi.score_type = 'pass_fail' AND qci.score = 0) OR (qi.score_type = '1_to_5' AND qci.score <= 2))
+    `).get(category, fromStr, toStr);
+    trend.push({ label: fromStr.slice(5), flag_count: row.flag_count });
+  }
+
+  const items = db.prepare(`
+    SELECT qi.text, COUNT(*) as flag_count, MAX(qc.date) as last_flagged
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE COALESCE(qi.category, 'General') = ?
+      AND qc.status = 'complete'
+      AND (qci.na IS NULL OR qci.na = 0)
+      AND ((qi.score_type = 'pass_fail' AND qci.score = 0) OR (qi.score_type = '1_to_5' AND qci.score <= 2))
+    GROUP BY qi.text
+    ORDER BY flag_count DESC
+  `).all(category);
+
+  res.json({ category, trend, items });
+});
+
 // AI-style performance summary for a staff member
 router.get('/staff/:id/insights', (req, res) => {
   const staffId = req.params.id;

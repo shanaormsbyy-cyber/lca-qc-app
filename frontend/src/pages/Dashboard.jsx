@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { useAuth } from '../context/AuthContext';
@@ -21,6 +22,8 @@ export default function Dashboard() {
   const [flaggedWeek, setFlaggedWeek] = useState([]);
   const [flaggedMonth, setFlaggedMonth] = useState([]);
   const [flagTab, setFlagTab] = useState('week');
+  const [flagDetail, setFlagDetail] = useState(null);
+  const [flagTrend, setFlagTrend] = useState(null);
 
   // Create check modal
   const [showCreate, setShowCreate] = useState(false);
@@ -62,6 +65,13 @@ export default function Dashboard() {
   useEffect(() => { load(); }, [manager.id]);
   useLiveSync(load);
 
+  const openFlagDetail = async (item) => {
+    setFlagDetail(item);
+    setFlagTrend(null);
+    const r = await api.get(`/kpis/flagged-items/trend?category=${encodeURIComponent(item.category)}`);
+    setFlagTrend(r.data);
+  };
+
   const openCreate = async (preselect = {}, type = 'staff') => {
     // Always reload checklists fresh so newly created ones appear
     const freshCL = await api.get('/qc/checklists').then(r => r.data).catch(() => checklists);
@@ -84,7 +94,7 @@ export default function Dashboard() {
     if (!property_id || (staffRequired && !staff_id) || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
     setCreating(true);
     try {
-      const payload = { ...checkForm, staff_id: staff_id || null };
+      const payload = { ...checkForm, staff_id: staff_id || null, check_type: createType };
       const r = await api.post('/qc/checks', payload);
       setShowCreate(false);
       navigate(`/qc/checks/${r.data.id}`);
@@ -220,7 +230,7 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {currentFlagged.map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 14px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 10 }}>
+                <div key={i} onClick={() => openFlagDetail(item)} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 14px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 10, cursor: 'pointer' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{item.category}</div>
                     {item.items?.length > 0 && (
@@ -416,6 +426,53 @@ export default function Dashboard() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Flagged category detail modal */}
+      {flagDetail && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.6)' }} onClick={() => setFlagDetail(null)} />
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 200, background: 'var(--card)', borderRadius: 16, width: 'min(560px, 95vw)', maxHeight: '80vh', overflowY: 'auto', padding: 24, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>{flagDetail.category}</div>
+                <div style={{ fontSize: 13, color: 'var(--t3)', marginTop: 2 }}>{flagDetail.flag_count} flags · <span style={{ ...flagSeverityStyle(flagDetail.color), padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{flagDetail.label}</span></div>
+              </div>
+              <button onClick={() => setFlagDetail(null)} style={{ background: 'transparent', border: 'none', color: 'var(--t3)', fontSize: 20, cursor: 'pointer', padding: '0 4px' }}>✕</button>
+            </div>
+
+            {!flagTrend ? (
+              <div className="loading" style={{ height: 80 }}><div className="spinner" /></div>
+            ) : (
+              <>
+                {flagTrend.trend?.some(t => t.flag_count > 0) && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 10 }}>Flag trend — last 8 weeks</div>
+                    <ResponsiveContainer width="100%" height={140}>
+                      <LineChart data={flagTrend.trend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="label" tick={{ fill: 'var(--t3)', fontSize: 10 }} />
+                        <YAxis allowDecimals={false} tick={{ fill: 'var(--t3)', fontSize: 10 }} />
+                        <Tooltip contentStyle={{ background: 'var(--navy2)', border: '1px solid var(--border)', borderRadius: 8 }} formatter={v => [v, 'Flags']} />
+                        <Line type="monotone" dataKey="flag_count" stroke="var(--red)" strokeWidth={2} dot={{ fill: 'var(--red)', r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 8 }}>All-time breakdown by item</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {flagTrend.items?.map((it, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, gap: 12 }}>
+                      <span style={{ fontSize: 13, flex: 1 }}>{it.text}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', flexShrink: 0 }}>{it.flag_count}× flagged</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       {/* Create QC Check modal */}

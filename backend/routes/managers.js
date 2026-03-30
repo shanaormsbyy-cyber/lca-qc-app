@@ -21,6 +21,13 @@ router.post('/', (req, res) => {
   }
 });
 
+router.put('/:id', (req, res) => {
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  db.prepare('UPDATE managers SET name=? WHERE id=?').run(name.trim(), req.params.id);
+  res.json({ ok: true });
+});
+
 router.put('/:id/password', (req, res) => {
   const { password } = req.body;
   const hash = bcrypt.hashSync(password, 10);

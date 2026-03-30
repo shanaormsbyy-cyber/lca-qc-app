@@ -10,6 +10,7 @@ export default function Settings() {
   const [showPropModal, setShowPropModal] = useState(false);
   const [newMgr, setNewMgr] = useState({ username: '', password: '', name: '' });
   const [mgrMsg, setMgrMsg] = useState('');
+  const [editingMgr, setEditingMgr] = useState(null); // { id, name }
   const [loading, setLoading] = useState(true);
 
   // QC / Alert settings
@@ -64,6 +65,17 @@ export default function Settings() {
       load();
     } catch (e) {
       setMgrMsg(e.response?.data?.error || 'Error creating manager');
+    }
+  };
+
+  const saveManagerName = async () => {
+    if (!editingMgr?.name?.trim()) return;
+    try {
+      await api.put(`/managers/${editingMgr.id}`, { name: editingMgr.name });
+      setEditingMgr(null);
+      load();
+    } catch (e) {
+      setMgrMsg(e.response?.data?.error || 'Error updating name');
     }
   };
 
@@ -207,15 +219,26 @@ export default function Settings() {
             <tbody>
               {managers.map(m => (
                 <tr key={m.id}>
-                  <td style={{ fontWeight: 600 }}>{m.name}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {editingMgr?.id === m.id ? (
+                      <input className="form-input" style={{ padding: '4px 8px', fontSize: 13 }} value={editingMgr.name} onChange={e => setEditingMgr(x => ({ ...x, name: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') saveManagerName(); if (e.key === 'Escape') setEditingMgr(null); }} autoFocus />
+                    ) : m.name}
+                  </td>
                   <td style={{ color: 'var(--t2)' }}>{m.username}</td>
                   <td>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => delManager(m.id, m.name)}
-                      disabled={managers.length <= 1}
-                      title={managers.length <= 1 ? 'Cannot delete the last manager' : ''}
-                    >Delete</button>
+                    <div className="flex gap-2">
+                      {editingMgr?.id === m.id ? (
+                        <>
+                          <button className="btn btn-sm btn-primary" onClick={saveManagerName}>Save</button>
+                          <button className="btn btn-sm btn-ghost" onClick={() => setEditingMgr(null)}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn btn-sm btn-secondary" onClick={() => setEditingMgr({ id: m.id, name: m.name })}>Edit</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => delManager(m.id, m.name)} disabled={managers.length <= 1} title={managers.length <= 1 ? 'Cannot delete the last manager' : ''}>Delete</button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

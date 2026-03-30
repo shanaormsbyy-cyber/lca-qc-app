@@ -181,7 +181,7 @@ export default function Checklists() {
   const [editingTrain, setEditingTrain] = useState(null);
 
   const load = () => Promise.all([
-    api.get('/qc/checklists'),
+    api.get('/qc/checklists?includeArchived=1'),
     api.get('/training/checklists'),
   ]).then(([q, t]) => {
     setChecklists(q.data);
@@ -213,6 +213,11 @@ export default function Checklists() {
   };
   const setDefault = async (id, defaultFor) => {
     await api.put(`/qc/checklists/${id}/set-default`, { default_for: defaultFor });
+    await load();
+  };
+
+  const toggleArchive = async (id, archived) => {
+    await api.put(`/qc/checklists/${id}/archive`, { archived: !archived });
     await load();
   };
 
@@ -321,11 +326,11 @@ export default function Checklists() {
             </div>
           )}
 
-          {checklists.length === 0 ? (
+          {checklists.filter(cl => !cl.archived).length === 0 ? (
             <div className="empty-state"><div className="icon">📋</div>No QC checklists yet. Create one above.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {checklists.map(cl => (
+              {checklists.filter(cl => !cl.archived).map(cl => (
                 <div key={cl.id} className="card">
                   <div className="card-header">
                     <div>
@@ -342,11 +347,34 @@ export default function Checklists() {
                       {cl.default_for !== 'property'  && <button className="btn btn-sm btn-ghost" onClick={() => setDefault(cl.id, 'property')}>Set Property Default</button>}
                       {cl.default_for                 && <button className="btn btn-sm btn-ghost" onClick={() => setDefault(cl.id, null)}>Clear Default</button>}
                       <button className="btn btn-sm btn-secondary" onClick={() => setEditing(cl)}>Edit</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => toggleArchive(cl.id, cl.archived)}>Archive</button>
                       <button className="btn btn-sm btn-danger"    onClick={() => delQC(cl.id)}>Delete</button>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {checklists.some(cl => cl.archived) && (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Archived</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {checklists.filter(cl => cl.archived).map(cl => (
+                  <div key={cl.id} className="card" style={{ opacity: 0.6 }}>
+                    <div className="card-header">
+                      <div>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--t2)' }}>{cl.name}</span>
+                        {cl.description && <div style={{ color: 'var(--t3)', fontSize: 12, marginTop: 2 }}>{cl.description}</div>}
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="btn btn-sm btn-ghost" onClick={() => toggleArchive(cl.id, cl.archived)}>Unarchive</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => delQC(cl.id)}>Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>
