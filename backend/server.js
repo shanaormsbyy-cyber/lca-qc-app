@@ -1,4 +1,5 @@
 const express = require('express');
+
 const cors = require('cors');
 const path = require('path');
 const os = require('os');
@@ -51,6 +52,17 @@ const db = require('./db');
     db.exec("ALTER TABLE qc_checks ADD COLUMN check_type TEXT DEFAULT 'staff'");
     console.log('Migration complete: added check_type column to qc_checks.');
   }
+}
+
+// Fix check_type for existing property health checks that were saved with default 'staff'
+{
+  const fixed = db.prepare(`
+    UPDATE qc_checks
+    SET check_type = 'property'
+    WHERE (check_type IS NULL OR check_type != 'property')
+      AND checklist_id IN (SELECT id FROM qc_checklists WHERE default_for = 'property')
+  `).run();
+  if (fixed.changes > 0) console.log(`Migration: fixed check_type=property for ${fixed.changes} existing property health check(s).`);
 }
 
 // Auto-migrate: add item_id column to qc_check_photos
