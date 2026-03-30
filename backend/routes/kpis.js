@@ -266,20 +266,24 @@ router.get('/flagged-items', (req, res) => {
   const sinceStr = since.toISOString().slice(0, 10);
 
   const rows = db.prepare(`
-    SELECT qi.text, qi.category, qi.score_type,
+    SELECT
+      COALESCE(qi.category, 'General') as category,
       COUNT(*) as flag_count,
-      MAX(qc.date) as last_flagged
+      COUNT(DISTINCT qi.text) as item_count,
+      MAX(qc.date) as last_flagged,
+      GROUP_CONCAT(qi.text) as item_texts_raw
     FROM qc_check_items qci
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.status = 'complete'
       AND qc.date >= ?
+      AND (qci.na IS NULL OR qci.na = 0)
       AND (
         (qi.score_type = 'pass_fail' AND qci.score = 0)
         OR
         (qi.score_type = '1_to_5' AND qci.score <= 2)
       )
-    GROUP BY qi.text
+    GROUP BY COALESCE(qi.category, 'General')
     HAVING COUNT(*) >= ?
     ORDER BY flag_count DESC
   `).all(sinceStr, minCount);
@@ -291,7 +295,17 @@ router.get('/flagged-items', (req, res) => {
     return { label: 'Noted', color: 'grey' };
   };
 
-  const items = rows.map(r => ({ ...r, ...getLabel(r.flag_count) }));
+  const items = rows.map(r => {
+    const uniqueTexts = [...new Set((r.item_texts_raw || '').split(',').filter(Boolean))];
+    return {
+      category: r.category,
+      flag_count: r.flag_count,
+      item_count: r.item_count,
+      last_flagged: r.last_flagged,
+      items: uniqueTexts.slice(0, 4),
+      ...getLabel(r.flag_count),
+    };
+  });
   res.json({ items, period, settings: { minCount, modMin, modMax, majMin, majMax, urgentMin } });
 });
 

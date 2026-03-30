@@ -222,12 +222,17 @@ export default function Dashboard() {
               {currentFlagged.map((item, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 14px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 10 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</div>
-                    {item.category && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{item.category}</div>}
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{item.category}</div>
+                    {item.items?.length > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 3, lineHeight: 1.5 }}>
+                        {item.items.join(' · ')}
+                        {item.item_count > item.items.length ? ` +${item.item_count - item.items.length} more` : ''}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontSize: 12, color: 'var(--t3)' }}>×{item.flag_count}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                     <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, ...flagSeverityStyle(item.color) }}>{item.label}</span>
+                    <span style={{ fontSize: 11, color: 'var(--t3)' }}>{item.flag_count} flag{item.flag_count !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
               ))}
