@@ -487,13 +487,15 @@ export default function Dashboard() {
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
+            {createType !== 'property' && (
             <div className="form-group">
-              <label className="form-label">{createType === 'property' ? 'Who cleaned this property? (optional)' : 'Staff Member Being Assessed'}</label>
+              <label className="form-label">Staff Member Being Assessed</label>
               <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
-                <option value="">{createType === 'property' ? 'Select cleaner…' : 'Select staff member…'}</option>
+                <option value="">Select staff member…</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
+            )}
             <div className="form-group">
               <label className="form-label">Checklist</label>
               <select className="form-select" value={checkForm.checklist_id} onChange={e => setCheckForm(f => ({ ...f, checklist_id: e.target.value }))}>
