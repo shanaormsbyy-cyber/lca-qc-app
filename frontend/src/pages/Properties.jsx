@@ -12,10 +12,9 @@ export default function Properties() {
   const [due, setDue] = useState(null);
   const [checklists, setChecklists] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [checkForm, setCheckForm] = useState({ property_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
 
   const load = () => Promise.all([
@@ -24,14 +23,12 @@ export default function Properties() {
     api.get('/scheduling/due'),
     api.get('/qc/checklists'),
     api.get('/managers'),
-    api.get('/staff'),
-  ]).then(([p, q, d, cl, m, s]) => {
+  ]).then(([p, q, d, cl, m]) => {
     setProperties(p.data);
     setChecks(q.data);
     setDue(d.data);
     setChecklists(cl.data);
     setManagers(m.data);
-    setStaff(s.data);
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
@@ -44,9 +41,9 @@ export default function Properties() {
   };
 
   const createCheck = async () => {
-    const { property_id, staff_id, checklist_id, assigned_to_id, date } = checkForm;
-    if (!property_id || !staff_id || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
-    const r = await api.post('/qc/checks', checkForm);
+    const { property_id, checklist_id, assigned_to_id, date } = checkForm;
+    if (!property_id || !checklist_id || !assigned_to_id || !date) return alert('All fields required');
+    const r = await api.post('/qc/checks', { ...checkForm, staff_id: null, check_type: 'property' });
     setShowModal(false);
     navigate(`/qc/checks/${r.data.id}`);
   };
@@ -151,13 +148,6 @@ export default function Properties() {
               <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>
                 <option value="">Select property…</option>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Staff Member</label>
-              <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
-                <option value="">Select staff member…</option>
-                {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div className="form-group">

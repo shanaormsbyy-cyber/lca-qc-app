@@ -424,7 +424,7 @@ export default function QCCheckForm() {
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{check.checklist_name}</h1>
         <p style={{ color: 'var(--t2)' }}>
-          {check.property_name} · {check.staff_name} · {fmtDate(check.date)}
+          {check.property_name}{check.check_type !== 'property' && check.staff_name ? ` · ${check.staff_name}` : ''} · {fmtDate(check.date)}
           {check.assigned_to_name && <> · Assigned to: <strong style={{ color: 'var(--t1)' }}>{check.assigned_to_name}</strong></>}
         </p>
       </div>

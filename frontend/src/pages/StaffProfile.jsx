@@ -23,7 +23,7 @@ export default function StaffProfile() {
       api.get('/training/sessions'),
     ]).then(([s, q, t]) => {
       setStaff(s.data.find(x => x.id === parseInt(id)));
-      setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete'));
+      setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
