@@ -4,6 +4,74 @@ import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 
+function AccessDetailsTab({ properties }) {
+  const [codes, setCodes] = useState({});
+  const [saving, setSaving] = useState({});
+  const [saved, setSaved] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    properties.forEach(p => { initial[p.id] = p.access_code || ''; });
+    setCodes(initial);
+  }, [properties]);
+
+  const save = async (id) => {
+    setSaving(s => ({ ...s, [id]: true }));
+    try {
+      await api.put(`/properties/${id}`, { access_code: codes[id] });
+      setSaved(s => ({ ...s, [id]: true }));
+      setTimeout(() => setSaved(s => ({ ...s, [id]: false })), 2000);
+    } finally {
+      setSaving(s => ({ ...s, [id]: false }));
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Access Details</span>
+        <span style={{ fontSize: 12, color: 'var(--t3)' }}>Enter access codes, lockbox combos, door codes etc.</span>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '40%' }}>Property</th>
+              <th>Access Code / Notes</th>
+              <th style={{ width: 80 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {properties.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: 700 }}>{p.name}</td>
+                <td>
+                  <input
+                    className="form-input"
+                    style={{ padding: '6px 10px', fontSize: 13 }}
+                    placeholder="e.g. Lockbox: 1234, Front door: 5678…"
+                    value={codes[p.id] ?? ''}
+                    onChange={e => setCodes(c => ({ ...c, [p.id]: e.target.value }))}
+                    onBlur={() => save(p.id)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
+                  />
+                </td>
+                <td>
+                  {saving[p.id]
+                    ? <span style={{ fontSize: 12, color: 'var(--t3)' }}>Saving…</span>
+                    : saved[p.id]
+                    ? <span style={{ fontSize: 12, color: 'var(--green)' }}>✓ Saved</span>
+                    : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function Properties() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
@@ -74,6 +142,7 @@ export default function Properties() {
       <div className="tab-row">
         <button className={`tab-btn${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
         <button className={`tab-btn${tab === 'qc' ? ' active' : ''}`} onClick={() => setTab('qc')}>Health Checks</button>
+        <button className={`tab-btn${tab === 'access' ? ' active' : ''}`} onClick={() => setTab('access')}>Access Details</button>
       </div>
 
       {tab === 'overview' && (
@@ -112,6 +181,10 @@ export default function Properties() {
           </table>
         </div>
         </>
+      )}
+
+      {tab === 'access' && (
+        <AccessDetailsTab properties={properties} />
       )}
 
       {tab === 'qc' && (

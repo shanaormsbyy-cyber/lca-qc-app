@@ -22,8 +22,9 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name } = req.body;
-  db.prepare('UPDATE properties SET name=? WHERE id=?').run(name, req.params.id);
+  const { name, access_code } = req.body;
+  if (name !== undefined) db.prepare('UPDATE properties SET name=? WHERE id=?').run(name, req.params.id);
+  if (access_code !== undefined) db.prepare('UPDATE properties SET access_code=? WHERE id=?').run(access_code, req.params.id);
   res.json({ ok: true });
 });
 
