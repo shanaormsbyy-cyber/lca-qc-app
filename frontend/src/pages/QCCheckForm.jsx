@@ -41,6 +41,7 @@ export default function QCCheckForm() {
   const cameraInputRef = useRef(null);
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [editingComplete, setEditingComplete] = useState(false);
   const [openSections, setOpenSections] = useState(new Set());
 
@@ -608,7 +609,29 @@ export default function QCCheckForm() {
       <div className="card mb-6">
         <div className="card-header">
           <span className="card-title">Corrective Actions</span>
-          <span style={{ fontSize: 12, color: 'var(--t3)' }}>Appears on PDF report</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {!isLocked && (
+              <button
+                className="btn btn-sm"
+                disabled={aiSummaryLoading}
+                onClick={async () => {
+                  setAiSummaryLoading(true);
+                  try {
+                    const r = await api.post(`/qc/checks/${id}/ai-summary`);
+                    setCorrectiveActions(r.data.summary);
+                  } catch (e) {
+                    alert(e.response?.data?.error || 'AI summary failed');
+                  } finally {
+                    setAiSummaryLoading(false);
+                  }
+                }}
+                style={{ background: 'rgba(139,92,246,0.12)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                {aiSummaryLoading ? <><span className="spinner" style={{ width: 12, height: 12, borderColor: '#8b5cf6', borderTopColor: 'transparent' }} /> Writing…</> : '✦ Write AI Summary'}
+              </button>
+            )}
+            <span style={{ fontSize: 12, color: 'var(--t3)' }}>Appears on PDF report</span>
+          </div>
         </div>
         {!isLocked ? (
           <textarea

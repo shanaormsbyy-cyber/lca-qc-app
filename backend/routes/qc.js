@@ -302,6 +302,84 @@ router.delete('/checks/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// AI summary for corrective actions
+router.post('/checks/:id/ai-summary', async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'AI not configured — set ANTHROPIC_API_KEY' });
+
+  const check = db.prepare(`
+    SELECT qc.*, p.name as property_name, s.name as staff_name
+    FROM qc_checks qc
+    JOIN properties p ON p.id = qc.property_id
+    LEFT JOIN staff s ON s.id = qc.staff_id
+    WHERE qc.id = ?
+  `).get(req.params.id);
+  if (!check) return res.status(404).json({ error: 'Not found' });
+
+  const items = db.prepare(`
+    SELECT qci.score, qci.notes, qci.na, qi.text, qi.category, qi.score_type, qi.weight,
+      COALESCE(qci.room_label, qi.category) as room_label
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    WHERE qci.check_id = ?
+    ORDER BY qci.id
+  `).all(req.params.id);
+
+  const passed = [];
+  const failed = [];
+  items.forEach(item => {
+    if (item.na) return;
+    const fail = item.score_type === 'pass_fail' ? item.score === 0 : item.score <= 2;
+    const label = item.room_label || item.category || 'General';
+    if (fail) failed.push(`- ${label}: ${item.text}${item.notes ? ` (note: ${item.notes})` : ''}`);
+    else passed.push(`- ${label}: ${item.text}`);
+  });
+
+  const checkTypeLabel = check.check_type === 'property' ? 'property health check' : 'cleaner performance check';
+  const subjectLabel = check.check_type === 'property'
+    ? `the property "${check.property_name}"`
+    : `${check.staff_name || 'the cleaner'} at "${check.property_name}"`;
+
+  const prompt = `You are a professional cleaning quality control manager. Write a concise corrective actions paragraph (3-5 sentences) for ${subjectLabel} following a ${checkTypeLabel}.
+
+Score: ${check.score_pct != null ? Math.round(check.score_pct) + '%' : 'not yet scored'}
+
+Passed items:
+${passed.slice(0, 20).join('\n') || 'None recorded'}
+
+Failed/low-scoring items:
+${failed.slice(0, 20).join('\n') || 'None — all items passed'}
+
+Write ONE paragraph that:
+1. Acknowledges what was done well (reference specific passed areas)
+2. Clearly states what needs improvement (reference the specific failed items)
+3. Gives practical, actionable steps to address those issues
+
+Be constructive, professional, and direct. Do not use bullet points — write in flowing prose.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(500).json({ error: data.error?.message || 'AI request failed' });
+    const text = data.content?.[0]?.text || '';
+    res.json({ summary: text.trim() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Photos ───────────────────────────────────────────────────────────────────
 
 router.get('/checks/:id/photos', (req, res) => {
