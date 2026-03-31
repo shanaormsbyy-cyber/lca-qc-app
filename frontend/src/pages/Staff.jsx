@@ -21,6 +21,7 @@ export default function Staff() {
   const [staffForm, setStaffForm] = useState({ name: '', role: 'Cleaner', start_date: '' });
   const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const load = () => Promise.all([
     api.get('/staff'),
@@ -104,13 +105,23 @@ export default function Staff() {
       </div>
 
       {tab === 'team' && (
+        <>
+        <div style={{ marginBottom: 16 }}>
+          <input
+            className="form-input"
+            style={{ maxWidth: 300 }}
+            placeholder="Search staff…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
         <div className="table-wrap">
           <table>
             <thead><tr>
               <th>Name</th><th>Role</th><th>Due Status</th><th>Last Check</th><th>Avg Score</th><th>Total Checks</th><th></th>
             </tr></thead>
             <tbody>
-              {staff.map(s => {
+              {staff.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.role.toLowerCase().includes(search.toLowerCase())).map(s => {
                 const d = dueInfo(s.id);
                 const avg = avgScore(s.id);
                 const total = checks.filter(c => c.staff_id === s.id && c.status === 'complete').length;
@@ -141,6 +152,7 @@ export default function Staff() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {tab === 'qc' && (

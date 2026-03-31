@@ -16,6 +16,7 @@ export default function Properties() {
   const [showModal, setShowModal] = useState(false);
   const [checkForm, setCheckForm] = useState({ property_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const load = () => Promise.all([
     api.get('/properties'),
@@ -76,13 +77,23 @@ export default function Properties() {
       </div>
 
       {tab === 'overview' && (
+        <>
+        <div style={{ marginBottom: 16 }}>
+          <input
+            className="form-input"
+            style={{ maxWidth: 300 }}
+            placeholder="Search properties…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
         <div className="table-wrap">
           <table>
             <thead><tr>
               <th>Property</th><th>Due Status</th><th>Last Check</th><th>Next Due</th><th>Avg Score</th><th>Total Checks</th>
             </tr></thead>
             <tbody>
-              {properties.map(p => {
+              {properties.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => {
                 const d = dueInfo(p.id);
                 const avg = avgScore(p.id);
                 const total = checks.filter(c => c.property_id === p.id && c.status === 'complete' && c.check_type === 'property').length;
@@ -100,6 +111,7 @@ export default function Properties() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {tab === 'qc' && (
