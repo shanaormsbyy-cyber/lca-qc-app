@@ -8,6 +8,7 @@ function AccessDetailsTab({ properties }) {
   const [codes, setCodes] = useState({});
   const [saving, setSaving] = useState({});
   const [saved, setSaved] = useState({});
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const initial = {};
@@ -26,11 +27,24 @@ function AccessDetailsTab({ properties }) {
     }
   };
 
+  const sorted = [...properties]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
     <div className="card">
       <div className="card-header">
         <span className="card-title">Access Details</span>
         <span style={{ fontSize: 12, color: 'var(--t3)' }}>Enter access codes, lockbox combos, door codes etc.</span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <input
+          className="form-input"
+          style={{ maxWidth: 300 }}
+          placeholder="Search properties…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
       <div className="table-wrap">
         <table>
@@ -42,7 +56,7 @@ function AccessDetailsTab({ properties }) {
             </tr>
           </thead>
           <tbody>
-            {properties.map(p => (
+            {sorted.map(p => (
               <tr key={p.id}>
                 <td style={{ fontWeight: 700 }}>{p.name}</td>
                 <td>
