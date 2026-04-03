@@ -99,6 +99,8 @@ export default function Properties() {
   const [checkForm, setCheckForm] = useState({ property_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [inactiveModal, setInactiveModal] = useState(null); // { id, name, inactive_until }
+  const [inactiveDate, setInactiveDate] = useState('');
 
   const load = () => Promise.all([
     api.get('/properties'),
@@ -129,6 +131,18 @@ export default function Properties() {
     const r = await api.post('/qc/checks', { ...checkForm, staff_id: null, check_type: 'property' });
     setShowModal(false);
     navigate(`/qc/checks/${r.data.id}`);
+  };
+
+  const saveInactive = async () => {
+    await api.put(`/properties/${inactiveModal.id}`, { inactive_until: inactiveDate || null });
+    setInactiveModal(null);
+    setInactiveDate('');
+    await load();
+  };
+
+  const clearInactive = async (id) => {
+    await api.put(`/properties/${id}`, { inactive_until: null });
+    await load();
   };
 
   const deleteCheck = async (id, e) => {
@@ -173,21 +187,28 @@ export default function Properties() {
         <div className="table-wrap">
           <table>
             <thead><tr>
-              <th>Property</th><th>Due Status</th><th>Last Check</th><th>Next Due</th><th>Avg Score</th><th>Total Checks</th>
+              <th>Property</th><th>Due Status</th><th>Last Check</th><th>Next Due</th><th>Avg Score</th><th>Total Checks</th><th></th>
             </tr></thead>
             <tbody>
               {properties.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => {
                 const d = dueInfo(p.id);
                 const avg = avgScore(p.id);
                 const total = checks.filter(c => c.property_id === p.id && c.status === 'complete' && c.check_type === 'property').length;
+                const isInactive = p.inactive_until && p.inactive_until >= new Date().toISOString().slice(0, 10);
                 return (
-                  <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/properties/${p.id}`)}>
+                  <tr key={p.id} style={{ cursor: 'pointer', opacity: isInactive ? 0.6 : 1 }} onClick={() => navigate(`/properties/${p.id}`)}>
                     <td style={{ fontWeight: 700 }}>{p.name}</td>
                     <td>{d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>
-                    <td style={{ color: 'var(--t2)' }}>{d?.next_due || '—'}</td>
+                    <td style={{ color: 'var(--t2)' }}>{isInactive ? `Until ${p.inactive_until}` : d?.next_due || '—'}</td>
                     <td><ScoreBadge score={avg} /></td>
                     <td style={{ color: 'var(--t2)' }}>{total}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      {isInactive
+                        ? <button className="btn btn-sm btn-ghost" onClick={() => clearInactive(p.id)}>Reactivate</button>
+                        : <button className="btn btn-sm btn-ghost" onClick={() => { setInactiveModal(p); setInactiveDate(''); }}>Mark Inactive</button>
+                      }
+                    </td>
                   </tr>
                 );
               })}
@@ -236,6 +257,25 @@ export default function Properties() {
             )
           }
         </>
+      )}
+
+      {inactiveModal && (
+        <div className="modal-overlay" onClick={() => setInactiveModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Mark Property Inactive</div>
+            <p style={{ color: 'var(--t2)', fontSize: 14, marginBottom: 20 }}>
+              <strong>{inactiveModal.name}</strong> will be hidden from overdue tracking until the date you set. Use this for long stays or renovation periods.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Inactive Until</label>
+              <input className="form-input" type="date" value={inactiveDate} onChange={e => setInactiveDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} />
+            </div>
+            <div className="flex gap-3">
+              <button className="btn btn-primary" onClick={saveInactive} disabled={!inactiveDate}>Confirm</button>
+              <button className="btn btn-ghost" onClick={() => setInactiveModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showModal && (

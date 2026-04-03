@@ -29,6 +29,7 @@ export function StatusBadge({ status }) {
 }
 
 export function DueBadge({ status, daysLeft }) {
+  if (status === 'inactive') return <span className="badge badge-grey">Inactive</span>;
   if (status === 'overdue') return <span className="badge badge-red">⚠ {Math.abs(daysLeft || 0)}d overdue</span>;
   if (status === 'due_soon') return <span className="badge badge-amber">⏰ Due in {daysLeft}d</span>;
   return <span className="badge badge-green">✓ {daysLeft}d left</span>;
