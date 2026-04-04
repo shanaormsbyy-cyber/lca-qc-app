@@ -188,5 +188,7 @@ insertSetting.run('flag_moderate_max', '4');
 insertSetting.run('flag_major_min', '5');
 insertSetting.run('flag_major_max', '7');
 insertSetting.run('flag_urgent_min', '8');
+insertSetting.run('top_performers_threshold', '90');
+insertSetting.run('top_performers_min_checks', '3');
 
 module.exports = db;

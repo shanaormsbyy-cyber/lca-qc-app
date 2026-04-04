@@ -205,6 +205,47 @@ router.get('/properties', (req, res) => {
   res.json(props);
 });
 
+// Top performers
+router.get('/top-performers', (req, res) => {
+  const settingsRows = db.prepare('SELECT * FROM settings').all();
+  const settings = {};
+  settingsRows.forEach(s => { settings[s.key] = s.value; });
+  const threshold = parseFloat(settings.top_performers_threshold || '90');
+  const minChecks = parseInt(settings.top_performers_min_checks || '3');
+
+  const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
+  const topPerformers = [];
+
+  staff.forEach(s => {
+    const result = db.prepare(`
+      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+      FROM qc_checks
+      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+    `).get(s.id);
+
+    if (result.cnt >= minChecks && result.avg != null && result.avg >= threshold) {
+      const recent = db.prepare(`
+        SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
+        FROM qc_checks
+        JOIN properties ON properties.id = qc_checks.property_id
+        WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+        ORDER BY qc_checks.date DESC LIMIT 3
+      `).all(s.id);
+
+      topPerformers.push({
+        ...s,
+        avg_score: Math.round(result.avg),
+        total_checks: result.cnt,
+        recent_checks: recent,
+        threshold,
+      });
+    }
+  });
+
+  topPerformers.sort((a, b) => b.avg_score - a.avg_score);
+  res.json({ topPerformers, threshold, minChecks });
+});
+
 // Performance watchlist
 router.get('/watchlist', (req, res) => {
   const settingsRows = db.prepare('SELECT * FROM settings').all();

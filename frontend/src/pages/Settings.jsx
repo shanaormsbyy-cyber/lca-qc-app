@@ -18,6 +18,8 @@ export default function Settings() {
     qc_freq_staff_days: '30',
     qc_freq_property_days: '14',
     watchlist_threshold: '90',
+    top_performers_threshold: '90',
+    top_performers_min_checks: '3',
     flag_min_count: '3',
     flag_moderate_min: '3',
     flag_moderate_max: '4',
@@ -133,6 +135,22 @@ export default function Settings() {
             <input className="form-input" type="number" min="1" max="100" value={qcSettings.watchlist_threshold}
               onChange={e => setSetting('watchlist_threshold', e.target.value)} />
             <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Cleaners with avg QC score below this % appear on the watchlist</div>
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>Top Performers</div>
+        <div className="form-row mb-6">
+          <div className="form-group">
+            <label className="form-label">Top Performer Threshold (%)</label>
+            <input className="form-input" type="number" min="1" max="100" value={qcSettings.top_performers_threshold}
+              onChange={e => setSetting('top_performers_threshold', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Cleaners with avg QC score at or above this % appear as top performers</div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Minimum Checks Required</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.top_performers_min_checks}
+              onChange={e => setSetting('top_performers_min_checks', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Minimum number of completed checks before a cleaner can qualify</div>
           </div>
         </div>
 

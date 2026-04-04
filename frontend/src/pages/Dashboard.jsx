@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [allQC, setAllQC] = useState([]);
   const [loading, setLoading] = useState(true);
   const [watchlist, setWatchlist] = useState([]);
+  const [topPerformers, setTopPerformers] = useState([]);
   const [flaggedWeek, setFlaggedWeek] = useState([]);
   const [flaggedMonth, setFlaggedMonth] = useState([]);
   const [flagTab, setFlagTab] = useState('week');
@@ -58,6 +59,7 @@ export default function Dashboard() {
       setManagers(mR.data);
     }).finally(() => setLoading(false));
     api.get('/kpis/watchlist').then(r => setWatchlist(r.data.watchlist || [])).catch(() => {});
+    api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
   };
@@ -183,17 +185,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Watchlist + Flagged Issues — side by side */}
+      {/* Watchlist + Top Performers + Flagged Issues */}
       <div className="card-row mb-6">
         {/* Performance Watchlist */}
         <div className="card" style={{ flex: 1, marginBottom: 0 }}>
           <div className="card-header">
-            <span className="card-title">⚠️ Performance Watchlist</span>
+            <span className="card-title">Performance Watchlist</span>
             <button className="btn btn-sm btn-ghost" onClick={() => navigate('/settings')}>Settings</button>
           </div>
           {watchlist.length === 0 ? (
             <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>
-              ✓ All team members are performing above the threshold.
+              All team members are performing above the threshold.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -207,6 +209,40 @@ export default function Dashboard() {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--red)' }}>{w.avg_score}%</div>
                     <div style={{ fontSize: 11, color: 'var(--t3)' }}>below {w.threshold}% threshold</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Top Performers */}
+        <div className="card" style={{ flex: 1, marginBottom: 0 }}>
+          <div className="card-header">
+            <span className="card-title">Top Performers</span>
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/settings')}>Settings</button>
+          </div>
+          {topPerformers.length === 0 ? (
+            <div style={{ color: 'var(--t3)', fontSize: 13, padding: '8px 0' }}>
+              No cleaners have reached the top performer threshold yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {topPerformers.map((w, i) => (
+                <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--cyan-dim)', border: '1px solid rgba(58,181,217,0.25)', borderRadius: 10, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 11, flexShrink: 0 }}>
+                      {i + 1}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{w.total_checks} check{w.total_checks !== 1 ? 's' : ''} completed</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--cyan)' }}>{w.avg_score}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>avg score</div>
                   </div>
                 </div>
               ))}
