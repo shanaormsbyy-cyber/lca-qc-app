@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { fmtDate } from '../utils';
-import logoUrl from '../assets/logo.png';
+
 import useLiveSync from '../hooks/useLiveSync';
 
 // RGB colour constants used in PDF — LCA brand colours
@@ -185,38 +185,16 @@ export default function QCCheckForm() {
       const pct = Math.round(check.score_pct || liveScore());
       const today = new Date().toISOString().slice(0, 10);
 
-      // Fetch logo
-      let logoB64 = null;
-      try {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 3000);
-        const resp = await fetch(logoUrl, { signal: controller.signal });
-        clearTimeout(t);
-        const blob = await resp.blob();
-        logoB64 = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
-        });
-      } catch (_) {}
-
       // ── HEADER ────────────────────────────────────────────────────────────────
       doc.setFillColor(8, 8, 12);
       doc.rect(0, 0, W, 40, 'F');
       doc.setFillColor(58, 181, 217);
       doc.rect(0, 38, W, 2, 'F');
 
-      if (logoB64) {
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(8, 5, 30, 30, 2, 2, 'F');
-        doc.addImage(logoB64, 'JPEG', 8, 5, 30, 30);
-      }
-
-      const textX = logoB64 ? 44 : 14;
       doc.setFontSize(18);
       doc.setFont(undefined, 'bold');
       doc.setTextColor(255, 255, 255);
-      doc.text('LCA Cleaning Services', textX, 18);
+      doc.text('Team Member Quality Control Report', 14, 18);
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(58, 181, 217);
@@ -398,7 +376,7 @@ export default function QCCheckForm() {
       doc.text(`${check.signed_off_by || '—'}  |  ${fmtDate(check.date)}  |  ${check.assigned_to_name || '—'}`, 14, y + 5);
 
       const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
-      doc.save(`LCA-QC-${safeName}-${check.date}.pdf`);
+      doc.save(`QC-Report-${safeName}-${check.date}.pdf`);
     } catch (err) {
       console.error('PDF export failed:', err);
       alert('PDF export failed: ' + err.message);

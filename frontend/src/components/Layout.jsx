@@ -11,6 +11,7 @@ const NAV = [
   { to: '/training',    label: 'Training' },
   { to: '/heatpump',    label: 'Heat Pumps' },
   { to: '/kpis',        label: 'KPIs' },
+  { to: '/staff-logins', label: 'Staff Logins' },
   { to: '/settings',    label: 'Settings' },
 ];
 

@@ -18,6 +18,10 @@ import Settings from './pages/Settings';
 import InductionTraining from './pages/InductionTraining';
 import HeatPumpTracker from './pages/HeatPumpTracker';
 import HeatPumpDetail from './pages/HeatPumpDetail';
+import StaffLogins from './pages/StaffLogins';
+import StaffPortalLogin from './pages/StaffPortalLogin';
+import StaffPortalDashboard from './pages/StaffPortalDashboard';
+import StaffPortalCheck from './pages/StaffPortalCheck';
 
 function RequireAuth({ children }) {
   const { manager, loading } = useAuth();
@@ -51,8 +55,13 @@ export default function App() {
         <Route path="kpis/:managerId" element={<ManagerProfile />} />
         <Route path="heatpump" element={<HeatPumpTracker />} />
         <Route path="heatpump/:id" element={<HeatPumpDetail />} />
+        <Route path="staff-logins" element={<StaffLogins />} />
         <Route path="settings" element={<Settings />} />
       </Route>
+      {/* Staff Portal (no manager auth required) */}
+      <Route path="/portal/login" element={<StaffPortalLogin />} />
+      <Route path="/portal" element={<StaffPortalDashboard />} />
+      <Route path="/portal/check/:id" element={<StaffPortalCheck />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

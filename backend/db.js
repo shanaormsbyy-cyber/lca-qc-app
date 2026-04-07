@@ -52,6 +52,14 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS staff_credentials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    staff_id INTEGER NOT NULL UNIQUE REFERENCES staff(id) ON DELETE CASCADE,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS properties (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
