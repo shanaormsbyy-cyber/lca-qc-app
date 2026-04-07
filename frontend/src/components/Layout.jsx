@@ -9,6 +9,7 @@ const NAV = [
   { to: '/qc',          label: 'QC Checks' },
   { to: '/checklists',  label: 'Checklists' },
   { to: '/training',    label: 'Training' },
+  { to: '/heatpump',    label: 'Heat Pumps' },
   { to: '/kpis',        label: 'KPIs' },
   { to: '/settings',    label: 'Settings' },
 ];

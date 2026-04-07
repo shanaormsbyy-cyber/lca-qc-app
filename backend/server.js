@@ -252,6 +252,7 @@ app.use('/api/training',   require('./routes/training'));
 app.use('/api/qc',         require('./routes/qc'));
 app.use('/api/scheduling', require('./routes/scheduling'));
 app.use('/api/kpis',       require('./routes/kpis'));
+app.use('/api/heatpump',   require('./routes/heatpump'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');

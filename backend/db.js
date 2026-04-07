@@ -162,6 +162,24 @@ db.exec(`
     original_name TEXT,
     uploaded_at TEXT DEFAULT (datetime('now'))
   );
+
+  -- Heat Pump Filter Tracker
+  CREATE TABLE IF NOT EXISTS heatpump_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    due_date TEXT,
+    last_completed TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS heatpump_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL REFERENCES heatpump_records(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT,
+    uploaded_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // ── Migrations — safe ALTER TABLE (no-op if column already exists) ─────────────

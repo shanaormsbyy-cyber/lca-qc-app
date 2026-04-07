@@ -16,6 +16,8 @@ import KPIs from './pages/KPIs';
 import ManagerProfile from './pages/ManagerProfile';
 import Settings from './pages/Settings';
 import InductionTraining from './pages/InductionTraining';
+import HeatPumpTracker from './pages/HeatPumpTracker';
+import HeatPumpDetail from './pages/HeatPumpDetail';
 
 function RequireAuth({ children }) {
   const { manager, loading } = useAuth();
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="checklists" element={<Checklists />} />
         <Route path="kpis" element={<KPIs />} />
         <Route path="kpis/:managerId" element={<ManagerProfile />} />
+        <Route path="heatpump" element={<HeatPumpTracker />} />
+        <Route path="heatpump/:id" element={<HeatPumpDetail />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
