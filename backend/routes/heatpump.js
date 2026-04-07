@@ -111,6 +111,20 @@ router.delete('/photos/:photoId', (req, res) => {
   res.json({ ok: true });
 });
 
+// Add all properties that aren't tracked yet
+router.post('/records/add-all', (req, res) => {
+  const missing = db.prepare(`
+    SELECT id FROM properties
+    WHERE id NOT IN (SELECT property_id FROM heatpump_records)
+  `).all();
+  let count = 0;
+  for (const p of missing) {
+    db.prepare('INSERT INTO heatpump_records (property_id) VALUES (?)').run(p.id);
+    count++;
+  }
+  res.json({ added: count });
+});
+
 // Get properties that don't have a heat pump record yet (for adding new ones)
 router.get('/available-properties', (req, res) => {
   const properties = db.prepare(`

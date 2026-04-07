@@ -48,6 +48,11 @@ export default function HeatPumpTracker() {
     load();
   };
 
+  const handleAddAll = async () => {
+    await api.post('/heatpump/records/add-all');
+    load();
+  };
+
   const filtered = records.filter(r => {
     if (filter === 'all') return true;
     const { status } = getDueStatus(r.due_date);
@@ -66,7 +71,10 @@ export default function HeatPumpTracker() {
           <h1 className="page-title">Heat Pump Filter Tracker</h1>
           <p className="page-subtitle">{records.length} properties tracked</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add Property</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {available.length > 0 && <button className="btn" onClick={handleAddAll}>Add All Properties</button>}
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add Property</button>
+        </div>
       </div>
 
       {(overdue > 0 || dueSoon > 0) && (
