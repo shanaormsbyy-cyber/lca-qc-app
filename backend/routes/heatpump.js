@@ -23,6 +23,12 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 const router = express.Router();
 router.use(requireAuth);
 
+// Format a Date as YYYY-MM-DD in NZ timezone
+function nzDate(d) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); // en-CA gives YYYY-MM-DD
+}
+
+
 // Get all heat pump records (one per property) with property info
 router.get('/records', (req, res) => {
   const records = db.prepare(`
@@ -71,13 +77,13 @@ router.put('/records/:id', (req, res) => {
 router.post('/records/:id/complete', (req, res) => {
   const record = db.prepare('SELECT * FROM heatpump_records WHERE id=?').get(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  const now = new Date().toISOString().slice(0, 10);
+  const now = nzDate(new Date());
   // Advance due date by configurable interval (default 90 days)
   const freqRow = db.prepare("SELECT value FROM settings WHERE key='heatpump_freq_days'").get();
   const freqDays = parseInt(freqRow?.value || '90') || 90;
   const nextDue = new Date();
   nextDue.setDate(nextDue.getDate() + freqDays);
-  const nextDueStr = nextDue.toISOString().slice(0, 10);
+  const nextDueStr = nzDate(nextDue);
   db.prepare('UPDATE heatpump_records SET last_completed=?, due_date=? WHERE id=?')
     .run(now, nextDueStr, req.params.id);
   res.json({ ok: true, last_completed: now, due_date: nextDueStr });
@@ -91,7 +97,7 @@ router.post('/recalculate', (req, res) => {
   for (const r of records) {
     const completed = new Date(r.last_completed + 'T00:00:00');
     completed.setDate(completed.getDate() + freqDays);
-    db.prepare('UPDATE heatpump_records SET due_date=? WHERE id=?').run(completed.toISOString().slice(0, 10), r.id);
+    db.prepare('UPDATE heatpump_records SET due_date=? WHERE id=?').run(nzDate(completed), r.id);
   }
   res.json({ ok: true, updated: records.length });
 });
