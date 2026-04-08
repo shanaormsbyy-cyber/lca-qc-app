@@ -27,6 +27,7 @@ export default function HeatPumpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const fileRef = useRef();
+  const galleryRef = useRef();
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -159,10 +160,14 @@ export default function HeatPumpDetail() {
             <span style={{ fontSize: 12, color: 'var(--t3)' }}>{record.photos?.length || 0} photos</span>
           </div>
 
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input type="file" accept="image/*" capture="environment" ref={fileRef} onChange={handlePhoto} style={{ display: 'none' }} />
+            <input type="file" accept="image/*" ref={galleryRef} onChange={handlePhoto} style={{ display: 'none' }} />
             <button className="btn btn-primary" onClick={() => fileRef.current?.click()} disabled={uploading}>
-              {uploading ? 'Uploading...' : 'Upload Photo'}
+              {uploading ? 'Uploading...' : 'Take Photo'}
+            </button>
+            <button className="btn" onClick={() => galleryRef.current?.click()} disabled={uploading}>
+              Choose from Gallery
             </button>
           </div>
 

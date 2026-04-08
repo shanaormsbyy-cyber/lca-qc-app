@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { fmtDate } from '../utils';
@@ -53,6 +55,111 @@ export default function HeatPumpTracker() {
     load();
   };
 
+  const exportReport = () => {
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210;
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Header
+    doc.setFillColor(8, 8, 12);
+    doc.rect(0, 0, W, 40, 'F');
+    doc.setFillColor(58, 181, 217);
+    doc.rect(0, 38, W, 2, 'F');
+
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Heat Pump Filter Clean Report', 14, 18);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(58, 181, 217);
+    doc.text('Compiled Summary of All Properties', 14, 26);
+    doc.setFontSize(8);
+    doc.setTextColor(160, 190, 200);
+    doc.text(`Generated: ${fmtDate(today)}`, W - 14, 12, { align: 'right' });
+
+    // Summary stats
+    let y = 50;
+    const overdue = records.filter(r => getDueStatus(r.due_date).status === 'overdue').length;
+    const dueSoon = records.filter(r => getDueStatus(r.due_date).status === 'due_soon').length;
+    const okCount = records.filter(r => getDueStatus(r.due_date).status === 'ok').length;
+    const noDate = records.filter(r => getDueStatus(r.due_date).status === 'none').length;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(58, 181, 217);
+    doc.text('Summary', 14, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`Total Properties: ${records.length}`, 14, y);
+    doc.text(`Overdue: ${overdue}`, 80, y);
+    doc.text(`Due Soon: ${dueSoon}`, 120, y);
+    doc.text(`On Track: ${okCount}`, 160, y);
+    y += 12;
+
+    // Table
+    const sorted = [...records].sort((a, b) => {
+      const sa = getDueStatus(a.due_date);
+      const sb = getDueStatus(b.due_date);
+      const order = { overdue: 0, due_soon: 1, ok: 2, none: 3 };
+      return (order[sa.status] ?? 3) - (order[sb.status] ?? 3);
+    });
+
+    const tableBody = sorted.map(r => {
+      const { status, daysLeft } = getDueStatus(r.due_date);
+      const statusLabel = status === 'overdue' ? `${daysLeft}d overdue` : status === 'due_soon' ? `Due in ${daysLeft}d` : status === 'ok' ? `${daysLeft}d left` : 'No date set';
+      return [
+        r.property_name,
+        fmtDate(r.due_date),
+        fmtDate(r.last_completed),
+        statusLabel,
+        r.notes || '',
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Property', 'Due Date', 'Last Completed', 'Status', 'Notes']],
+      body: tableBody,
+      theme: 'striped',
+      headStyles: { fillColor: [8, 8, 12], textColor: [58, 181, 217], fontStyle: 'bold', fontSize: 8 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 50, fontStyle: 'bold' },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 'auto' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const val = String(data.cell.raw);
+          if (val.includes('overdue')) { data.cell.styles.textColor = [220, 50, 50]; data.cell.styles.fontStyle = 'bold'; }
+          else if (val.includes('Due in')) { data.cell.styles.textColor = [200, 130, 10]; data.cell.styles.fontStyle = 'bold'; }
+          else if (val.includes('left')) { data.cell.styles.textColor = [30, 160, 80]; }
+          else { data.cell.styles.textColor = [150, 150, 150]; }
+        }
+      },
+    });
+
+    y = doc.lastAutoTable.finalY + 12;
+
+    // Footer
+    if (y > 270) { doc.addPage(); y = 20; }
+    doc.setDrawColor(58, 181, 217);
+    doc.setLineWidth(0.4);
+    doc.line(14, y, W - 14, y);
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text(`Report generated on ${fmtDate(today)}  |  ${records.length} properties tracked`, 14, y);
+
+    doc.save(`Heat-Pump-Filter-Report-${today}.pdf`);
+  };
+
   const filtered = records.filter(r => {
     if (filter === 'all') return true;
     const { status } = getDueStatus(r.due_date);
@@ -71,7 +178,8 @@ export default function HeatPumpTracker() {
           <h1 className="page-title">Heat Pump Filter Tracker</h1>
           <p className="page-subtitle">{records.length} properties tracked</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {records.length > 0 && <button className="btn" onClick={exportReport}>Export Report</button>}
           {available.length > 0 && <button className="btn" onClick={handleAddAll}>Add All Properties</button>}
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add Property</button>
         </div>
