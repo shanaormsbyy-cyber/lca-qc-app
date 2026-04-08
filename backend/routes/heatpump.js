@@ -83,6 +83,19 @@ router.post('/records/:id/complete', (req, res) => {
   res.json({ ok: true, last_completed: now, due_date: nextDueStr });
 });
 
+// Recalculate all due dates based on last_completed + frequency setting
+router.post('/recalculate', (req, res) => {
+  const freqRow = db.prepare("SELECT value FROM settings WHERE key='heatpump_freq_days'").get();
+  const freqDays = parseInt(freqRow?.value || '90') || 90;
+  const records = db.prepare('SELECT id, last_completed FROM heatpump_records WHERE last_completed IS NOT NULL').all();
+  for (const r of records) {
+    const completed = new Date(r.last_completed + 'T00:00:00');
+    completed.setDate(completed.getDate() + freqDays);
+    db.prepare('UPDATE heatpump_records SET due_date=? WHERE id=?').run(completed.toISOString().slice(0, 10), r.id);
+  }
+  res.json({ ok: true, updated: records.length });
+});
+
 // Delete record
 router.delete('/records/:id', (req, res) => {
   // Delete associated photos from disk

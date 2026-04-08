@@ -95,6 +95,8 @@ export default function Settings() {
 
   const saveQcSettings = async () => {
     await api.put('/scheduling/settings', qcSettings);
+    // Recalculate heat pump due dates with the new frequency
+    await api.post('/heatpump/recalculate');
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 2500);
   };
