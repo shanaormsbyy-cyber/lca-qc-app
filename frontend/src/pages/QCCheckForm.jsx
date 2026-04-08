@@ -198,7 +198,7 @@ export default function QCCheckForm() {
       doc.setFontSize(9);
       doc.setFont(undefined, 'normal');
       doc.setTextColor(58, 181, 217);
-      doc.text('Quality Control Inspection Report', textX, 26);
+      doc.text('Quality Control Inspection Report', 14, 26);
       doc.setFontSize(8);
       doc.setTextColor(160, 190, 200);
       doc.text(`Generated: ${fmtDate(today)}`, W - 14, 12, { align: 'right' });
