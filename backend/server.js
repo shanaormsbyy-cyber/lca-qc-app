@@ -143,57 +143,9 @@ const db = require('./db');
   }
 }
 
-// Auto-migrate KOSH properties (insert any missing ones)
-const koshProperties = [
-  '12 Portal Crescent','11 Steele Road','11/182 London Street','1/19 Taylor Terrace',
-  '7/35 Selwyn Street, Tauranga','1/10 Palmerston Street','5/240 Old Farm Road','10 Cook Street',
-  '1/15 Beverley Crescent','6/240 Old Farm Road','74 Awatere Avenue','2/15 Beverley Crescent',
-  '1/3 Glen Lynne Avenue','21 Mistry Place','3/3 Glen Lynne Avenue','16D Ridout Street',
-  '45B Vercoe Road','45A Vercoe Road','11 Raddington Way','11A Raddington Way',
-  '1/120 Beerescourt Road','2/2 Clematis Avenue','22/182 London Street','303/220 Tristram Street',
-  '6A Shirley Place','6 Shirley Place','2/20 Hunter Street','1/22 Willoughby Street',
-  '5/22 Willoughby Street','6/22 Willoughby Street','3/19 Beale Street','1/29 Palmerston Street',
-  '16B Ridout Street','77A Awatere Avenue','163 River Road North','163 River Road South',
-  '7/182 London Street',
-];
-{
-  const insertProp = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)');
-  const sel = db.prepare('SELECT name FROM properties');
-  const existingProps = new Set(sel.all([]).map(r => r.name));
-  sel.finalize();
-  let migratedCount = 0;
-  for (const name of koshProperties) {
-    if (!existingProps.has(name)) {
-      insertProp.run(name, '', '');
-      migratedCount++;
-    }
-  }
-  insertProp.finalize();
-  if (migratedCount > 0) console.log(`Migrated ${migratedCount} KOSH properties into database.`);
-}
-
-// Auto-migrate staff members (insert any missing ones)
-const lcaStaff = [
-  'Arabella Tuck','Aroha Wise','Cassandra Hiwarau','Elijah Lasi','Gabby Elliott',
-  'Hine Peautolu','James Jenkins','Jesse Palmer','Maria Florez',
-  'Micayla Hughes','Milly Charlton','Paula Stacey','Tarlya Carey','Tarmz Brown',
-  'Tea Manuel','Tegan Watson-King','Tirihana Tahatika','Vienna Pahi','Wiki King',
-];
-{
-  const insertStaff = db.prepare('INSERT INTO staff (name, role, start_date) VALUES (?, ?, ?)');
-  const sel = db.prepare('SELECT name FROM staff');
-  const existingStaff = new Set(sel.all([]).map(r => r.name));
-  sel.finalize();
-  let migratedStaff = 0;
-  for (const name of lcaStaff) {
-    if (!existingStaff.has(name)) {
-      insertStaff.run(name, 'Cleaner', '');
-      migratedStaff++;
-    }
-  }
-  insertStaff.finalize();
-  if (migratedStaff > 0) console.log(`Migrated ${migratedStaff} staff members into database.`);
-}
+// KOSH properties and LCA staff auto-migration removed —
+// these were one-time imports that re-inserted deleted records on every deploy.
+// Properties and staff are now managed entirely through the UI.
 
 // Auto-migrate Jacqueline Kirker as a manager
 {
