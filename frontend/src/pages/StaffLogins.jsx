@@ -158,7 +158,7 @@ export default function StaffLogins() {
               <>
                 <div style={{ marginBottom: 12 }}>
                   <label className="form-label">Staff Member</label>
-                  <select className="form-input" value={addForm.staff_id} onChange={e => {
+                  <select className="form-input form-select" value={addForm.staff_id} onChange={e => {
                     const sid = e.target.value;
                     setAddForm(f => ({ ...f, staff_id: sid, username: autoUsername(sid) }));
                   }}>
