@@ -72,9 +72,11 @@ router.post('/records/:id/complete', (req, res) => {
   const record = db.prepare('SELECT * FROM heatpump_records WHERE id=?').get(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
   const now = new Date().toISOString().slice(0, 10);
-  // Advance due date by 90 days (quarterly filter clean cycle)
+  // Advance due date by configurable interval (default 90 days)
+  const freqRow = db.prepare("SELECT value FROM settings WHERE key='heatpump_freq_days'").get();
+  const freqDays = parseInt(freqRow?.value || '90') || 90;
   const nextDue = new Date();
-  nextDue.setDate(nextDue.getDate() + 90);
+  nextDue.setDate(nextDue.getDate() + freqDays);
   const nextDueStr = nextDue.toISOString().slice(0, 10);
   db.prepare('UPDATE heatpump_records SET last_completed=?, due_date=? WHERE id=?')
     .run(now, nextDueStr, req.params.id);

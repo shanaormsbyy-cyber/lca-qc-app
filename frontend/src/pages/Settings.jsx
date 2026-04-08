@@ -20,6 +20,7 @@ export default function Settings() {
     watchlist_threshold: '90',
     top_performers_threshold: '90',
     top_performers_min_checks: '3',
+    heatpump_freq_days: '90',
     flag_min_count: '3',
     flag_moderate_min: '3',
     flag_moderate_max: '4',
@@ -151,6 +152,16 @@ export default function Settings() {
             <input className="form-input" type="number" min="1" value={qcSettings.top_performers_min_checks}
               onChange={e => setSetting('top_performers_min_checks', e.target.value)} />
             <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Minimum number of completed checks before a cleaner can qualify</div>
+          </div>
+        </div>
+
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--t2)', marginBottom: 16 }}>Heat Pump Filter Cleans</div>
+        <div className="form-row mb-6">
+          <div className="form-group">
+            <label className="form-label">Filter Clean Frequency (days)</label>
+            <input className="form-input" type="number" min="1" value={qcSettings.heatpump_freq_days}
+              onChange={e => setSetting('heatpump_freq_days', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 5 }}>Days between filter cleans — next due date is set automatically when marking complete</div>
           </div>
         </div>
 
