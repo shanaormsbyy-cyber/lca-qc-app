@@ -153,7 +153,7 @@ export default function StaffLogins() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h2 style={{ marginBottom: 16 }}>Create Staff Login</h2>
             {staffWithoutLogin.length === 0 ? (
-              <p style={{ color: 'var(--t3)' }}>All staff members already have a login.</p>
+              <p style={{ color: 'var(--t3)' }}>{staff.length === 0 ? 'No staff members yet. Add staff members first before creating logins.' : 'All staff members already have a login.'}</p>
             ) : (
               <>
                 <div style={{ marginBottom: 12 }}>
