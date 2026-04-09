@@ -108,7 +108,7 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   res.json({ total, average, best, latest, trend });
 });
 
-// ─── Staff: my commonly flagged issues (last 7 days) ────────────────────────
+// ─── Staff: my commonly flagged issues grouped by room/category ─────────────
 router.get('/my-flags', requireStaffAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT qi.text, qi.category, COUNT(*) as flag_count
@@ -117,12 +117,19 @@ router.get('/my-flags', requireStaffAuth, (req, res) => {
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.staff_id = ? AND qc.status = 'complete'
       AND qci.score = 0
-      AND qc.date >= date('now', '-7 days')
     GROUP BY qi.text, qi.category
-    ORDER BY flag_count DESC
-    LIMIT 10
+    HAVING COUNT(*) >= 3
+    ORDER BY qi.category, flag_count DESC
   `).all(req.staffUser.id);
-  res.json(rows);
+
+  // Group by category/room
+  const grouped = {};
+  for (const r of rows) {
+    const cat = r.category || 'General';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push({ text: r.text, count: r.flag_count });
+  }
+  res.json(grouped);
 });
 
 // ─── Staff: change own password ─────────────────────────────────────────────

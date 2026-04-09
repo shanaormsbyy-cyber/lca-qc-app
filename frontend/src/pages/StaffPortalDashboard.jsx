@@ -170,24 +170,24 @@ export default function StaffPortalDashboard() {
           </div>
         )}
 
-        {/* Flagged issues this week */}
-        {flags.length > 0 && (
+        {/* Flagged issues by room */}
+        {Object.keys(flags).length > 0 && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <span className="card-title">Flagged Issues This Week</span>
-              <span style={{ fontSize: 12, color: 'var(--t3)' }}>{flags.length} item{flags.length !== 1 ? 's' : ''}</span>
+              <span className="card-title">Commonly Flagged Issues</span>
+              <span style={{ fontSize: 12, color: 'var(--t3)' }}>Flagged 3+ times</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {flags.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < flags.length - 1 ? '1px solid var(--glass-border)' : 'none' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--t1)' }}>{f.text}</div>
-                    {f.category && <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{f.category}</div>}
+            {Object.entries(flags).map(([room, items]) => (
+              <div key={room} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--cyan)', marginBottom: 8 }}>{room}</div>
+                {items.map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < items.length - 1 ? '1px solid var(--glass-border)' : 'none' }}>
+                    <span style={{ fontSize: 13, color: 'var(--t1)' }}>{f.text}</span>
+                    <span className="badge badge-red" style={{ flexShrink: 0 }}>{f.count}x</span>
                   </div>
-                  <span className="badge badge-red" style={{ flexShrink: 0 }}>{f.flag_count}x</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
 
