@@ -108,7 +108,7 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   res.json({ total, average, best, latest, trend });
 });
 
-// ─── Staff: my commonly flagged issues grouped by room/category ─────────────
+// ─── Staff: my commonly flagged issues (last 30 days, 3+ occurrences) ───────
 router.get('/my-flags', requireStaffAuth, (req, res) => {
   const rows = db.prepare(`
     SELECT qi.text, qi.category, COUNT(*) as flag_count
@@ -117,6 +117,7 @@ router.get('/my-flags', requireStaffAuth, (req, res) => {
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.staff_id = ? AND qc.status = 'complete'
       AND qci.score = 0
+      AND qc.date >= date('now', '-30 days')
     GROUP BY qi.text, qi.category
     HAVING COUNT(*) >= 3
     ORDER BY qi.category, flag_count DESC

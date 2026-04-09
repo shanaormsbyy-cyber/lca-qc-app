@@ -65,7 +65,7 @@ export default function StaffPortalDashboard() {
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [checks, setChecks] = useState([]);
-  const [flags, setFlags] = useState([]);
+  const [flags, setFlags] = useState({});
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -175,7 +175,7 @@ export default function StaffPortalDashboard() {
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <span className="card-title">Commonly Flagged Issues</span>
-              <span style={{ fontSize: 12, color: 'var(--t3)' }}>Flagged 3+ times</span>
+              <span style={{ fontSize: 12, color: 'var(--t3)' }}>Last 30 days, 3+ times</span>
             </div>
             {Object.entries(flags).map(([room, items]) => (
               <div key={room} style={{ marginBottom: 16 }}>
