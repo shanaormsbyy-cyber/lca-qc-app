@@ -22,6 +22,8 @@ export default function Staff() {
   const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [inactiveModal, setInactiveModal] = useState(null);
+  const [inactiveDate, setInactiveDate] = useState('');
 
   const load = () => Promise.all([
     api.get('/staff'),
@@ -53,6 +55,18 @@ export default function Staff() {
     if (editing) await api.put(`/staff/${editing.id}`, staffForm);
     else await api.post('/staff', staffForm);
     await load(); setShowStaffModal(false);
+  };
+
+  const setInactive = async () => {
+    if (!inactiveModal) return;
+    await api.put(`/staff/${inactiveModal.id}`, { inactive_until: inactiveDate || null });
+    setInactiveModal(null); setInactiveDate(''); load();
+  };
+
+  const clearInactive = async (id, e) => {
+    e.stopPropagation();
+    await api.put(`/staff/${id}`, { inactive_until: null });
+    load();
   };
 
   const delStaff = async (id, e) => {
@@ -125,23 +139,28 @@ export default function Staff() {
                 const d = dueInfo(s.id);
                 const avg = avgScore(s.id);
                 const total = checks.filter(c => c.staff_id === s.id && c.status === 'complete').length;
+                const isInactive = s.inactive_until && s.inactive_until >= new Date().toISOString().slice(0, 10);
                 return (
-                  <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/staff/${s.id}`)}>
+                  <tr key={s.id} style={{ cursor: 'pointer', opacity: isInactive ? 0.5 : 1 }} onClick={() => navigate(`/staff/${s.id}`)}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 13, flexShrink: 0 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: isInactive ? 'var(--t3)' : 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 13, flexShrink: 0 }}>
                           {s.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
                         <span style={{ fontWeight: 700 }}>{s.name}</span>
                       </div>
                     </td>
                     <td style={{ color: 'var(--t2)' }}>{s.role}</td>
-                    <td>{d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
+                    <td>{isInactive ? <span className="badge badge-grey">Inactive until {s.inactive_until}</span> : d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>
                     <td><ScoreBadge score={avg} /></td>
                     <td style={{ color: 'var(--t2)' }}>{total}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 6 }}>
+                        {isInactive
+                          ? <button className="btn btn-sm btn-ghost" onClick={e => clearInactive(s.id, e)}>Reactivate</button>
+                          : <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setInactiveModal(s); setInactiveDate(''); }}>Inactive</button>
+                        }
                         <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setEditing(s); setStaffForm({ name: s.name, role: s.role, start_date: s.start_date }); setShowStaffModal(true); }}>Edit</button>
                         <button className="btn btn-sm btn-danger" onClick={e => delStaff(s.id, e)}>Del</button>
                       </div>
@@ -232,6 +251,26 @@ export default function Staff() {
             <div className="flex gap-3">
               <button className="btn btn-primary" onClick={createCheck}>Create & Open</button>
               <button className="btn btn-ghost" onClick={() => setShowQCModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Inactive Modal */}
+      {inactiveModal && (
+        <div className="modal-overlay" onClick={() => setInactiveModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Set Inactive</div>
+            <p style={{ color: 'var(--t2)', marginBottom: 16, fontSize: 14 }}>
+              Mark <strong>{inactiveModal.name}</strong> as inactive until a specific date. They won't appear as overdue for QC checks during this period.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Inactive Until</label>
+              <input className="form-input" type="date" value={inactiveDate} onChange={e => setInactiveDate(e.target.value)} />
+            </div>
+            <div className="flex gap-3">
+              <button className="btn btn-primary" onClick={setInactive} disabled={!inactiveDate}>Set Inactive</button>
+              <button className="btn btn-ghost" onClick={() => setInactiveModal(null)}>Cancel</button>
             </div>
           </div>
         </div>

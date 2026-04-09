@@ -65,7 +65,12 @@ export default function StaffPortalDashboard() {
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [checks, setChecks] = useState([]);
+  const [flags, setFlags] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwMsg, setPwMsg] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('staff_user');
@@ -78,15 +83,39 @@ export default function StaffPortalDashboard() {
     Promise.all([
       api.get('/staff-portal/my-stats', { headers }),
       api.get('/staff-portal/my-checks', { headers }),
-    ]).then(([statsRes, checksRes]) => {
+      api.get('/staff-portal/my-flags', { headers }),
+    ]).then(([statsRes, checksRes, flagsRes]) => {
       setStats(statsRes.data);
       setChecks(checksRes.data);
+      setFlags(flagsRes.data);
     }).catch(() => {
       localStorage.removeItem('staff_token');
       localStorage.removeItem('staff_user');
       navigate('/portal/login');
     }).finally(() => setLoading(false));
   }, []);
+
+  const handlePasswordChange = async () => {
+    setPwMsg('');
+    if (!pwForm.currentPassword || !pwForm.newPassword) return setPwMsg('Fill in all fields');
+    if (pwForm.newPassword !== pwForm.confirm) return setPwMsg('New passwords do not match');
+    if (pwForm.newPassword.length < 4) return setPwMsg('Password must be at least 4 characters');
+    setPwSaving(true);
+    try {
+      const token = localStorage.getItem('staff_token');
+      await api.post('/staff-portal/change-password', {
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setPwMsg('Password updated successfully');
+      setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
+      setTimeout(() => setShowPassword(false), 1500);
+    } catch (err) {
+      setPwMsg(err.response?.data?.error || 'Failed to change password');
+    } finally {
+      setPwSaving(false);
+    }
+  };
 
   const logout = () => {
     localStorage.removeItem('staff_token');
@@ -106,7 +135,10 @@ export default function StaffPortalDashboard() {
           <span style={{ fontWeight: 800, fontSize: 18, color: 'var(--cyan)' }}>Team Member Portal</span>
           <span style={{ color: 'var(--t3)', fontSize: 13, marginLeft: 12 }}>{user?.name}</span>
         </div>
-        <button className="btn btn-sm" onClick={logout}>Logout</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-sm" onClick={() => setShowPassword(true)}>Settings</button>
+          <button className="btn btn-sm" onClick={logout}>Logout</button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
@@ -135,6 +167,27 @@ export default function StaffPortalDashboard() {
         ) : (
           <div className="card" style={{ textAlign: 'center', padding: 40, marginBottom: 24 }}>
             <p style={{ color: 'var(--t3)', fontSize: 15 }}>No QC checks completed yet. Your results will appear here once your manager completes a quality control check.</p>
+          </div>
+        )}
+
+        {/* Flagged issues this week */}
+        {flags.length > 0 && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <span className="card-title">Flagged Issues This Week</span>
+              <span style={{ fontSize: 12, color: 'var(--t3)' }}>{flags.length} item{flags.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {flags.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < flags.length - 1 ? '1px solid var(--glass-border)' : 'none' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--t1)' }}>{f.text}</div>
+                    {f.category && <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{f.category}</div>}
+                  </div>
+                  <span className="badge badge-red" style={{ flexShrink: 0 }}>{f.flag_count}x</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -180,6 +233,32 @@ export default function StaffPortalDashboard() {
           )}
         </div>
       </div>
+
+      {/* Password change modal */}
+      {showPassword && (
+        <div className="modal-overlay" onClick={() => { setShowPassword(false); setPwMsg(''); }}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2 style={{ marginBottom: 16 }}>Change Password</h2>
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label">Current Password</label>
+              <input className="form-input" type="password" value={pwForm.currentPassword} onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label">New Password</label>
+              <input className="form-input" type="password" value={pwForm.newPassword} onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="form-label">Confirm New Password</label>
+              <input className="form-input" type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} />
+            </div>
+            {pwMsg && <p style={{ color: pwMsg.includes('success') ? 'var(--green)' : 'var(--red)', marginBottom: 12, fontSize: 13 }}>{pwMsg}</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn" onClick={() => { setShowPassword(false); setPwMsg(''); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handlePasswordChange} disabled={pwSaving}>{pwSaving ? 'Saving...' : 'Update Password'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

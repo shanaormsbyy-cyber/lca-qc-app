@@ -5,3 +5,4 @@ backend/lca.db
 backend/lca.db.lock
 *.lock
 .env
+backend/db.sqlite3

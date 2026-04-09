@@ -35,10 +35,11 @@ router.get('/me', requireStaffAuth, (req, res) => {
 // ─── Read-only: my QC checks ───────────────────────────────────────────────
 router.get('/my-checks', requireStaffAuth, (req, res) => {
   const checks = db.prepare(`
-    SELECT qc.*, p.name AS property_name, m.name AS assigned_to_name, cl.name AS checklist_name
+    SELECT qc.id, qc.property_id, qc.staff_id, qc.checklist_id, qc.date, qc.status,
+           qc.total_score, qc.max_score, qc.score_pct, qc.notes, qc.check_type, qc.created_at,
+           p.name AS property_name, cl.name AS checklist_name
     FROM qc_checks qc
     LEFT JOIN properties p ON p.id = qc.property_id
-    LEFT JOIN managers m ON m.id = qc.assigned_to_id
     LEFT JOIN qc_checklists cl ON cl.id = qc.checklist_id
     WHERE qc.staff_id = ? AND qc.status = 'complete'
     ORDER BY qc.date DESC
@@ -49,12 +50,12 @@ router.get('/my-checks', requireStaffAuth, (req, res) => {
 // ─── Read-only: single check with items + photos ────────────────────────────
 router.get('/my-checks/:id', requireStaffAuth, (req, res) => {
   const check = db.prepare(`
-    SELECT qc.*, p.name AS property_name, s.name AS staff_name,
-           m.name AS assigned_to_name, cl.name AS checklist_name
+    SELECT qc.id, qc.property_id, qc.staff_id, qc.checklist_id, qc.date, qc.status,
+           qc.total_score, qc.max_score, qc.score_pct, qc.notes, qc.check_type, qc.created_at,
+           p.name AS property_name, s.name AS staff_name, cl.name AS checklist_name
     FROM qc_checks qc
     LEFT JOIN properties p ON p.id = qc.property_id
     LEFT JOIN staff s ON s.id = qc.staff_id
-    LEFT JOIN managers m ON m.id = qc.assigned_to_id
     LEFT JOIN qc_checklists cl ON cl.id = qc.checklist_id
     WHERE qc.id = ? AND qc.staff_id = ?
   `).get(req.params.id, req.staffUser.id);
@@ -105,6 +106,38 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   }
 
   res.json({ total, average, best, latest, trend });
+});
+
+// ─── Staff: my commonly flagged issues (last 7 days) ────────────────────────
+router.get('/my-flags', requireStaffAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT qi.text, qi.category, COUNT(*) as flag_count
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    JOIN qc_checks qc ON qc.id = qci.check_id
+    WHERE qc.staff_id = ? AND qc.status = 'complete'
+      AND qci.score = 0
+      AND qc.date >= date('now', '-7 days')
+    GROUP BY qi.text, qi.category
+    ORDER BY flag_count DESC
+    LIMIT 10
+  `).all(req.staffUser.id);
+  res.json(rows);
+});
+
+// ─── Staff: change own password ─────────────────────────────────────────────
+router.post('/change-password', requireStaffAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current and new password required' });
+  if (newPassword.length < 4) return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  const cred = db.prepare('SELECT * FROM staff_credentials WHERE staff_id = ?').get(req.staffUser.id);
+  if (!cred) return res.status(404).json({ error: 'No credentials found' });
+  if (!bcrypt.compareSync(currentPassword, cred.password_hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE staff_credentials SET password_hash = ? WHERE staff_id = ?').run(hash, req.staffUser.id);
+  res.json({ ok: true });
 });
 
 // ─── Manager-only: manage staff credentials ─────────────────────────────────

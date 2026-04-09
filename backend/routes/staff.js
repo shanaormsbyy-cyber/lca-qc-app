@@ -16,8 +16,9 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, role, start_date } = req.body;
-  db.prepare('UPDATE staff SET name=?, role=?, start_date=? WHERE id=?').run(name, role, start_date, req.params.id);
+  const { name, role, start_date, inactive_until } = req.body;
+  if (name !== undefined) db.prepare('UPDATE staff SET name=?, role=?, start_date=? WHERE id=?').run(name, role, start_date, req.params.id);
+  if (inactive_until !== undefined) db.prepare('UPDATE staff SET inactive_until=? WHERE id=?').run(inactive_until || null, req.params.id);
   res.json({ ok: true });
 });
 

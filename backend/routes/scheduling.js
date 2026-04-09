@@ -27,7 +27,7 @@ router.get('/due', (req, res) => {
 
   // Last QC check per staff member
   const staffChecks = db.prepare(`
-    SELECT s.id, s.name, s.role,
+    SELECT s.id, s.name, s.role, s.inactive_until,
       MAX(qc.date) as last_check_date,
       COUNT(qc.id) as total_checks
     FROM staff s
@@ -59,8 +59,16 @@ router.get('/due', (req, res) => {
     return { next_due: nextStr, days_left: daysLeft, status };
   }
 
-  const staffDue = staffChecks.map(s => ({ ...s, ...getDueInfo(s.last_check_date, staffDays) }))
-    .sort((a, b) => (a.days_left || -999) - (b.days_left || -999));
+  const staffDue = staffChecks.map(s => {
+    if (s.inactive_until && s.inactive_until >= today) {
+      return { ...s, status: 'inactive', next_due: null, days_left: null };
+    }
+    return { ...s, ...getDueInfo(s.last_check_date, staffDays) };
+  }).sort((a, b) => {
+    if (a.status === 'inactive') return 1;
+    if (b.status === 'inactive') return -1;
+    return (a.days_left || -999) - (b.days_left || -999);
+  });
 
   const propDue = propChecks.map(p => {
     if (p.inactive_until && p.inactive_until >= today) {

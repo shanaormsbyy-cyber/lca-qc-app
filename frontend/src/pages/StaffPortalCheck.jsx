@@ -66,8 +66,6 @@ export default function StaffPortalCheck() {
         ['Date', fmtDate(check.date)],
         ['Check Type', check.check_type === 'property' ? 'Property Health Check' : 'Team QC Check'],
         ['Checklist', check.checklist_name || '—'],
-        ['Assigned To', check.assigned_to_name || '—'],
-        ['Signed Off By', check.signed_off_by || '—'],
       ];
       info.forEach(([label, value], i) => {
         const x = i % 2 === 0 ? 14 : 110;
@@ -196,20 +194,6 @@ export default function StaffPortalCheck() {
         }
       }
 
-      // ── SIGN-OFF ──────────────────────────────────────────────────────────────
-      if (y > 260) { doc.addPage(); y = 20; }
-      doc.setDrawColor(58, 181, 217);
-      doc.setLineWidth(0.4);
-      doc.line(14, y, W - 14, y);
-      y += 6;
-      doc.setFontSize(8);
-      doc.setFont(undefined, 'bold');
-      doc.setTextColor(58, 181, 217);
-      doc.text('Sign-off', 14, y);
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(80, 80, 80);
-      doc.text(`${check.signed_off_by || '—'}  |  ${fmtDate(check.date)}  |  ${check.assigned_to_name || '—'}`, 14, y + 5);
-
       const safeName = (check.property_name || 'Property').replace(/[^a-zA-Z0-9]/g, '-');
       doc.save(`QC-Report-${safeName}-${check.date}.pdf`);
     } catch (err) {
@@ -331,11 +315,9 @@ export default function StaffPortalCheck() {
           </div>
         )}
 
-        {/* Sign-off info */}
-        <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)', display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, color: 'var(--t2)' }}>
-          <div><span style={{ color: 'var(--t3)' }}>Signed off by:</span> <strong>{check.signed_off_by || '—'}</strong></div>
-          <div><span style={{ color: 'var(--t3)' }}>Assigned to:</span> <strong>{check.assigned_to_name || '—'}</strong></div>
-          <div><span style={{ color: 'var(--t3)' }}>Date:</span> <strong>{fmtDate(check.date)}</strong></div>
+        {/* Date info */}
+        <div style={{ marginTop: 20, padding: '12px 16px', background: 'var(--glass)', borderRadius: 10, border: '1px solid var(--glass-border)', fontSize: 13, color: 'var(--t2)' }}>
+          <span style={{ color: 'var(--t3)' }}>Date:</span> <strong>{fmtDate(check.date)}</strong>
         </div>
       </div>
     </div>
