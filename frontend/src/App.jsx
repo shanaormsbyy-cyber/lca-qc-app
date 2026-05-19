@@ -22,6 +22,8 @@ import StaffLogins from './pages/StaffLogins';
 import StaffPortalLogin from './pages/StaffPortalLogin';
 import StaffPortalDashboard from './pages/StaffPortalDashboard';
 import StaffPortalCheck from './pages/StaffPortalCheck';
+import Disciplinary from './pages/Disciplinary';
+import WarningDetail from './pages/WarningDetail';
 
 function RequireAuth({ children }) {
   const { manager, loading } = useAuth();
@@ -57,6 +59,8 @@ export default function App() {
         <Route path="heatpump/:id" element={<HeatPumpDetail />} />
         <Route path="staff-logins" element={<StaffLogins />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="disciplinary" element={<Disciplinary />} />
+        <Route path="disciplinary/:id" element={<WarningDetail />} />
       </Route>
       {/* Staff Portal (no manager auth required) */}
       <Route path="/portal/login" element={<StaffPortalLogin />} />
