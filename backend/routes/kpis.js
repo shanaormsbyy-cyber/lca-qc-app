@@ -399,6 +399,13 @@ router.get('/staff/:id/insights', (req, res) => {
   const day30Ago = new Date(today); day30Ago.setDate(day30Ago.getDate() - 30);
   const day30Str = day30Ago.toISOString().slice(0, 10);
 
+  // Load configurable thresholds
+  const settingsRows = db.prepare('SELECT * FROM settings').all();
+  const settings = {};
+  settingsRows.forEach(s => { settings[s.key] = s.value; });
+  const acceptableThreshold = parseFloat(settings.watchlist_threshold || '90');
+  const topThreshold = parseFloat(settings.top_performers_threshold || '90');
+
   // All completed checks for this staff member, ordered oldest→newest
   const checks = db.prepare(`
     SELECT qc.id, qc.date, qc.score_pct
@@ -443,6 +450,9 @@ router.get('/staff/:id/insights', (req, res) => {
   });
   const issues = Object.values(issueMap);
 
+  // Pre-compute persistent issues count so score card can account for it
+  const persistent = issues.filter(i => i.total_fails >= 3 && i.last_fail >= day30Str);
+
   const insights = [];
 
   // ── 1. Score trend (last 3+ checks) ───────────────────────────────────────
@@ -457,15 +467,15 @@ router.get('/staff/:id/insights', (req, res) => {
     } else if (allDown) {
       insights.push({ type: 'warning', text: `Score has declined across the last 3 checks (${scores.map(s => Math.round(s) + '%').join(' → ')}). Review recent check items for patterns.` });
     }
-    if (latestScore < 70) {
-      insights.push({ type: 'alert', text: `Latest check score is ${Math.round(latestScore)}% — below the 70% threshold. Consider scheduling a follow-up check or coaching session.` });
-    } else if (latestScore >= 90) {
-      insights.push({ type: 'positive', text: `Latest check score is ${Math.round(latestScore)}% — excellent performance. Consistently strong results.` });
+    if (latestScore < acceptableThreshold) {
+      insights.push({ type: 'alert', text: `Latest check score is ${Math.round(latestScore)}% — below the ${Math.round(acceptableThreshold)}% acceptable average. Consider scheduling a follow-up check or coaching session.` });
+    } else if (latestScore >= topThreshold && persistent.length === 0) {
+      // Only show "excellent" if there are no current persistent failures
+      insights.push({ type: 'positive', text: `Latest check score is ${Math.round(latestScore)}% — above the ${Math.round(topThreshold)}% target with no current recurring issues.` });
     }
   }
 
   // ── 2. Persistent recurring issues (3+ fails, still recent) ──────────────
-  const persistent = issues.filter(i => i.total_fails >= 3 && i.last_fail >= day30Str);
   if (persistent.length > 0) {
     persistent.slice(0, 3).forEach(issue => {
       insights.push({ type: 'alert', text: `"${issue.text}" has failed ${issue.total_fails} times${issue.category ? ` (${issue.category})` : ''} and was last flagged on ${issue.last_fail.split('-').reverse().join('-')}. This is a persistent pattern — consider direct coaching on this item.` });
@@ -506,11 +516,17 @@ router.get('/staff/:id/insights', (req, res) => {
 
   // ── 6. Overall summary line ───────────────────────────────────────────────
   const avgScore = checks.reduce((s, c) => s + c.score_pct, 0) / checks.length;
+  const midThreshold = acceptableThreshold - (acceptableThreshold - (acceptableThreshold * 0.85));
   let summary;
-  if (avgScore >= 90) summary = `Strong performer with an average score of ${Math.round(avgScore)}% across ${checks.length} checks.`;
-  else if (avgScore >= 80) summary = `Solid performer averaging ${Math.round(avgScore)}% across ${checks.length} checks, with some areas to watch.`;
-  else if (avgScore >= 70) summary = `Average performance of ${Math.round(avgScore)}% across ${checks.length} checks — room for improvement in key areas.`;
-  else summary = `Below-target average of ${Math.round(avgScore)}% across ${checks.length} checks — recommend active coaching and follow-up.`;
+  if (avgScore >= topThreshold && persistent.length === 0) {
+    summary = `Strong performer with an average score of ${Math.round(avgScore)}% across ${checks.length} checks.`;
+  } else if (avgScore >= acceptableThreshold) {
+    summary = `Averaging ${Math.round(avgScore)}% across ${checks.length} checks — meeting the ${Math.round(acceptableThreshold)}% target${persistent.length > 0 ? ', but with recurring items to address' : ''}.`;
+  } else if (avgScore >= acceptableThreshold * 0.85) {
+    summary = `Averaging ${Math.round(avgScore)}% across ${checks.length} checks — below the ${Math.round(acceptableThreshold)}% acceptable average. Improvement needed in key areas.`;
+  } else {
+    summary = `Below-target average of ${Math.round(avgScore)}% across ${checks.length} checks — recommend active coaching and follow-up.`;
+  }
 
   if (insights.length === 0) {
     insights.push({ type: 'positive', text: 'No recurring issues detected. Performance looks consistent across recent checks.' });
@@ -656,9 +672,28 @@ function getRecommendation(text, category) {
 }
 
 // Common issues for a specific staff member
+// Accepts optional ?month=YYYY-MM to filter to a specific calendar month.
+// Defaults to the current month.
 router.get('/staff/:id/common-issues', (req, res) => {
   const staffId = req.params.id;
   const minCount = 3;
+
+  // Determine date range
+  let from, to;
+  if (req.query.month) {
+    const [y, m] = req.query.month.split('-').map(Number);
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 0); // last day of that month
+    from = start.toISOString().slice(0, 10);
+    to = end.toISOString().slice(0, 10);
+  } else {
+    // Default: current month
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    from = start.toISOString().slice(0, 10);
+    to = end.toISOString().slice(0, 10);
+  }
 
   const rows = db.prepare(`
     SELECT qi.text, qi.category, qi.score_type,
@@ -669,6 +704,8 @@ router.get('/staff/:id/common-issues', (req, res) => {
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.status = 'complete'
       AND qc.staff_id = ?
+      AND qc.date >= ?
+      AND qc.date <= ?
       AND (
         (qi.score_type = 'pass_fail' AND qci.score = 0)
         OR
@@ -677,9 +714,9 @@ router.get('/staff/:id/common-issues', (req, res) => {
     GROUP BY qi.text
     HAVING COUNT(*) >= ?
     ORDER BY flag_count DESC
-  `).all(staffId, minCount);
+  `).all(staffId, from, to, minCount);
 
-  res.json(rows);
+  res.json({ rows, from, to });
 });
 
 module.exports = router;

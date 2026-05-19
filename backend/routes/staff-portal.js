@@ -108,22 +108,39 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   res.json({ total, average, best, latest, trend });
 });
 
-// ─── Staff: my commonly flagged issues (last 30 days, 3+ occurrences) ───────
+// ─── Staff: my commonly flagged issues, accepts ?month=YYYY-MM ───────────────
 router.get('/my-flags', requireStaffAuth, (req, res) => {
+  let from, to;
+  if (req.query.month) {
+    const [y, m] = req.query.month.split('-').map(Number);
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 0);
+    from = start.toISOString().slice(0, 10);
+    to = end.toISOString().slice(0, 10);
+  } else {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    from = start.toISOString().slice(0, 10);
+    to = end.toISOString().slice(0, 10);
+  }
+
   const rows = db.prepare(`
     SELECT qi.text, qi.category, COUNT(*) as flag_count
     FROM qc_check_items qci
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.staff_id = ? AND qc.status = 'complete'
-      AND qci.score = 0
-      AND qc.date >= date('now', '-30 days')
+      AND qc.date >= ? AND qc.date <= ?
+      AND (
+        (qi.score_type = 'pass_fail' AND qci.score = 0)
+        OR (qi.score_type = '1_to_5' AND qci.score <= 2)
+      )
     GROUP BY qi.text, qi.category
     HAVING COUNT(*) >= 3
     ORDER BY qi.category, flag_count DESC
-  `).all(req.staffUser.id);
+  `).all(req.staffUser.id, from, to);
 
-  // Group by category/room
   const grouped = {};
   for (const r of rows) {
     const cat = r.category || 'General';
