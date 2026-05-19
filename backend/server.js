@@ -196,6 +196,57 @@ const UPLOADS_DIR = process.env.NODE_ENV === 'production'
   : path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Auto-migrate: warnings tables
+{
+  const s = db.prepare('PRAGMA table_info(warnings)');
+  const cols = s.all();
+  s.finalize();
+  if (cols.length === 0) {
+    db.exec('BEGIN');
+    try {
+      db.exec(`
+        CREATE TABLE warnings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          staff_id INTEGER NOT NULL REFERENCES staff(id),
+          level TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          details TEXT NOT NULL DEFAULT '',
+          corrective_actions TEXT NOT NULL DEFAULT '',
+          issued_by TEXT NOT NULL,
+          issued_at TEXT NOT NULL,
+          acknowledged_at TEXT,
+          acknowledged_by TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      db.exec(`
+        CREATE TABLE warning_check_links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          warning_id INTEGER NOT NULL REFERENCES warnings(id) ON DELETE CASCADE,
+          check_id INTEGER NOT NULL REFERENCES qc_checks(id) ON DELETE CASCADE
+        )
+      `);
+      db.exec(`
+        CREATE TABLE warning_edits (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          warning_id INTEGER NOT NULL REFERENCES warnings(id) ON DELETE CASCADE,
+          edited_by TEXT NOT NULL,
+          edited_at TEXT NOT NULL,
+          prev_level TEXT NOT NULL,
+          prev_reason TEXT NOT NULL,
+          prev_details TEXT NOT NULL,
+          prev_corrective_actions TEXT NOT NULL
+        )
+      `);
+      db.exec('COMMIT');
+      console.log('Migration complete: created warnings, warning_check_links, warning_edits tables.');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+}
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));
