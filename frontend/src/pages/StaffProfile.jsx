@@ -13,6 +13,11 @@ export default function StaffProfile() {
   const [qcChecks, setQcChecks] = useState([]);
   const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
+  const [warnings, setWarnings] = useState([]);
+  const [issuesMonth, setIssuesMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,11 +31,16 @@ export default function StaffProfile() {
       setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
-    api.get(`/kpis/staff/${id}/common-issues`).then(r => setCommonIssues(r.data)).catch(() => {});
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
+    api.get(`/warnings?staff_id=${id}`).then(r => setWarnings(r.data)).catch(() => {});
+  };
+
+  const loadIssues = (month) => {
+    api.get(`/kpis/staff/${id}/common-issues?month=${month}`).then(r => setCommonIssues(r.data.rows)).catch(() => {});
   };
 
   useEffect(() => { load(); }, [id]);
+  useEffect(() => { loadIssues(issuesMonth); }, [id, issuesMonth]);
   useLiveSync(load);
 
   const deleteStaff = async () => {
@@ -41,6 +51,13 @@ export default function StaffProfile() {
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!staff) return <div className="page"><p>Staff not found.</p></div>;
+
+  const LEVEL_LABELS = { verbal_note: 'Verbal Note', written_warning: 'Written Warning', final_warning: 'Final Warning' };
+  const LEVEL_COLORS = {
+    verbal_note:     { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' },
+    written_warning: { color: '#f97316',      bg: 'rgba(249,115,22,0.12)' },
+    final_warning:   { color: 'var(--red)',   bg: 'rgba(239,68,68,0.12)'  },
+  };
 
   const chartData = [...qcChecks]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -69,6 +86,7 @@ export default function StaffProfile() {
         <div className="stat-card"><div className="stat-label">QC Checks</div><div className="stat-value">{qcChecks.length}</div></div>
         <div className="stat-card"><div className="stat-label">Avg QC Score</div><div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{avgScore ? Math.round(avgScore) + '%' : '—'}</div></div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
+        <div className="stat-card"><div className="stat-label">Warnings</div><div className="stat-value" style={{ color: warnings.length > 0 ? 'var(--red)' : 'var(--t1)' }}>{warnings.length}</div></div>
         <div className="stat-card"><div className="stat-label">Service Time</div><div className="stat-value" style={{ fontSize: 28, letterSpacing: -1 }}>{(() => { const days = Math.floor((new Date() - new Date(staff.start_date)) / 86400000); return days >= 365 ? `${Math.floor(days/365)}y ${Math.floor((days%365)/30)}m` : days >= 30 ? `${Math.floor(days/30)}m` : `${days}d`; })()}</div></div>
       </div>
 
@@ -76,8 +94,19 @@ export default function StaffProfile() {
       <div className="card mb-6">
         <div className="card-header">
           <span className="card-title">Most Common Issues</span>
-          <span style={{ fontSize: 12, color: 'var(--t3)' }}>Failed 3+ times across all checks</span>
+          <input
+            type="month"
+            value={issuesMonth}
+            max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+            onChange={e => setIssuesMonth(e.target.value)}
+            style={{
+              background: 'var(--navy2)', border: '1px solid var(--border)',
+              borderRadius: 6, color: 'var(--t2)', fontSize: 12,
+              padding: '3px 8px', cursor: 'pointer',
+            }}
+          />
         </div>
+        <p style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 12 }}>Failed 3+ times in selected month</p>
         {commonIssues.length === 0 ? (
           <p style={{ color: 'var(--t3)', fontSize: 13 }}>No recurring issues found. Keep it up!</p>
         ) : (
@@ -208,6 +237,42 @@ export default function StaffProfile() {
           </div>
         )}
       </div>
+
+      {warnings.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Disciplinary Warnings</div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Level</th><th>Reason</th><th>Date Issued</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {warnings.map(w => {
+                  const overdue = !w.acknowledged_at && Math.floor((Date.now() - new Date(w.issued_at)) / 86400000) >= 3;
+                  const s = LEVEL_COLORS[w.level] || LEVEL_COLORS.verbal_note;
+                  return (
+                    <tr key={w.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/disciplinary/${w.id}`)}>
+                      <td>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: s.color, background: s.bg }}>
+                          {LEVEL_LABELS[w.level] || w.level}
+                        </span>
+                      </td>
+                      <td style={{ color: 'var(--t2)' }}>{w.reason}</td>
+                      <td style={{ color: 'var(--t2)' }}>{fmtDate(w.issued_at)}</td>
+                      <td>
+                        {w.acknowledged_at ? null : (
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: overdue ? 'var(--red)' : 'var(--amber)', background: overdue ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
+                            {overdue ? 'Overdue' : 'Awaiting'}
+                          </span>
+                        )}
+                      </td>
+                      <td><button className="btn btn-sm" onClick={e => { e.stopPropagation(); navigate(`/disciplinary/${w.id}`); }}>View</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
