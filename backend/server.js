@@ -257,6 +257,7 @@ app.use('/api/scheduling', require('./routes/scheduling'));
 app.use('/api/kpis',       require('./routes/kpis'));
 app.use('/api/heatpump',   require('./routes/heatpump'));
 app.use('/api/staff-portal', require('./routes/staff-portal'));
+app.use('/api/warnings', require('./routes/warnings'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
