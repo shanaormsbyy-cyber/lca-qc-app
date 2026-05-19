@@ -246,7 +246,7 @@ export default function StaffProfile() {
               <thead><tr><th>Level</th><th>Reason</th><th>Date Issued</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {warnings.map(w => {
-                  const overdue = !w.acknowledged_at && Math.floor((Date.now() - new Date(w.issued_at)) / 86400000) >= 3;
+                  const overdue = w.ack_status === 'overdue';
                   const s = LEVEL_COLORS[w.level] || LEVEL_COLORS.verbal_note;
                   return (
                     <tr key={w.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/disciplinary/${w.id}`)}>

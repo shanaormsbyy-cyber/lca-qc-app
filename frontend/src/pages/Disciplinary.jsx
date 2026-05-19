@@ -51,6 +51,7 @@ export default function Disciplinary() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ ...BLANK });
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const load = () => {
     Promise.all([
@@ -84,11 +85,14 @@ export default function Disciplinary() {
     e.preventDefault();
     if (!form.staff_id || !form.reason) return;
     setSaving(true);
+    setSubmitError('');
     try {
       await api.post('/warnings', { ...form, staff_id: parseInt(form.staff_id) });
       setShowModal(false);
       setForm({ ...BLANK });
       load();
+    } catch {
+      setSubmitError('Failed to save warning. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -212,6 +216,7 @@ export default function Disciplinary() {
                   </div>
                 </div>
               )}
+              {submitError && <p style={{ color: 'var(--red)', fontSize: 13, marginBottom: 8 }}>{submitError}</p>}
               <div className="flex gap-3 mt-4">
                 <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Issue Warning'}</button>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>

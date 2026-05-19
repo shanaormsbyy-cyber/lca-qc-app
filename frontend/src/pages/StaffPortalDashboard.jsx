@@ -71,6 +71,7 @@ export default function StaffPortalDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [portalWarnings, setPortalWarnings] = useState([]);
+  const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -110,11 +111,18 @@ export default function StaffPortalDashboard() {
 
   const acknowledgeWarning = async (warningId) => {
     const token = localStorage.getItem('staff_token');
-    await api.post(`/warnings/my-warnings/${warningId}/acknowledge`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    api.get('/warnings/my-warnings', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => setPortalWarnings(r.data)).catch(() => {});
+    setAcknowledgingId(warningId);
+    try {
+      await api.post(`/warnings/my-warnings/${warningId}/acknowledge`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const r = await api.get('/warnings/my-warnings', { headers: { Authorization: `Bearer ${token}` } });
+      setPortalWarnings(r.data);
+    } catch {
+      alert('Could not record acknowledgement. Please try again.');
+    } finally {
+      setAcknowledgingId(null);
+    }
   };
 
   useEffect(() => { loadFlags(flagsMonth); }, [flagsMonth]);
@@ -251,8 +259,9 @@ export default function StaffPortalDashboard() {
                       className="btn btn-primary"
                       style={{ width: '100%', marginTop: 4 }}
                       onClick={() => acknowledgeWarning(w.id)}
+                      disabled={acknowledgingId === w.id}
                     >
-                      I have read and acknowledge this warning and agree to the corrective actions
+                      {acknowledgingId === w.id ? 'Saving...' : 'I have read and acknowledge this warning and agree to the corrective actions'}
                     </button>
                   )}
                 </div>

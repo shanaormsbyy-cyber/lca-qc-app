@@ -76,7 +76,7 @@ export default function WarningDetail() {
         setAllChecks(r.data.filter(c => c.staff_id === warning.staff_id && c.status === 'complete'));
       });
     }
-  }, [editing]);
+  }, [editing, warning]);
 
   const toggleCheck = (checkId) => {
     setForm(f => ({
