@@ -237,8 +237,9 @@ export default function QCCheckForm() {
       (r.data.ambiguous || []).forEach(a => { choices[a.item_id] = 'pass'; });
       setAmbiguousChoices(choices);
       setShowVoiceModal(true);
-    } catch {
-      setVoiceError('Analysis failed — please try again.');
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Analysis failed — please try again.';
+      setVoiceError(msg);
       setVoiceResult(null);
       setShowVoiceModal(false);
     } finally {
