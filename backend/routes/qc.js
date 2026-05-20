@@ -380,6 +380,100 @@ Be constructive, professional, and direct. Do not use bullet points — write in
   }
 });
 
+// POST /qc/checks/:id/voice-analyse — AI maps voice transcript to checklist items
+router.post('/checks/:id/voice-analyse', async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'AI not configured — set ANTHROPIC_API_KEY' });
+
+  const { transcript } = req.body;
+  if (!transcript || transcript.trim().length < 10) {
+    return res.status(400).json({ error: 'Transcript is too short' });
+  }
+
+  const check = db.prepare('SELECT * FROM qc_checks WHERE id = ?').get(req.params.id);
+  if (!check) return res.status(404).json({ error: 'Check not found' });
+
+  const items = db.prepare(`
+    SELECT qci.id, qci.item_id, qi.text, qi.score_type, qi.weight,
+      COALESCE(qci.room_label, qi.category) as room_label,
+      qi.category
+    FROM qc_check_items qci
+    JOIN qc_checklist_items qi ON qi.id = qci.item_id
+    WHERE qci.check_id = ?
+    ORDER BY qci.id
+  `).all(req.params.id);
+
+  db.prepare('UPDATE qc_checks SET voice_transcript = ? WHERE id = ?').run(transcript.trim(), req.params.id);
+
+  const itemList = items.map(i => ({
+    id: i.id,
+    text: i.text,
+    room_label: i.room_label || i.category || 'General',
+  }));
+
+  const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager has walked through a property and recorded a voice note describing issues they found during their inspection.
+
+Your job is to map their observations to specific checklist items.
+
+Rules:
+- If an item is clearly mentioned as an issue in the transcript, add it to "fails"
+- If the transcript mentions something that could match an item but the specific room/area is unclear (e.g. "bedroom" when there are multiple bedroom sections like "Bedroom 1", "Bedroom 2"), add it to "ambiguous"
+- Everything else is considered passed — do not include passed items in your response
+- Return ONLY valid JSON, no explanation, no markdown, no other text
+
+Checklist items (use the "id" field in your response):
+${JSON.stringify(itemList, null, 2)}
+
+Voice note transcript:
+"${transcript.trim()}"
+
+Return JSON in this exact format:
+{
+  "summary": "2-3 sentence plain English overview of what was found and what will be failed",
+  "fails": [
+    { "item_id": 123, "reason": "short phrase from transcript explaining the issue" }
+  ],
+  "ambiguous": [
+    { "item_id": 456, "reason": "what was mentioned in the transcript", "note": "brief explanation of why it is unclear which room or item this refers to" }
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) return res.status(500).json({ error: data.error?.message || 'AI request failed' });
+
+    const text = data.content?.[0]?.text || '';
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return res.status(500).json({ error: 'AI returned malformed response — please try again.' });
+    }
+
+    res.json({
+      summary: parsed.summary || '',
+      fails: parsed.fails || [],
+      ambiguous: parsed.ambiguous || [],
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── Photos ───────────────────────────────────────────────────────────────────
 
 router.get('/checks/:id/photos', (req, res) => {
