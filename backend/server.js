@@ -247,6 +247,17 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Auto-migrate: voice_transcript column on qc_checks
+{
+  const s = db.prepare('PRAGMA table_info(qc_checks)');
+  const cols = s.all();
+  s.finalize();
+  if (!cols.find(c => c.name === 'voice_transcript')) {
+    db.exec('ALTER TABLE qc_checks ADD COLUMN voice_transcript TEXT');
+    console.log('Migration complete: added voice_transcript column to qc_checks.');
+  }
+}
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));

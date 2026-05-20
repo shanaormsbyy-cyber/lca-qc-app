@@ -218,5 +218,6 @@ insertSetting.run('flag_urgent_min', '8');
 insertSetting.run('top_performers_threshold', '90');
 insertSetting.run('top_performers_min_checks', '3');
 insertSetting.run('heatpump_freq_days', '90');
+insertSetting.run('voice_default_unmentioned', 'pass');
 
 module.exports = db;
