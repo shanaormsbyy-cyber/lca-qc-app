@@ -20,6 +20,8 @@ export default function StaffProfile() {
   });
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [slackEmail, setSlackEmail] = useState('');
+  const [slackEmailSaved, setSlackEmailSaved] = useState(false);
 
   const load = () => {
     Promise.all([
@@ -27,7 +29,9 @@ export default function StaffProfile() {
       api.get('/qc/checks'),
       api.get('/training/sessions'),
     ]).then(([s, q, t]) => {
-      setStaff(s.data.find(x => x.id === parseInt(id)));
+      const found = s.data.find(x => x.id === parseInt(id));
+      setStaff(found);
+      setSlackEmail(found?.slack_email || '');
       setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
@@ -47,6 +51,12 @@ export default function StaffProfile() {
     if (!confirm(`Are you sure you wish to delete this team member?\n\n"${staff.name}" will be permanently removed along with all their QC checks and training records. This cannot be undone.`)) return;
     await api.delete(`/staff/${id}`);
     navigate('/staff');
+  };
+
+  const saveSlackEmail = async () => {
+    await api.put(`/staff/${id}`, { slack_email: slackEmail });
+    setSlackEmailSaved(true);
+    setTimeout(() => setSlackEmailSaved(false), 2000);
   };
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
@@ -79,6 +89,26 @@ export default function StaffProfile() {
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>{staff.name}</h1>
           <p style={{ color: 'var(--t2)' }}>{staff.role} · Started {staff.start_date}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+            <input
+              type="email"
+              value={slackEmail}
+              onChange={e => setSlackEmail(e.target.value)}
+              placeholder="Slack email (for notifications)"
+              style={{
+                fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                border: '1px solid var(--border)', background: 'var(--navy2)',
+                color: 'var(--t1)', width: 240,
+              }}
+            />
+            <button
+              className="btn btn-sm"
+              onClick={saveSlackEmail}
+              style={{ fontSize: 12 }}
+            >
+              {slackEmailSaved ? '✓ Saved' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
 
