@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth, requireStaffAuth } = require('../middleware/auth');
+const { notifyDisciplinary } = require('../services/slack');
 
 const router = express.Router();
 
@@ -107,6 +108,7 @@ router.post('/', requireAuth, (req, res) => {
     });
 
     db.exec('COMMIT');
+    notifyDisciplinary(warningId).catch(() => {});
     res.json({ id: warningId });
   } catch (e) {
     db.exec('ROLLBACK');

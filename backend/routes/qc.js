@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { notifyCheckComplete, notifyBelowThreshold } = require('../services/slack');
 
 const UPLOADS_DIR = process.env.NODE_ENV === 'production'
   ? '/app/data/uploads'
@@ -294,6 +295,13 @@ router.put('/checks/:id', (req, res) => {
     db.exec('ROLLBACK');
     return res.status(500).json({ error: e.message });
   }
+
+  // Fire Slack notifications after successful commit
+  if (req.body.status === 'complete') {
+    notifyCheckComplete(req.params.id).catch(() => {});
+    notifyBelowThreshold(req.params.id).catch(() => {});
+  }
+
   res.json({ ok: true });
 });
 
