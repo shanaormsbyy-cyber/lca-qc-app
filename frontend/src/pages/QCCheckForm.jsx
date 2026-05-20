@@ -45,6 +45,17 @@ export default function QCCheckForm() {
   const [editingComplete, setEditingComplete] = useState(false);
   const [openSections, setOpenSections] = useState(new Set());
 
+  // Voice note state
+  const [voiceState, setVoiceState] = useState('idle'); // 'idle' | 'recording' | 'done'
+  const [transcript, setTranscript] = useState('');
+  const [voiceAnalysing, setVoiceAnalysing] = useState(false);
+  const [voiceError, setVoiceError] = useState('');
+  const [voiceResult, setVoiceResult] = useState(null); // { summary, fails, ambiguous }
+  const [ambiguousChoices, setAmbiguousChoices] = useState({}); // { item_id: 'fail' | 'pass' }
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [voiceDefaultUnmentioned, setVoiceDefaultUnmentioned] = useState('pass');
+  const speechRef = useRef(null);
+
   const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
       setCheck(r.data);
@@ -53,7 +64,17 @@ export default function QCCheckForm() {
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(true); }, [id]);
+  useEffect(() => {
+    load(true);
+    api.get('/scheduling/settings').then(r => {
+      setVoiceDefaultUnmentioned(r.data.voice_default_unmentioned || 'pass');
+    }).catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
+    return () => { speechRef.current?.stop(); };
+  }, []);
+
   useLiveSync(() => load(false));
 
   const loadPhotos = () => {
@@ -162,6 +183,88 @@ export default function QCCheckForm() {
     if (!confirm('Delete this QC check and all its results? This cannot be undone.')) return;
     await api.delete(`/qc/checks/${id}`);
     navigate('/qc');
+  };
+
+  const startRecording = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceState('done');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-NZ';
+    let finalText = '';
+    recognition.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+        else interim += e.results[i][0].transcript;
+      }
+      setTranscript(finalText + interim);
+    };
+    recognition.onerror = e => {
+      if (e.error === 'not-allowed') setVoiceError('Microphone access denied. Please allow microphone access and try again.');
+      setVoiceState('idle');
+    };
+    recognition.onend = () => {
+      setTranscript(t => t.trim());
+      setVoiceState('done');
+    };
+    speechRef.current = recognition;
+    recognition.start();
+    setVoiceState('recording');
+    setVoiceError('');
+  };
+
+  const stopRecording = () => {
+    speechRef.current?.stop();
+  };
+
+  const analyseVoice = async () => {
+    if (voiceAnalysing || transcript.trim().length < 10) return;
+    setVoiceAnalysing(true);
+    setVoiceError('');
+    try {
+      const r = await api.post(`/qc/checks/${id}/voice-analyse`, { transcript });
+      setVoiceResult({
+        summary: r.data.summary || '',
+        fails: r.data.fails || [],
+        ambiguous: r.data.ambiguous || [],
+      });
+      const choices = {};
+      (r.data.ambiguous || []).forEach(a => { choices[a.item_id] = 'pass'; });
+      setAmbiguousChoices(choices);
+      setShowVoiceModal(true);
+    } catch {
+      setVoiceError('Analysis failed — please try again.');
+      setVoiceResult(null);
+      setShowVoiceModal(false);
+    } finally {
+      setVoiceAnalysing(false);
+    }
+  };
+
+  const applyVoiceScores = () => {
+    const failIds = new Set([
+      ...(voiceResult.fails || []).map(f => f.item_id),
+      ...Object.entries(ambiguousChoices).filter(([, v]) => v === 'fail').map(([k]) => parseInt(k)),
+    ]);
+
+    setItems(prev => prev.map(item => {
+      if (item.na) return item;
+      if (failIds.has(item.id)) {
+        return { ...item, score: item.score_type === 'pass_fail' ? 0 : 1 };
+      }
+      if (voiceDefaultUnmentioned === 'pass') {
+        return { ...item, score: item.score_type === 'pass_fail' ? 1 : 5 };
+      }
+      return item;
+    }));
+
+    setShowVoiceModal(false);
+    setVoiceResult(null);
   };
 
   const save = async (complete = false) => {
@@ -408,6 +511,85 @@ export default function QCCheckForm() {
         </p>
       </div>
 
+      {/* Voice Note Card */}
+      {(check.status !== 'complete' || editingComplete) && (
+        <div className="card mb-4" style={{ padding: '20px' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Voice Note</div>
+          <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>
+            Walk through the property and describe any issues aloud. AI will fill in the checklist for you.
+          </div>
+
+          {voiceError && (
+            <div style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}>{voiceError}</div>
+          )}
+
+          {voiceState === 'idle' && (
+            <button
+              className="btn btn-primary"
+              onClick={startRecording}
+              style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              <span style={{ fontSize: 18 }}>🎙️</span> Record Voice Note
+            </button>
+          )}
+
+          {voiceState === 'recording' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <span style={{
+                  width: 12, height: 12, borderRadius: '50%', background: 'var(--red)',
+                  animation: 'pulse 1s infinite',
+                  display: 'inline-block',
+                }} />
+                <span style={{ fontWeight: 700, color: 'var(--red)', fontSize: 14 }}>Recording...</span>
+              </div>
+              {transcript && (
+                <div style={{
+                  fontSize: 13, color: 'var(--t2)', background: 'var(--navy2)',
+                  border: '1px solid var(--border)', borderRadius: 8,
+                  padding: '10px 14px', marginBottom: 12, minHeight: 60, lineHeight: 1.6,
+                }}>
+                  {transcript}
+                </div>
+              )}
+              <button className="btn btn-danger" onClick={stopRecording}>⏹ Stop</button>
+            </div>
+          )}
+
+          {voiceState === 'done' && (
+            <div>
+              <textarea
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+                rows={4}
+                style={{
+                  width: '100%', fontSize: 13, color: 'var(--t1)', background: 'var(--navy2)',
+                  border: '1px solid var(--border)', borderRadius: 8,
+                  padding: '10px 14px', marginBottom: 12, lineHeight: 1.6, resize: 'vertical',
+                  boxSizing: 'border-box',
+                }}
+                placeholder="Your transcript appears here. You can also type observations manually."
+              />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={analyseVoice}
+                  disabled={voiceAnalysing || transcript.trim().length < 10}
+                >
+                  {voiceAnalysing ? 'Analysing...' : '✨ Analyse with AI'}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => { setVoiceState('idle'); setTranscript(''); setVoiceError(''); }}
+                >
+                  Re-record
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="card mb-6" style={{ padding: '16px 20px' }}>
         <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
           <span style={{ fontWeight: 600 }}>Overall Score</span>
@@ -647,6 +829,109 @@ export default function QCCheckForm() {
         </div>
         <button className="btn btn-danger btn-sm" onClick={deleteCheck}>🗑 Delete Check</button>
       </div>
+
+      {/* Voice Analysis Confirmation Modal */}
+      {showVoiceModal && voiceResult && (
+        <div className="modal-overlay" onClick={() => setShowVoiceModal(false)}>
+          <div className="modal" style={{ maxWidth: 580, maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">AI Checklist Analysis</div>
+
+            <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 20 }}>
+              {voiceResult.summary}
+            </p>
+
+            {voiceResult.fails.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 10 }}>
+                  Will Fail ({voiceResult.fails.length} item{voiceResult.fails.length !== 1 ? 's' : ''})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {voiceResult.fails.map(f => {
+                    const item = items.find(i => i.id === f.item_id);
+                    if (!item) return null;
+                    return (
+                      <div key={f.item_id} style={{
+                        padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        background: 'rgba(239,68,68,0.07)',
+                        borderLeft: '3px solid var(--red)',
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>
+                          {item.room_label || item.category} — {item.text}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{f.reason}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {voiceResult.ambiguous.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 10 }}>
+                  Needs Your Input ({voiceResult.ambiguous.length} item{voiceResult.ambiguous.length !== 1 ? 's' : ''})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {voiceResult.ambiguous.map(a => {
+                    const item = items.find(i => i.id === a.item_id);
+                    if (!item) return null;
+                    const choice = ambiguousChoices[a.item_id] || 'pass';
+                    return (
+                      <div key={a.item_id} style={{
+                        padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        background: 'rgba(245,158,11,0.07)',
+                        borderLeft: '3px solid var(--amber)',
+                      }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>
+                          {item.room_label || item.category} — {item.text}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>{a.note}</div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => setAmbiguousChoices(c => ({ ...c, [a.item_id]: 'fail' }))}
+                            style={{
+                              fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
+                              border: '1px solid var(--red)',
+                              background: choice === 'fail' ? 'var(--red)' : 'transparent',
+                              color: choice === 'fail' ? '#fff' : 'var(--red)',
+                            }}
+                          >Mark as Fail</button>
+                          <button
+                            onClick={() => setAmbiguousChoices(c => ({ ...c, [a.item_id]: 'pass' }))}
+                            style={{
+                              fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
+                              border: '1px solid var(--border)',
+                              background: choice === 'pass' ? 'var(--border)' : 'transparent',
+                              color: 'var(--t2)',
+                            }}
+                          >Leave as Pass</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {voiceResult.fails.length === 0 && voiceResult.ambiguous.length === 0 && (
+              <p style={{ fontSize: 13, color: 'var(--green)', marginBottom: 20 }}>
+                ✓ No issues found in the transcript — all items will be marked as passed.
+              </p>
+            )}
+
+            <div className="flex gap-3 mt-4">
+              <button className="btn btn-primary" onClick={applyVoiceScores}>
+                Confirm & Apply
+              </button>
+              <button className="btn btn-ghost" onClick={() => setShowVoiceModal(false)}>
+                Edit Manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Photo picker modal */}
       {photoPickerItem !== null && (
