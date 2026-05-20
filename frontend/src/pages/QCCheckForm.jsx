@@ -665,8 +665,8 @@ export default function QCCheckForm() {
               <label style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '20px 12px', borderRadius: 14, border: '2px solid var(--border)', background: 'var(--bg)', cursor: 'pointer', fontWeight: 700, fontSize: 14, color: 'var(--t1)' }}>
                 <span style={{ fontSize: 32, lineHeight: 1 }}>🖼️</span>
                 Gallery
-                <input ref={rollInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => { if (e.target.files[0]) { const it = items.find(i => i.id === photoPickerItem); uploadPhoto(photoPickerItem, it?.category, e.target.files[0]); e.target.value = ''; } }} />
+                <input ref={rollInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                  onChange={e => { const it = items.find(i => i.id === photoPickerItem); Array.from(e.target.files).forEach(f => uploadPhoto(photoPickerItem, it?.category, f)); e.target.value = ''; }} />
               </label>
             </div>
             <button onClick={() => setPhotoPickerItem(null)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', fontSize: 15, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Cancel</button>
