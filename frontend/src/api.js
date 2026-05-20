@@ -6,7 +6,8 @@ api.interceptors.request.use(config => {
   // Staff portal login/me/my-* endpoints use the staff token; everything else uses manager token
   const url = config.url || '';
   const isStaffSession = url === '/staff-portal/login' || url === '/staff-portal/me'
-    || url === '/staff-portal/change-password' || url.startsWith('/staff-portal/my-');
+    || url === '/staff-portal/change-password' || url.startsWith('/staff-portal/my-')
+    || url.startsWith('/warnings/my-warnings');
   const token = isStaffSession
     ? localStorage.getItem('staff_token')
     : localStorage.getItem('lca_token');
