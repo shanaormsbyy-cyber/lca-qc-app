@@ -27,6 +27,7 @@ export default function Settings() {
     flag_major_min: '5',
     flag_major_max: '7',
     flag_urgent_min: '8',
+    voice_default_unmentioned: 'pass',
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -293,6 +294,37 @@ export default function Settings() {
         </div>
         {mgrMsg && <p style={{ color: mgrMsg.includes('success') ? 'var(--ok)' : 'var(--red)', marginBottom: 12, fontSize: 13 }}>{mgrMsg}</p>}
         <button className="btn btn-primary" onClick={addManager}>Create Manager</button>
+      </div>
+
+      {/* Voice Analysis Settings */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">Voice Analysis</span>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16, lineHeight: 1.6 }}>
+          When a manager uses the Voice Note feature to fill in a QC checklist, items not mentioned in the voice note can either be automatically passed or left unchanged.
+        </div>
+        <div className="form-row mb-4">
+          <div className="form-group">
+            <label className="form-label">Default unmentioned items to</label>
+            <select
+              className="form-select"
+              value={qcSettings.voice_default_unmentioned}
+              onChange={e => setSetting('voice_default_unmentioned', e.target.value)}
+            >
+              <option value="pass">Pass (recommended)</option>
+              <option value="leave">Leave unchanged</option>
+            </select>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 6 }}>
+              {qcSettings.voice_default_unmentioned === 'pass'
+                ? 'Items not mentioned will be marked as passed. Use this when the voice note covers the full walkthrough.'
+                : 'Only mentioned items will be updated. Use this when you want to manually complete the rest of the checklist.'}
+            </div>
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={saveQcSettings}>
+          {settingsSaved ? '✓ Saved' : 'Save Settings'}
+        </button>
       </div>
 
       {showPropModal && (
