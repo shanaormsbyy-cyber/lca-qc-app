@@ -28,6 +28,11 @@ export default function Settings() {
     flag_major_max: '7',
     flag_urgent_min: '8',
     voice_default_unmentioned: 'pass',
+    slack_webhook_url: '',
+    slack_bot_token: '',
+    slack_notify_check_complete: 'true',
+    slack_notify_below_threshold: 'true',
+    portal_base_url: '',
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -294,6 +299,82 @@ export default function Settings() {
         </div>
         {mgrMsg && <p style={{ color: mgrMsg.includes('success') ? 'var(--ok)' : 'var(--red)', marginBottom: 12, fontSize: 13 }}>{mgrMsg}</p>}
         <button className="btn btn-primary" onClick={addManager}>Create Manager</button>
+      </div>
+
+      {/* Slack Integration */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">Slack Integration</span>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16, lineHeight: 1.6 }}>
+          Send automatic Slack notifications to cleaners and your management team.
+          To set up: create a Slack App at api.slack.com, add an Incoming Webhook for your notifications channel, and add the <code>chat:write</code> and <code>users:lookupByEmail</code> Bot Token Scopes.
+        </div>
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="form-label">Notifications Channel Webhook URL</label>
+          <input
+            className="form-input"
+            type="text"
+            placeholder="https://hooks.slack.com/services/..."
+            value={qcSettings.slack_webhook_url}
+            onChange={e => setSetting('slack_webhook_url', e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>Used for management alerts posted to your #lca-notifications channel</div>
+        </div>
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="form-label">Bot Token</label>
+          <input
+            className="form-input"
+            type="password"
+            placeholder="xoxb-..."
+            value={qcSettings.slack_bot_token}
+            onChange={e => setSetting('slack_bot_token', e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>Used to send DMs to cleaners — requires chat:write and users:lookupByEmail scopes</div>
+        </div>
+
+        <div className="form-group" style={{ marginBottom: 16 }}>
+          <label className="form-label">Portal Base URL</label>
+          <input
+            className="form-input"
+            type="text"
+            placeholder="https://your-app.up.railway.app"
+            value={qcSettings.portal_base_url}
+            onChange={e => setSetting('portal_base_url', e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>Used to build links in notifications (no trailing slash)</div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={qcSettings.slack_notify_check_complete === 'true'}
+              onChange={e => setSetting('slack_notify_check_complete', e.target.checked ? 'true' : 'false')}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Notify cleaner on check completion</div>
+              <div style={{ fontSize: 12, color: 'var(--t3)' }}>Sends a DM to the cleaner when their QC check is signed off</div>
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={qcSettings.slack_notify_below_threshold === 'true'}
+              onChange={e => setSetting('slack_notify_below_threshold', e.target.checked ? 'true' : 'false')}
+            />
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Notify management on below-threshold scores</div>
+              <div style={{ fontSize: 12, color: 'var(--t3)' }}>Posts to your notifications channel when a check is below target, or a cleaner's average drops below the threshold</div>
+            </div>
+          </label>
+        </div>
+
+        <button className="btn btn-primary" onClick={saveQcSettings}>
+          {settingsSaved ? '✓ Saved' : 'Save Settings'}
+        </button>
       </div>
 
       {/* Voice Analysis Settings */}
