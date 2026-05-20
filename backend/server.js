@@ -258,6 +258,17 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Auto-migrate: slack_email column on staff
+{
+  const s = db.prepare('PRAGMA table_info(staff)');
+  const cols = s.all();
+  s.finalize();
+  if (!cols.find(c => c.name === 'slack_email')) {
+    db.exec('ALTER TABLE staff ADD COLUMN slack_email TEXT');
+    console.log('Migration complete: added slack_email column to staff.');
+  }
+}
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));

@@ -219,5 +219,10 @@ insertSetting.run('top_performers_threshold', '90');
 insertSetting.run('top_performers_min_checks', '3');
 insertSetting.run('heatpump_freq_days', '90');
 insertSetting.run('voice_default_unmentioned', 'pass');
+insertSetting.run('slack_webhook_url', '');
+insertSetting.run('slack_bot_token', '');
+insertSetting.run('slack_notify_check_complete', 'true');
+insertSetting.run('slack_notify_below_threshold', 'true');
+insertSetting.run('portal_base_url', '');
 
 module.exports = db;
