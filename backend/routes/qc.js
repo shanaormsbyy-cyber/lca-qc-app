@@ -456,7 +456,7 @@ Return JSON in this exact format:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1000,
+        max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -467,8 +467,10 @@ Return JSON in this exact format:
     const text = data.content?.[0]?.text || '';
     let parsed;
     try {
-      parsed = JSON.parse(text);
+      const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      parsed = JSON.parse(clean);
     } catch {
+      console.error('voice-analyse AI raw response:', text);
       return res.status(500).json({ error: 'AI returned malformed response — please try again.' });
     }
 
