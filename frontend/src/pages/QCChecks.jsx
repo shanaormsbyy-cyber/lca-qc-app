@@ -60,7 +60,10 @@ export default function QCChecks() {
   const handleChecklistChange = (checklist_id) => {
     const cl = checklists.find(c => String(c.id) === String(checklist_id));
     const rs = cl?.repeatable_sections || [];
-    const room_counts = Object.fromEntries(rs.map(s => [s, 1]));
+    const prop = properties.find(p => String(p.id) === String(checkForm.property_id));
+    let saved = {};
+    try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+    const room_counts = Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
     setCheckForm(f => ({ ...f, checklist_id, room_counts }));
   };
 
@@ -137,7 +140,20 @@ export default function QCChecks() {
             <div className="modal-title">New QC Check</div>
             <div className="form-group">
               <label className="form-label">Property</label>
-              <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>
+              <select
+                className="form-select"
+                value={checkForm.property_id}
+                onChange={e => {
+                  const propertyId = e.target.value;
+                  const prop = properties.find(p => String(p.id) === propertyId);
+                  const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+                  const rs = cl?.repeatable_sections || [];
+                  let saved = {};
+                  try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+                  const room_counts = Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
+                  setCheckForm(f => ({ ...f, property_id: propertyId, room_counts }));
+                }}
+              >
                 <option value="">Select property…</option>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
