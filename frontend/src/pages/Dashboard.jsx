@@ -33,7 +33,7 @@ export default function Dashboard() {
   const [staff, setStaff] = useState([]);
   const [properties, setProperties] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: today });
+  const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: today, room_counts: {} });
   const [creating, setCreating] = useState(false);
 
   const load = () => {
@@ -75,17 +75,29 @@ export default function Dashboard() {
   };
 
   const openCreate = async (preselect = {}, type = 'staff') => {
-    // Always reload checklists fresh so newly created ones appear
     const freshCL = await api.get('/qc/checklists').then(r => r.data).catch(() => checklists);
     setChecklists(freshCL);
     setCreateType(type);
     const defaultCL = freshCL.find(cl => cl.default_for === type);
+    const checklistId = defaultCL ? String(defaultCL.id) : '';
+    const propertyId = String(preselect.property_id || '');
+    const room_counts = checklistId && propertyId
+      ? (() => {
+          const prop = properties.find(p => String(p.id) === propertyId);
+          const cl = freshCL.find(c => String(c.id) === checklistId);
+          const rs = cl?.repeatable_sections || [];
+          let saved = {};
+          try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+          return Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
+        })()
+      : {};
     setCheckForm({
-      property_id: String(preselect.property_id || ''),
+      property_id: propertyId,
       staff_id: String(preselect.staff_id || ''),
-      checklist_id: defaultCL ? String(defaultCL.id) : '',
+      checklist_id: checklistId,
       assigned_to_id: String(manager.id),
       date: today,
+      room_counts,
     });
     setShowCreate(true);
   };
@@ -518,7 +530,20 @@ export default function Dashboard() {
             <div className="modal-title">{createType === 'property' ? 'New Property Health Check' : 'New Team QC Check'}</div>
             <div className="form-group">
               <label className="form-label">Property</label>
-              <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>
+              <select
+                className="form-select"
+                value={checkForm.property_id}
+                onChange={e => {
+                  const propertyId = e.target.value;
+                  const prop = properties.find(p => String(p.id) === propertyId);
+                  const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+                  const rs = cl?.repeatable_sections || [];
+                  let saved = {};
+                  try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+                  const room_counts = Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
+                  setCheckForm(f => ({ ...f, property_id: propertyId, room_counts }));
+                }}
+              >
                 <option value="">Select property…</option>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -539,6 +564,29 @@ export default function Dashboard() {
                 {checklists.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            {checkForm.checklist_id && (() => {
+              const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+              const rs = cl?.repeatable_sections || [];
+              if (rs.length === 0) return null;
+              return (
+                <div className="card mb-2" style={{ padding: '14px 16px', background: 'var(--bg)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--t2)' }}>Property room counts</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                    {rs.map(section => (
+                      <div key={section}>
+                        <label className="form-label" style={{ fontSize: 12 }}>{section}s</label>
+                        <input
+                          type="number" min="1" max="20"
+                          className="form-input"
+                          value={checkForm.room_counts[section] ?? 1}
+                          onChange={e => setCheckForm(f => ({ ...f, room_counts: { ...f.room_counts, [section]: parseInt(e.target.value) || 1 } }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="form-group">
               <label className="form-label">Assign To</label>
               <select className="form-select" value={checkForm.assigned_to_id} onChange={e => setCheckForm(f => ({ ...f, assigned_to_id: e.target.value }))}>
