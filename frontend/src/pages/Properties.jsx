@@ -86,6 +86,111 @@ function AccessDetailsTab({ properties }) {
   );
 }
 
+function RoomConfigTab({ properties, checklists }) {
+  const [configs, setConfigs] = useState({});
+  const [saving, setSaving] = useState({});
+  const [saved, setSaved] = useState({});
+  const [search, setSearch] = useState('');
+
+  // Get all repeatable sections from all checklists (deduplicated)
+  const sections = [...new Set(
+    checklists.flatMap(cl => cl.repeatable_sections || [])
+  )];
+
+  useEffect(() => {
+    const initial = {};
+    properties.forEach(p => {
+      try { initial[p.id] = JSON.parse(p.room_config || '{}'); }
+      catch { initial[p.id] = {}; }
+    });
+    setConfigs(initial);
+  }, [properties, checklists]);
+
+  const save = async (id) => {
+    setSaving(s => ({ ...s, [id]: true }));
+    try {
+      await api.put(`/properties/${id}`, { room_config: configs[id] });
+      setSaved(s => ({ ...s, [id]: true }));
+      setTimeout(() => setSaved(s => ({ ...s, [id]: false })), 2000);
+    } finally {
+      setSaving(s => ({ ...s, [id]: false }));
+    }
+  };
+
+  const setCount = (propId, section, val) => {
+    setConfigs(c => ({ ...c, [propId]: { ...c[propId], [section]: parseInt(val) || 1 } }));
+  };
+
+  const sorted = [...properties]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  if (sections.length === 0) {
+    return (
+      <div className="card">
+        <div className="card-header"><span className="card-title">Room Configuration</span></div>
+        <p style={{ color: 'var(--t3)', padding: '16px 0' }}>No repeatable sections found. Add repeatable sections (e.g. Bedroom, Bathroom) to a checklist first.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Room Configuration</span>
+        <span style={{ fontSize: 12, color: 'var(--t3)' }}>Set room counts per property — auto-applied when starting a QC check.</span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <input
+          className="form-input"
+          style={{ maxWidth: 300 }}
+          placeholder="Search properties…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '35%' }}>Property</th>
+              {sections.map(s => <th key={s}>{s}s</th>)}
+              <th style={{ width: 80 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: 700 }}>{p.name}</td>
+                {sections.map(section => (
+                  <td key={section}>
+                    <input
+                      type="number" min="1" max="20"
+                      className="form-input"
+                      style={{ padding: '6px 10px', fontSize: 13, width: 70 }}
+                      value={configs[p.id]?.[section] ?? 1}
+                      onChange={e => setCount(p.id, section, e.target.value)}
+                      onBlur={() => save(p.id)}
+                      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                    />
+                  </td>
+                ))}
+                <td>
+                  {saving[p.id]
+                    ? <span style={{ fontSize: 12, color: 'var(--t3)' }}>Saving…</span>
+                    : saved[p.id]
+                    ? <span style={{ fontSize: 12, color: 'var(--green)' }}>✓ Saved</span>
+                    : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function Properties() {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
@@ -171,6 +276,7 @@ export default function Properties() {
         <button className={`tab-btn${tab === 'overview' ? ' active' : ''}`} onClick={() => setTab('overview')}>Overview</button>
         <button className={`tab-btn${tab === 'qc' ? ' active' : ''}`} onClick={() => setTab('qc')}>Health Checks</button>
         <button className={`tab-btn${tab === 'access' ? ' active' : ''}`} onClick={() => setTab('access')}>Access Details</button>
+        <button className={`tab-btn${tab === 'roomconfig' ? ' active' : ''}`} onClick={() => setTab('roomconfig')}>Room Config</button>
       </div>
 
       {tab === 'overview' && (
@@ -220,6 +326,10 @@ export default function Properties() {
 
       {tab === 'access' && (
         <AccessDetailsTab properties={properties} />
+      )}
+
+      {tab === 'roomconfig' && (
+        <RoomConfigTab properties={properties} checklists={checklists} />
       )}
 
       {tab === 'qc' && (
