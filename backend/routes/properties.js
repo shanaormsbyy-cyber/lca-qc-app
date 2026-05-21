@@ -22,10 +22,11 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
-  const { name, access_code, inactive_until } = req.body;
+  const { name, access_code, inactive_until, room_config } = req.body;
   if (name !== undefined) db.prepare('UPDATE properties SET name=? WHERE id=?').run(name, req.params.id);
   if (access_code !== undefined) db.prepare('UPDATE properties SET access_code=? WHERE id=?').run(access_code, req.params.id);
   if (inactive_until !== undefined) db.prepare('UPDATE properties SET inactive_until=? WHERE id=?').run(inactive_until || null, req.params.id);
+  if (room_config !== undefined) db.prepare('UPDATE properties SET room_config=? WHERE id=?').run(JSON.stringify(room_config), req.params.id);
   res.json({ ok: true });
 });
 
