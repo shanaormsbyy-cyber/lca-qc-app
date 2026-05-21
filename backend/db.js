@@ -199,6 +199,7 @@ const migrations = [
   "ALTER TABLE properties      ADD COLUMN access_code TEXT DEFAULT NULL",
   "ALTER TABLE properties      ADD COLUMN inactive_until TEXT DEFAULT NULL",
   "ALTER TABLE staff            ADD COLUMN inactive_until TEXT DEFAULT NULL",
+  "ALTER TABLE properties      ADD COLUMN room_config TEXT DEFAULT NULL",
 ];
 migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
