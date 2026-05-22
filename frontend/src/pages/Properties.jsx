@@ -201,7 +201,7 @@ export default function Properties() {
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [checkForm, setCheckForm] = useState({ property_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [checkForm, setCheckForm] = useState({ property_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '', room_counts: {} });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [inactiveModal, setInactiveModal] = useState(null); // { id, name, inactive_until }
@@ -394,18 +394,67 @@ export default function Properties() {
             <div className="modal-title">New Property Health Check</div>
             <div className="form-group">
               <label className="form-label">Property</label>
-              <select className="form-select" value={checkForm.property_id} onChange={e => setCheckForm(f => ({ ...f, property_id: e.target.value }))}>
+              <select
+                className="form-select"
+                value={checkForm.property_id}
+                onChange={e => {
+                  const propertyId = e.target.value;
+                  const prop = properties.find(p => String(p.id) === propertyId);
+                  const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+                  const rs = cl?.repeatable_sections || [];
+                  let saved = {};
+                  try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+                  const room_counts = Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
+                  setCheckForm(f => ({ ...f, property_id: propertyId, room_counts }));
+                }}
+              >
                 <option value="">Select property…</option>
                 {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Checklist</label>
-              <select className="form-select" value={checkForm.checklist_id} onChange={e => setCheckForm(f => ({ ...f, checklist_id: e.target.value }))}>
+              <select
+                className="form-select"
+                value={checkForm.checklist_id}
+                onChange={e => {
+                  const checklistId = e.target.value;
+                  const cl = checklists.find(c => String(c.id) === checklistId);
+                  const rs = cl?.repeatable_sections || [];
+                  const prop = properties.find(p => String(p.id) === String(checkForm.property_id));
+                  let saved = {};
+                  try { saved = JSON.parse(prop?.room_config || '{}'); } catch { saved = {}; }
+                  const room_counts = Object.fromEntries(rs.map(s => [s, saved[s] ?? 1]));
+                  setCheckForm(f => ({ ...f, checklist_id: checklistId, room_counts }));
+                }}
+              >
                 <option value="">Select checklist…</option>
                 {checklists.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+            {checkForm.checklist_id && (() => {
+              const cl = checklists.find(c => String(c.id) === String(checkForm.checklist_id));
+              const rs = cl?.repeatable_sections || [];
+              if (rs.length === 0) return null;
+              return (
+                <div className="card mb-2" style={{ padding: '14px 16px', background: 'var(--bg)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--t2)' }}>Property room counts</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                    {rs.map(section => (
+                      <div key={section}>
+                        <label className="form-label" style={{ fontSize: 12 }}>{section}s</label>
+                        <input
+                          type="number" min="1" max="20"
+                          className="form-input"
+                          value={checkForm.room_counts[section] ?? 1}
+                          onChange={e => setCheckForm(f => ({ ...f, room_counts: { ...f.room_counts, [section]: parseInt(e.target.value) || 1 } }))}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             <div className="form-group">
               <label className="form-label">Assign To</label>
               <select className="form-select" value={checkForm.assigned_to_id} onChange={e => setCheckForm(f => ({ ...f, assigned_to_id: e.target.value }))}>
