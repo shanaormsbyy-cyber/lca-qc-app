@@ -75,15 +75,19 @@ export default function Dashboard() {
   };
 
   const openCreate = async (preselect = {}, type = 'staff') => {
-    const freshCL = await api.get('/qc/checklists').then(r => r.data).catch(() => checklists);
+    const [freshCL, freshProps] = await Promise.all([
+      api.get('/qc/checklists').then(r => r.data).catch(() => checklists),
+      api.get('/properties').then(r => r.data).catch(() => properties),
+    ]);
     setChecklists(freshCL);
+    setProperties(freshProps);
     setCreateType(type);
     const defaultCL = freshCL.find(cl => cl.default_for === type);
     const checklistId = defaultCL ? String(defaultCL.id) : '';
     const propertyId = String(preselect.property_id || '');
     const room_counts = checklistId && propertyId
       ? (() => {
-          const prop = properties.find(p => String(p.id) === propertyId);
+          const prop = freshProps.find(p => String(p.id) === propertyId);
           const cl = freshCL.find(c => String(c.id) === checklistId);
           const rs = cl?.repeatable_sections || [];
           let saved = {};
