@@ -191,35 +191,67 @@ export default function QCCheckForm() {
       setVoiceState('done');
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-NZ';
+
     let finalText = '';
-    recognition.onresult = e => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
-        else interim += e.results[i][0].transcript;
-      }
-      setTranscript(finalText + interim);
+    let stoppedByUser = false;
+
+    const createRecognition = () => {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-NZ';
+
+      recognition.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+          else interim += e.results[i][0].transcript;
+        }
+        setTranscript(finalText + interim);
+      };
+
+      recognition.onerror = e => {
+        if (e.error === 'not-allowed') {
+          setVoiceError('Microphone access denied. Please allow microphone access and try again.');
+          stoppedByUser = true;
+          setVoiceState('idle');
+        }
+        // 'no-speech' and 'network' errors are transient — onend will restart us
+      };
+
+      recognition.onend = () => {
+        if (stoppedByUser) {
+          setTranscript(finalText.trim());
+          setVoiceState('done');
+        } else {
+          // Browser timed out — restart automatically to keep recording
+          try {
+            const next = createRecognition();
+            speechRef.current = next;
+            next.start();
+          } catch {
+            setTranscript(finalText.trim());
+            setVoiceState('done');
+          }
+        }
+      };
+
+      return recognition;
     };
-    recognition.onerror = e => {
-      if (e.error === 'not-allowed') setVoiceError('Microphone access denied. Please allow microphone access and try again.');
-      setVoiceState('idle');
-    };
-    recognition.onend = () => {
-      setTranscript(t => t.trim());
-      setVoiceState('done');
-    };
+
+    const recognition = createRecognition();
     speechRef.current = recognition;
     recognition.start();
     setVoiceState('recording');
     setVoiceError('');
+
+    // Expose stop so the button can set the flag before calling stop()
+    speechRef.current._stopByUser = () => { stoppedByUser = true; speechRef.current?.stop(); };
   };
 
   const stopRecording = () => {
-    speechRef.current?.stop();
+    if (speechRef.current?._stopByUser) speechRef.current._stopByUser();
+    else speechRef.current?.stop();
   };
 
   const analyseVoice = async () => {
