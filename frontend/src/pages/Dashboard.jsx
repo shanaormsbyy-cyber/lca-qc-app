@@ -129,24 +129,16 @@ export default function Dashboard() {
 
   const completeQC = allQC.filter(q => q.status === 'complete');
 
-  // Staff avg: only checks tagged as staff-type (evaluating the cleaner's performance)
-  const staffChecks = completeQC.filter(q => q.check_type === 'staff' || !q.check_type);
-  const staffIds = [...new Set(staffChecks.map(q => q.staff_id))];
-  const staffAvg = staffIds.length
-    ? Math.round(staffIds.reduce((sum, sid) => {
-        const c = staffChecks.filter(q => q.staff_id === sid);
-        return sum + c.reduce((s, q) => s + q.score_pct, 0) / c.length;
-      }, 0) / staffIds.length)
+  // Staff avg: simple mean across all completed staff checks (correct — not averaged per-person first)
+  const staffChecks = completeQC.filter(q => (q.check_type === 'staff' || !q.check_type) && q.score_pct != null);
+  const staffAvg = staffChecks.length
+    ? Math.round(staffChecks.reduce((sum, q) => sum + q.score_pct, 0) / staffChecks.length)
     : null;
 
-  // Property avg: only checks tagged as property-type (evaluating the property's health)
-  const propertyChecks = completeQC.filter(q => q.check_type === 'property');
-  const propIds = [...new Set(propertyChecks.map(q => q.property_id))];
-  const propAvg = propIds.length
-    ? Math.round(propIds.reduce((sum, pid) => {
-        const c = propertyChecks.filter(q => q.property_id === pid);
-        return sum + c.reduce((s, q) => s + q.score_pct, 0) / c.length;
-      }, 0) / propIds.length)
+  // Property avg: simple mean across all completed property checks
+  const propertyChecks = completeQC.filter(q => q.check_type === 'property' && q.score_pct != null);
+  const propAvg = propertyChecks.length
+    ? Math.round(propertyChecks.reduce((sum, q) => sum + q.score_pct, 0) / propertyChecks.length)
     : null;
 
   const scoreColor = v => v == null ? '' : v >= 80 ? ' green' : v >= 60 ? '' : ' red';
