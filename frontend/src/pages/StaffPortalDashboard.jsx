@@ -19,38 +19,46 @@ function TrendChart({ trend, threshold = 85 }) {
   const chartH = 160;
   const barW = 32;
   const gap = 6;
-  const totalW = trend.length * (barW + gap);
+  const labelW = 28; // space reserved on left for y-axis labels
+  const barsW = trend.length * (barW + gap);
+  const svgW = Math.max(barsW + labelW + 8, 320);
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   return (
     <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-      <svg width={Math.max(totalW, 300)} height={chartH + 40} style={{ display: 'block' }}>
-        {/* Grid lines */}
+      <svg width={svgW} height={chartH + 40} style={{ display: 'block' }}>
+        {/* Grid lines + y-axis labels */}
         {[0, 25, 50, 75, 100].map(v => {
           const yy = chartH - (v / maxVal) * chartH + 10;
           return (
             <g key={v}>
-              <line x1={0} y1={yy} x2={totalW} y2={yy} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-              <text x={0} y={yy - 4} fill="var(--t3)" fontSize={9}>{v}%</text>
+              <line x1={labelW} y1={yy} x2={svgW} y2={yy} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+              <text x={labelW - 4} y={yy + 3} fill="rgba(255,255,255,0.3)" fontSize={9} textAnchor="end">{v}%</text>
             </g>
           );
         })}
         {trend.map((t, i) => {
-          const x = i * (barW + gap) + 20;
+          const x = labelW + i * (barW + gap);
           const h = t.avg != null ? (t.avg / maxVal) * chartH : 0;
           const y = chartH - h + 10;
-          const color = t.avg == null ? 'rgba(255,255,255,0.05)' : t.avg >= threshold ? 'var(--ok)' : t.avg >= threshold * 0.82 ? 'var(--amber)' : 'var(--red)';
-          const monthLabel = t.month.slice(5); // MM
-          const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const mName = monthNames[parseInt(monthLabel) - 1] || monthLabel;
+          // Use hex colours so they work even if CSS vars aren't loaded in portal context
+          const color = t.avg == null
+            ? 'rgba(255,255,255,0.05)'
+            : t.avg >= threshold
+              ? '#22c55e'
+              : t.avg >= threshold * 0.82
+                ? '#f59e0b'
+                : '#ef4444';
+          const mName = monthNames[parseInt(t.month.slice(5)) - 1] || t.month.slice(5);
           return (
             <g key={i}>
-              <rect x={x} y={t.avg != null ? y : chartH + 10 - 2} width={barW} height={t.avg != null ? h : 2} rx={4} fill={color} opacity={t.avg != null ? 0.85 : 0.3} />
+              <rect x={x} y={t.avg != null ? y : chartH + 10 - 2} width={barW} height={t.avg != null ? h : 2} rx={4} fill={color} opacity={t.avg != null ? 0.9 : 0.3} />
               {t.avg != null && (
-                <text x={x + barW / 2} y={y - 6} fill="var(--t1)" fontSize={10} fontWeight={700} textAnchor="middle">{t.avg}%</text>
+                <text x={x + barW / 2} y={y - 6} fill="#ffffff" fontSize={10} fontWeight={700} textAnchor="middle">{t.avg}%</text>
               )}
-              <text x={x + barW / 2} y={chartH + 26} fill="var(--t3)" fontSize={9} textAnchor="middle">{mName}</text>
+              <text x={x + barW / 2} y={chartH + 26} fill="rgba(255,255,255,0.4)" fontSize={9} textAnchor="middle">{mName}</text>
               {t.count > 0 && (
-                <text x={x + barW / 2} y={chartH + 36} fill="var(--t3)" fontSize={8} textAnchor="middle">{t.count} check{t.count > 1 ? 's' : ''}</text>
+                <text x={x + barW / 2} y={chartH + 36} fill="rgba(255,255,255,0.3)" fontSize={8} textAnchor="middle">{t.count} check{t.count > 1 ? 's' : ''}</text>
               )}
             </g>
           );
