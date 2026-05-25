@@ -38,7 +38,7 @@ router.post('/checklists', (req, res) => {
     const result = db.prepare('INSERT INTO training_checklists (name, description) VALUES (?, ?)').run(name, description || '');
     clId = result.lastInsertRowid;
     (sections || []).forEach((sec, si) => {
-      const sResult = db.prepare('INSERT INTO training_checklist_sections (checklist_id, name, description, order_idx) VALUES (?, ?, ?, ?)').run(clId, sec.name, sec.description || '', si);
+      const sResult = db.prepare('INSERT INTO training_checklist_sections (checklist_id, name, description, shift_label, order_idx) VALUES (?, ?, ?, ?, ?)').run(clId, sec.name, sec.description || '', sec.shift_label || '', si);
       const sId = sResult.lastInsertRowid;
       (sec.items || []).forEach((item, ii) => {
         db.prepare('INSERT INTO training_checklist_items (section_id, text, order_idx) VALUES (?, ?, ?)').run(sId, item.text, ii);
@@ -59,7 +59,7 @@ router.put('/checklists/:id', (req, res) => {
     db.prepare('UPDATE training_checklists SET name=?, description=? WHERE id=?').run(name, description || '', req.params.id);
     db.prepare('DELETE FROM training_checklist_sections WHERE checklist_id=?').run(req.params.id);
     (sections || []).forEach((sec, si) => {
-      const sResult = db.prepare('INSERT INTO training_checklist_sections (checklist_id, name, description, order_idx) VALUES (?, ?, ?, ?)').run(req.params.id, sec.name, sec.description || '', si);
+      const sResult = db.prepare('INSERT INTO training_checklist_sections (checklist_id, name, description, shift_label, order_idx) VALUES (?, ?, ?, ?, ?)').run(req.params.id, sec.name, sec.description || '', sec.shift_label || null, si);
       const sId = sResult.lastInsertRowid;
       (sec.items || []).forEach((item, ii) => {
         db.prepare('INSERT INTO training_checklist_items (section_id, text, order_idx) VALUES (?, ?, ?)').run(sId, item.text, ii);
