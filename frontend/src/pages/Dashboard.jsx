@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [coachingStaffIds, setCoachingStaffIds] = useState(new Set());
   const [firstPassData, setFirstPassData] = useState(null);
   const [recleanTimeData, setRecleanTimeData] = useState(null);
+  const [complaints30d, setComplaints30d] = useState(null);
   const [flagDetail, setFlagDetail] = useState(null);
   const [flagTrend, setFlagTrend] = useState(null);
 
@@ -80,6 +81,7 @@ export default function Dashboard() {
     }).catch(() => {});
     api.get('/kpis/first-pass-rate').then(r => setFirstPassData(r.data)).catch(() => {});
     api.get('/kpis/reclean-time').then(r => setRecleanTimeData(r.data)).catch(() => {});
+    api.get('/complaints?period=30d').then(r => setComplaints30d(r.data.length)).catch(() => {});
   };
 
   useEffect(() => { load(); }, [manager.id]);
@@ -247,6 +249,15 @@ export default function Dashboard() {
                 </svg>
               );
             })()}
+          </div>
+        )}
+
+        {/* Total Complaints (30d) stat card */}
+        {complaints30d !== null && (
+          <div className={`stat-card${complaints30d > 0 ? ' danger' : ''}`} onClick={() => navigate('/complaints')} style={{ cursor: 'pointer' }}>
+            <div className="stat-label">Total Complaints (30d)</div>
+            <div className={`stat-value${complaints30d > 0 ? ' red' : ' green'}`}>{complaints30d}</div>
+            <div className="stat-sub">{complaints30d > 0 ? 'View complaints log' : 'No complaints logged'}</div>
           </div>
         )}
 

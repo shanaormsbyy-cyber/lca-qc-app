@@ -13,7 +13,9 @@ router.get('/', (req, res) => {
   const { staff_id, period = 'all' } = req.query;
 
   let dateClause = '';
-  if (period === '90d') {
+  if (period === '30d') {
+    dateClause = "AND c.date >= date('now', '-30 days')";
+  } else if (period === '90d') {
     dateClause = "AND c.date >= date('now', '-90 days')";
   } else if (period === '180d') {
     dateClause = "AND c.date >= date('now', '-180 days')";
