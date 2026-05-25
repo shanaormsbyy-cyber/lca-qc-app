@@ -59,7 +59,10 @@ export default function QCCheckForm() {
   const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
       setCheck(r.data);
-      if (overwriteItems) setItems(r.data.items || []);
+      // Always overwrite items if check is complete — prevents stale in-progress
+      // items from a background tab from being treated as authoritative
+      const shouldOverwrite = overwriteItems || r.data.status === 'complete';
+      if (shouldOverwrite) setItems(r.data.items || []);
       setCorrectiveActions(r.data.notes || '');
     }).finally(() => setLoading(false));
   };
@@ -302,7 +305,9 @@ export default function QCCheckForm() {
 
   const save = async (complete = false) => {
     setSaving(true);
-    const payload = { items, notes: correctiveActions };
+    // Never overwrite items on a completed check unless explicitly editing it
+    const sendItems = complete || check.status !== 'complete' || editingComplete;
+    const payload = { ...(sendItems ? { items } : {}), notes: correctiveActions };
     if (complete) { payload.status = 'complete'; payload.signed_off_by = manager.name; }
     await api.put(`/qc/checks/${id}`, payload);
     if (complete) navigate('/qc');
