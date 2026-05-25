@@ -41,6 +41,7 @@ export default function QCCheckForm() {
   const cameraInputRef = useRef(null);
   // Corrective actions — stored in check.notes
   const [correctiveActions, setCorrectiveActions] = useState('');
+  const [correctiveActionsEditing, setCorrectiveActionsEditing] = useState(false);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [editingComplete, setEditingComplete] = useState(false);
   const [openSections, setOpenSections] = useState(new Set());
@@ -63,7 +64,11 @@ export default function QCCheckForm() {
       // items from a background tab from being treated as authoritative
       const shouldOverwrite = overwriteItems || r.data.status === 'complete';
       if (shouldOverwrite) setItems(r.data.items || []);
-      setCorrectiveActions(r.data.notes || '');
+      // Don't overwrite notes while the user is actively typing or AI is writing
+      setCorrectiveActionsEditing(editing => {
+        if (!editing) setCorrectiveActions(r.data.notes || '');
+        return editing;
+      });
     }).finally(() => setLoading(false));
   };
 
@@ -814,13 +819,18 @@ export default function QCCheckForm() {
                 disabled={aiSummaryLoading}
                 onClick={async () => {
                   setAiSummaryLoading(true);
+                  setCorrectiveActionsEditing(true);
                   try {
                     const r = await api.post(`/qc/checks/${id}/ai-summary`);
-                    setCorrectiveActions(r.data.summary);
+                    const summary = r.data.summary;
+                    setCorrectiveActions(summary);
+                    // Save immediately so it persists and live sync can't wipe it
+                    await api.put(`/qc/checks/${id}`, { notes: summary });
                   } catch (e) {
                     alert(e.response?.data?.error || 'AI summary failed');
                   } finally {
                     setAiSummaryLoading(false);
+                    setCorrectiveActionsEditing(false);
                   }
                 }}
                 style={{ background: 'rgba(139,92,246,0.12)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}
@@ -837,6 +847,8 @@ export default function QCCheckForm() {
             style={{ minHeight: 100, resize: 'vertical', fontFamily: 'inherit' }}
             placeholder="Describe any corrective actions required, follow-up tasks, or notes for this inspection…"
             value={correctiveActions}
+            onFocus={() => setCorrectiveActionsEditing(true)}
+            onBlur={() => setCorrectiveActionsEditing(false)}
             onChange={e => setCorrectiveActions(e.target.value)}
           />
         ) : (
