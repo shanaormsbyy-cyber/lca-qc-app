@@ -75,7 +75,17 @@ export default function Training() {
                     </div>
                   </td>
                   <td><StatusBadge status={s.status} /></td>
-                  <td><button className="btn btn-sm btn-primary" onClick={e => { e.stopPropagation(); navigate(`/training/sessions/${s.id}`); }}>Open</button></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-sm btn-primary" onClick={e => { e.stopPropagation(); navigate(`/training/sessions/${s.id}`); }}>Open</button>
+                      <button className="btn btn-sm btn-danger" onClick={async e => {
+                        e.stopPropagation();
+                        if (!confirm(`Delete session for ${s.trainee_name}?`)) return;
+                        await api.delete(`/training/sessions/${s.id}`);
+                        load();
+                      }}>Delete</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
