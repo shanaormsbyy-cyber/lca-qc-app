@@ -227,5 +227,6 @@ insertSetting.run('slack_bot_token', '');
 insertSetting.run('slack_notify_check_complete', 'true');
 insertSetting.run('slack_notify_below_threshold', 'true');
 insertSetting.run('portal_base_url', '');
+insertSetting.run('anthropic_api_key', '');
 
 module.exports = db;

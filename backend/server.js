@@ -348,6 +348,7 @@ app.use('/api/staff-portal', require('./routes/staff-portal'));
 app.use('/api/warnings', require('./routes/warnings'));
 app.use('/api/coaching', require('./routes/coaching'));
 app.use('/api/complaints', require('./routes/complaints'));
+app.use('/api/chat', require('./routes/chat'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');

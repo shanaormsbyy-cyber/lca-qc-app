@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ChatAssistant from './ChatAssistant';
 
 const NAV = [
   { to: '/',             label: 'Dashboard',   end: true },
@@ -70,6 +71,7 @@ export default function Layout() {
         </div>
         <Outlet />
       </main>
+      <ChatAssistant />
     </div>
   );
 }

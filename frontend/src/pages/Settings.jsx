@@ -33,6 +33,7 @@ export default function Settings() {
     slack_notify_check_complete: 'true',
     slack_notify_below_threshold: 'true',
     portal_base_url: '',
+    anthropic_api_key: '',
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -345,6 +346,20 @@ export default function Settings() {
             onChange={e => setSetting('portal_base_url', e.target.value)}
           />
           <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>Used to build links in notifications (no trailing slash)</div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Anthropic API Key (AI Assistant)</label>
+          <input
+            className="form-input"
+            type="password"
+            placeholder="sk-ant-..."
+            value={qcSettings.anthropic_api_key}
+            onChange={e => setSetting('anthropic_api_key', e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>
+            Required for the AI chat assistant. Get your key at console.anthropic.com
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
