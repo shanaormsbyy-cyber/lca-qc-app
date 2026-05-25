@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [flagTab, setFlagTab] = useState('week');
   const [heatpumpsDue, setHeatpumpsDue] = useState(0);
   const [coachingFollowUp, setCoachingFollowUp] = useState(0);
+  const [firstPassData, setFirstPassData] = useState(null);
   const [flagDetail, setFlagDetail] = useState(null);
   const [flagTrend, setFlagTrend] = useState(null);
 
@@ -74,6 +75,7 @@ export default function Dashboard() {
       const count = r.data.filter(s => s.status === 'open' && s.followup_date).length;
       setCoachingFollowUp(count);
     }).catch(() => {});
+    api.get('/kpis/first-pass-rate').then(r => setFirstPassData(r.data)).catch(() => {});
   };
 
   useEffect(() => { load(); }, [manager.id]);
@@ -214,6 +216,67 @@ export default function Dashboard() {
           <div className="stat-sub">{coachingFollowUp > 0 ? 'Open sessions with follow-up' : 'No follow-ups scheduled'}</div>
         </div>
       </div>
+
+      {/* First-Pass Rate */}
+      {firstPassData && firstPassData.total > 0 && (
+        <div className="card mb-6">
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <div>
+              <span className="card-title">First-Time Pass Rate</span>
+              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+                Cleans that pass QC without needing a redo — if this climbs, coaching is sticking
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{
+                fontSize: 36, fontWeight: 900, lineHeight: 1,
+                color: firstPassData.rate >= 85 ? 'var(--ok)' : firstPassData.rate >= 70 ? 'var(--amber)' : 'var(--red)',
+              }}>
+                {firstPassData.rate}%
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+                {firstPassData.passed} of {firstPassData.total} checks passed ≥{firstPassData.threshold}%
+              </div>
+            </div>
+          </div>
+          {/* Monthly sparkline */}
+          {(() => {
+            const trend = firstPassData.trend.filter(m => m.total > 0);
+            if (trend.length < 2) return null;
+            const barW = 28, gap = 6;
+            const chartH = 80;
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <svg width={Math.max(trend.length * (barW + gap), 300)} height={chartH + 28} style={{ display: 'block' }}>
+                  {[0, 50, 85, 100].map(v => {
+                    const y = chartH - (v / 100) * chartH;
+                    return (
+                      <g key={v}>
+                        <line x1={0} y1={y} x2={trend.length * (barW + gap)} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
+                        {v === 85 && <line x1={0} y1={y} x2={trend.length * (barW + gap)} y2={y} stroke="rgba(34,197,94,0.3)" strokeWidth={1} strokeDasharray="4 3" />}
+                      </g>
+                    );
+                  })}
+                  {trend.map((m, i) => {
+                    const x = i * (barW + gap);
+                    const h = (m.rate / 100) * chartH;
+                    const y = chartH - h;
+                    const col = m.rate >= 85 ? 'var(--ok)' : m.rate >= 70 ? 'var(--amber)' : 'var(--red)';
+                    return (
+                      <g key={m.month}>
+                        <rect x={x} y={y} width={barW} height={h} rx={4} fill={col} opacity={0.8} />
+                        <text x={x + barW / 2} y={y - 4} fill="var(--t1)" fontSize={9} fontWeight={700} textAnchor="middle">{m.rate}%</text>
+                        <text x={x + barW / 2} y={chartH + 14} fill="var(--t3)" fontSize={9} textAnchor="middle">{m.label}</text>
+                        <text x={x + barW / 2} y={chartH + 24} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.total}✓</text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Watchlist + Top Performers + Flagged Issues */}
       <div className="card-row mb-6">
