@@ -76,6 +76,12 @@ router.get('/my-checks/:id', requireStaffAuth, (req, res) => {
 
 // ─── Read-only: my score stats ──────────────────────────────────────────────
 router.get('/my-stats', requireStaffAuth, (req, res) => {
+  const settingsRows = db.prepare('SELECT * FROM settings').all();
+  const settings = {};
+  settingsRows.forEach(s => { settings[s.key] = s.value; });
+  const threshold = parseFloat(settings.watchlist_threshold || '85');
+  const topThreshold = parseFloat(settings.top_performer_threshold || '95');
+
   const checks = db.prepare(`
     SELECT score_pct, date FROM qc_checks
     WHERE staff_id = ? AND status = 'complete' AND score_pct IS NOT NULL
@@ -83,7 +89,7 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   `).all(req.staffUser.id);
 
   const total = checks.length;
-  if (total === 0) return res.json({ total: 0, average: 0, best: 0, latest: 0, trend: [] });
+  if (total === 0) return res.json({ total: 0, average: 0, best: 0, latest: 0, trend: [], threshold, topThreshold });
 
   const scores = checks.map(c => c.score_pct);
   const average = Math.round(scores.reduce((a, b) => a + b, 0) / total);
@@ -105,7 +111,7 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
     }
   }
 
-  res.json({ total, average, best, latest, trend });
+  res.json({ total, average, best, latest, trend, threshold, topThreshold });
 });
 
 // ─── Staff: my commonly flagged issues, accepts ?month=YYYY-MM ───────────────

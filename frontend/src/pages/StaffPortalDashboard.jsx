@@ -13,7 +13,7 @@ function StatCard({ label, value, color, sub }) {
   );
 }
 
-function TrendChart({ trend }) {
+function TrendChart({ trend, threshold = 85 }) {
   if (!trend || trend.length === 0) return null;
   const maxVal = 100;
   const chartH = 160;
@@ -38,7 +38,7 @@ function TrendChart({ trend }) {
           const x = i * (barW + gap) + 20;
           const h = t.avg != null ? (t.avg / maxVal) * chartH : 0;
           const y = chartH - h + 10;
-          const color = t.avg == null ? 'rgba(255,255,255,0.05)' : t.avg >= 85 ? 'var(--green)' : t.avg >= 70 ? 'var(--amber)' : 'var(--red)';
+          const color = t.avg == null ? 'rgba(255,255,255,0.05)' : t.avg >= threshold ? 'var(--ok)' : t.avg >= threshold * 0.82 ? 'var(--amber)' : 'var(--red)';
           const monthLabel = t.month.slice(5); // MM
           const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
           const mName = monthNames[parseInt(monthLabel) - 1] || monthLabel;
@@ -138,7 +138,8 @@ export default function StaffPortalDashboard() {
 
   if (loading) return <div className="loading"><div className="spinner" /><span>Loading...</span></div>;
 
-  const scoreColor = (s) => s >= 85 ? 'var(--green)' : s >= 70 ? 'var(--amber)' : 'var(--red)';
+  const threshold = stats?.threshold ?? 85;
+  const scoreColor = (s) => s >= threshold ? 'var(--ok)' : s >= threshold * 0.82 ? 'var(--amber)' : 'var(--red)';
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '0 0 40px' }}>
@@ -174,7 +175,7 @@ export default function StaffPortalDashboard() {
               <div className="card-header">
                 <span className="card-title">Score Trend (Last 12 Months)</span>
               </div>
-              <TrendChart trend={stats.trend} />
+              <TrendChart trend={stats.trend} threshold={threshold} />
             </div>
           </>
         ) : (
@@ -244,7 +245,7 @@ export default function StaffPortalDashboard() {
                       <td>{fmtDate(c.date)}</td>
                       <td style={{ fontWeight: 700 }}>{c.property_name}</td>
                       <td>
-                        <span className={`badge ${c.score_pct >= 85 ? 'badge-green' : c.score_pct >= 70 ? 'badge-amber' : 'badge-red'}`}>
+                        <span className={`badge ${c.score_pct >= threshold ? 'badge-green' : c.score_pct >= threshold * 0.82 ? 'badge-amber' : 'badge-red'}`}>
                           {Math.round(c.score_pct)}%
                         </span>
                       </td>
