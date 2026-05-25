@@ -22,7 +22,7 @@ export default function InductionTraining() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [activeShift, setActiveShift] = useState(0);
+  const [activeShiftLabel, setActiveShiftLabel] = useState(null);
 
   const [staff, setStaff] = useState([]);
   const [showStart, setShowStart] = useState(false);
@@ -113,6 +113,7 @@ export default function InductionTraining() {
         s.shift_label === oldLabel ? { ...s, shift_label: newLabel } : s
       ),
     }));
+    setActiveShiftLabel(newLabel);
   };
 
   const addShift = () => {
@@ -123,15 +124,16 @@ export default function InductionTraining() {
       ...d,
       sections: [...d.sections, { name: '', description: '', shift_label: label, items: [] }],
     }));
-    setActiveShift(order.length);
+    setActiveShiftLabel(label);
   };
 
   const removeShift = (shiftLabel) => {
-    setDraft(d => ({
-      ...d,
-      sections: d.sections.filter(s => s.shift_label !== shiftLabel),
-    }));
-    setActiveShift(s => Math.max(0, s - 1));
+    setDraft(d => {
+      const next = d.sections.filter(s => s.shift_label !== shiftLabel);
+      const { order } = groupByShift(next);
+      setActiveShiftLabel(order[0] || null);
+      return { ...d, sections: next };
+    });
   };
 
   const addItem = (si) => {
@@ -181,6 +183,8 @@ export default function InductionTraining() {
 
   // ── View mode grouping ─────────────────────────────────────────────────────
   const { order: shiftOrder, map: shiftMap } = groupByShift(checklist?.sections || []);
+  const activeViewLabel = activeShiftLabel && shiftOrder.includes(activeShiftLabel)
+    ? activeShiftLabel : (shiftOrder[0] || null);
 
   return (
     <div className="page">
@@ -216,18 +220,18 @@ export default function InductionTraining() {
           ) : (
             <>
               <div className="tab-row" style={{ marginBottom: 0 }}>
-                {shiftOrder.map((label, i) => (
-                  <button key={label} className={`tab-btn${activeShift === i ? ' active' : ''}`}
-                    onClick={() => setActiveShift(i)}>
+                {shiftOrder.map((label) => (
+                  <button key={label} className={`tab-btn${activeViewLabel === label ? ' active' : ''}`}
+                    onClick={() => setActiveShiftLabel(label)}>
                     {label}
                   </button>
                 ))}
               </div>
 
-              {shiftOrder[activeShift] && (
-                <div className="card" style={{ marginTop: 0, borderTopLeftRadius: activeShift === 0 ? 0 : undefined }}>
-                  {shiftMap[shiftOrder[activeShift]].map((sec, si) => (
-                    <div key={si} style={{ marginBottom: si < shiftMap[shiftOrder[activeShift]].length - 1 ? 24 : 0 }}>
+              {activeViewLabel && (
+                <div className="card" style={{ marginTop: 0, borderTopLeftRadius: shiftOrder[0] === activeViewLabel ? 0 : undefined }}>
+                  {shiftMap[activeViewLabel].map((sec, si) => (
+                    <div key={si} style={{ marginBottom: si < shiftMap[activeViewLabel].length - 1 ? 24 : 0 }}>
                       {/* Section name as sub-heading */}
                       {sec.name && (
                         <div style={{
@@ -270,7 +274,7 @@ export default function InductionTraining() {
                         <p style={{ color: 'var(--t3)', fontSize: 13 }}>No tasks yet.</p>
                       )}
 
-                      {si < shiftMap[shiftOrder[activeShift]].length - 1 && (
+                      {si < shiftMap[activeViewLabel].length - 1 && (
                         <div style={{ height: 1, background: 'var(--glass-border)', margin: '16px 0 0' }} />
                       )}
                     </div>
@@ -284,7 +288,8 @@ export default function InductionTraining() {
         /* ── Edit Mode ───────────────────────────────────────────────────── */
         (() => {
           const { order: draftShiftOrder, map: draftShiftMap } = groupByShift(draft.sections);
-          const currentShiftLabel = draftShiftOrder[activeShift];
+          const currentShiftLabel = (activeShiftLabel && draftShiftOrder.includes(activeShiftLabel))
+            ? activeShiftLabel : (draftShiftOrder[0] || null);
           const currentShiftSections = currentShiftLabel ? draftShiftMap[currentShiftLabel] : [];
 
           return (
@@ -316,9 +321,9 @@ export default function InductionTraining() {
               {/* Shift tabs */}
               {draftShiftOrder.length > 0 && (
                 <div className="tab-row" style={{ marginBottom: 0 }}>
-                  {draftShiftOrder.map((label, i) => (
-                    <button key={label} className={`tab-btn${activeShift === i ? ' active' : ''}`}
-                      onClick={() => setActiveShift(i)}>
+                  {draftShiftOrder.map((label) => (
+                    <button key={label} className={`tab-btn${currentShiftLabel === label ? ' active' : ''}`}
+                      onClick={() => setActiveShiftLabel(label)}>
                       {label}
                     </button>
                   ))}
@@ -330,7 +335,7 @@ export default function InductionTraining() {
                   <p style={{ color: 'var(--t3)', marginBottom: 12 }}>No shifts yet.</p>
                 </div>
               ) : currentShiftLabel && (
-                <div className="card" style={{ marginTop: 0, marginBottom: 16, borderTopLeftRadius: activeShift === 0 ? 0 : undefined }}>
+                <div className="card" style={{ marginTop: 0, marginBottom: 16, borderTopLeftRadius: draftShiftOrder[0] === currentShiftLabel ? 0 : undefined }}>
                   {/* Shift name editor + remove */}
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div style={{ flex: '1 1 160px' }}>
