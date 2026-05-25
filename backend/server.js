@@ -269,6 +269,32 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Auto-migrate: coaching_sessions table
+{
+  const s = db.prepare("PRAGMA table_info(coaching_sessions)");
+  const cols = s.all();
+  s.finalize();
+  if (cols.length === 0) {
+    db.exec(`
+      CREATE TABLE coaching_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        staff_id INTEGER NOT NULL REFERENCES staff(id),
+        manager_id INTEGER NOT NULL REFERENCES managers(id),
+        date TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        problem_type TEXT NOT NULL CHECK(problem_type IN ('cant', 'didnt', 'wont')),
+        how_coached TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        followup_date TEXT,
+        sessions_required INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'resolved')),
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    console.log('Migration complete: created coaching_sessions table.');
+  }
+}
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));
@@ -280,6 +306,7 @@ app.use('/api/kpis',       require('./routes/kpis'));
 app.use('/api/heatpump',   require('./routes/heatpump'));
 app.use('/api/staff-portal', require('./routes/staff-portal'));
 app.use('/api/warnings', require('./routes/warnings'));
+app.use('/api/coaching', require('./routes/coaching'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
