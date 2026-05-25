@@ -246,11 +246,13 @@ router.put('/checks/:id', (req, res) => {
   try {
     if (items) {
       items.forEach(item => {
+        // Preserve null scores as null — null means unscored, not fail
+        const score = (item.score === null || item.score === undefined) ? null : item.score;
         db.prepare('UPDATE qc_check_items SET score=?, notes=?, na=? WHERE id=?')
-          .run(item.score ?? 0, item.notes || '', item.na ? 1 : 0, item.id);
+          .run(score, item.notes || '', item.na ? 1 : 0, item.id);
       });
 
-      // Recalculate score — N/A items excluded from both total and max
+      // Recalculate score — N/A items and unscored (null) items excluded from both total and max
       const checkItems = db.prepare(`
         SELECT qci.score, qci.na, qi.score_type, qi.weight
         FROM qc_check_items qci
@@ -261,12 +263,13 @@ router.put('/checks/:id', (req, res) => {
       let total = 0, max = 0;
       checkItems.forEach(ci => {
         if (ci.na) return;
+        if (ci.score === null || ci.score === undefined) return; // unscored — exclude
         const w = ci.weight || 1;
         if (ci.score_type === 'pass_fail') {
-          total += (ci.score || 0) * w;
+          total += ci.score * w;
           max += w;
         } else {
-          total += (ci.score || 0) * w;
+          total += ci.score * w;
           max += 5 * w;
         }
       });
