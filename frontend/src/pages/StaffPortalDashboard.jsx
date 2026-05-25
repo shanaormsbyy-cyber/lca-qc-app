@@ -70,8 +70,6 @@ export default function StaffPortalDashboard() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [portalWarnings, setPortalWarnings] = useState([]);
-  const [acknowledgingId, setAcknowledgingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -99,7 +97,6 @@ export default function StaffPortalDashboard() {
       localStorage.removeItem('staff_user');
       navigate('/portal/login');
     }).finally(() => setLoading(false));
-    api.get('/warnings/my-warnings', { headers }).then(r => setPortalWarnings(r.data)).catch(() => {});
   }, []);
 
   const loadFlags = (month) => {
@@ -107,22 +104,6 @@ export default function StaffPortalDashboard() {
     api.get(`/staff-portal/my-flags?month=${month}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => setFlags(r.data))
       .catch(() => {});
-  };
-
-  const acknowledgeWarning = async (warningId) => {
-    const token = localStorage.getItem('staff_token');
-    setAcknowledgingId(warningId);
-    try {
-      await api.post(`/warnings/my-warnings/${warningId}/acknowledge`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const r = await api.get('/warnings/my-warnings', { headers: { Authorization: `Bearer ${token}` } });
-      setPortalWarnings(r.data);
-    } catch {
-      alert('Could not record acknowledgement. Please try again.');
-    } finally {
-      setAcknowledgingId(null);
-    }
   };
 
   useEffect(() => { loadFlags(flagsMonth); }, [flagsMonth]);
@@ -199,74 +180,6 @@ export default function StaffPortalDashboard() {
         ) : (
           <div className="card" style={{ textAlign: 'center', padding: 40, marginBottom: 24 }}>
             <p style={{ color: 'var(--t3)', fontSize: 15 }}>No QC checks completed yet. Your results will appear here once your manager completes a quality control check.</p>
-          </div>
-        )}
-
-        {/* Warnings */}
-        {portalWarnings.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            {portalWarnings.map(w => {
-              const LEVEL_LABELS = { verbal_note: 'Verbal Note', written_warning: 'Written Warning', final_warning: 'Final Warning' };
-              const LEVEL_COLORS = {
-                verbal_note:     { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' },
-                written_warning: { color: '#f97316',      bg: 'rgba(249,115,22,0.12)' },
-                final_warning:   { color: 'var(--red)',   bg: 'rgba(239,68,68,0.12)'  },
-              };
-              const s = LEVEL_COLORS[w.level] || LEVEL_COLORS.verbal_note;
-              return (
-                <div key={w.id} className="card" style={{ marginBottom: 16, border: `1px solid ${s.color}40` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 6, color: s.color, background: s.bg }}>
-                      {LEVEL_LABELS[w.level] || w.level}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--t3)' }}>Issued {fmtDate(w.issued_at)} by {w.issued_by}</span>
-                  </div>
-
-                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>{w.reason}</div>
-
-                  {w.details && (
-                    <p style={{ fontSize: 13, color: 'var(--t2)', lineHeight: 1.6, marginBottom: 12, whiteSpace: 'pre-wrap' }}>{w.details}</p>
-                  )}
-
-                  {w.corrective_actions && (
-                    <div style={{ background: 'rgba(58,181,217,0.07)', border: '1px solid rgba(58,181,217,0.2)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--cyan)', marginBottom: 6 }}>Corrective Actions Required</div>
-                      <p style={{ fontSize: 13, color: 'var(--t1)', lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{w.corrective_actions}</p>
-                    </div>
-                  )}
-
-                  {w.linked_checks.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 6 }}>Linked QC Checks</div>
-                      {w.linked_checks.map(c => (
-                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--glass-border)', cursor: 'pointer' }}
-                          onClick={() => navigate(`/portal/check/${c.id}`)}>
-                          <span style={{ fontSize: 13 }}>{fmtDate(c.date)} — {c.property_name}</span>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: c.score_pct >= 85 ? 'var(--green)' : c.score_pct >= 70 ? 'var(--amber)' : 'var(--red)' }}>
-                            {Math.round(c.score_pct)}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {w.acknowledged_at ? (
-                    <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
-                      ✓ Acknowledged on {fmtDate(w.acknowledged_at)}
-                    </div>
-                  ) : (
-                    <button
-                      className="btn btn-primary"
-                      style={{ width: '100%', marginTop: 4 }}
-                      onClick={() => acknowledgeWarning(w.id)}
-                      disabled={acknowledgingId === w.id}
-                    >
-                      {acknowledgingId === w.id ? 'Saving...' : 'I have read and acknowledge this warning and agree to the corrective actions'}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
           </div>
         )}
 

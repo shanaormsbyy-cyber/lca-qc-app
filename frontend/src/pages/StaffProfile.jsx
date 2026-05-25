@@ -13,7 +13,8 @@ export default function StaffProfile() {
   const [qcChecks, setQcChecks] = useState([]);
   const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
-  const [warnings, setWarnings] = useState([]);
+  const [coachingSessions, setCoachingSessions] = useState([]);
+  const [activeTab, setActiveTab] = useState('qc');
   const [issuesMonth, setIssuesMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -36,7 +37,7 @@ export default function StaffProfile() {
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
-    api.get(`/warnings?staff_id=${id}`).then(r => setWarnings(r.data)).catch(() => {});
+    api.get(`/coaching?staff_id=${id}`).then(r => setCoachingSessions(r.data)).catch(() => {});
   };
 
   const loadIssues = (month) => {
@@ -61,13 +62,6 @@ export default function StaffProfile() {
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!staff) return <div className="page"><p>Staff not found.</p></div>;
-
-  const LEVEL_LABELS = { verbal_note: 'Verbal Note', written_warning: 'Written Warning', final_warning: 'Final Warning' };
-  const LEVEL_COLORS = {
-    verbal_note:     { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' },
-    written_warning: { color: '#f97316',      bg: 'rgba(249,115,22,0.12)' },
-    final_warning:   { color: 'var(--red)',   bg: 'rgba(239,68,68,0.12)'  },
-  };
 
   const chartData = [...qcChecks]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -116,7 +110,7 @@ export default function StaffProfile() {
         <div className="stat-card"><div className="stat-label">QC Checks</div><div className="stat-value">{qcChecks.length}</div></div>
         <div className="stat-card"><div className="stat-label">Avg QC Score</div><div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{avgScore ? Math.round(avgScore) + '%' : '—'}</div></div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
-        <div className="stat-card"><div className="stat-label">Warnings</div><div className="stat-value" style={{ color: warnings.length > 0 ? 'var(--red)' : 'var(--t1)' }}>{warnings.length}</div></div>
+        <div className="stat-card"><div className="stat-label">Coaching Sessions</div><div className="stat-value">{coachingSessions.length}</div></div>
         <div className="stat-card"><div className="stat-label">Service Time</div><div className="stat-value" style={{ fontSize: 28, letterSpacing: -1 }}>{(() => { const days = Math.floor((new Date() - new Date(staff.start_date)) / 86400000); return days >= 365 ? `${Math.floor(days/365)}y ${Math.floor((days%365)/30)}m` : days >= 30 ? `${Math.floor(days/30)}m` : `${days}d`; })()}</div></div>
       </div>
 
@@ -224,83 +218,100 @@ export default function StaffProfile() {
         </div>
       )}
 
-      <div className="card mb-6">
-        <div className="card-title" style={{ marginBottom: 16 }}>QC Check History</div>
-        {qcChecks.length === 0 ? <p style={{ color: 'var(--t3)' }}>No completed QC checks yet.</p> : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Property</th><th>Checklist</th><th>Score</th><th>Signed off by</th></tr></thead>
-              <tbody>
-                {[...qcChecks].sort((a, b) => b.date.localeCompare(a.date)).map(c => (
-                  <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
-                    <td>{fmtDate(c.date)}</td>
-                    <td>{c.property_name}</td>
-                    <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>
-                    <td><ScoreBadge score={c.score_pct} /></td>
-                    <td style={{ color: 'var(--t2)' }}>{c.signed_off_by}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        {['qc', 'training', 'coaching'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontWeight: 700, fontSize: 13,
+              background: activeTab === tab ? 'var(--cyan)' : 'var(--navy2)',
+              color: activeTab === tab ? '#000' : 'var(--t2)',
+            }}
+          >
+            {tab === 'qc' ? 'QC Checks' : tab === 'training' ? 'Training' : 'Coaching'}
+          </button>
+        ))}
       </div>
 
-      <div className="card">
-        <div className="card-title" style={{ marginBottom: 16 }}>Training History</div>
-        {trainSessions.length === 0 ? <p style={{ color: 'var(--t3)' }}>No training sessions yet.</p> : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Checklist</th><th>Completion</th><th>Status</th><th>Signed off by</th></tr></thead>
-              <tbody>
-                {trainSessions.map(t => (
-                  <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
-                    <td>{fmtDate(t.date)}</td>
-                    <td>{t.checklist_name}</td>
-                    <td>{Math.round(t.completion_pct)}%</td>
-                    <td><StatusBadge status={t.status} /></td>
-                    <td style={{ color: 'var(--t2)' }}>{t.signed_off_by || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {warnings.length > 0 && (
-        <div className="card" style={{ marginTop: 24 }}>
-          <div className="card-title" style={{ marginBottom: 16 }}>Disciplinary Warnings</div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Level</th><th>Reason</th><th>Date Issued</th><th>Status</th><th></th></tr></thead>
-              <tbody>
-                {warnings.map(w => {
-                  const overdue = w.ack_status === 'overdue';
-                  const s = LEVEL_COLORS[w.level] || LEVEL_COLORS.verbal_note;
-                  return (
-                    <tr key={w.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/disciplinary/${w.id}`)}>
-                      <td>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: s.color, background: s.bg }}>
-                          {LEVEL_LABELS[w.level] || w.level}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--t2)' }}>{w.reason}</td>
-                      <td style={{ color: 'var(--t2)' }}>{fmtDate(w.issued_at)}</td>
-                      <td>
-                        {w.acknowledged_at ? null : (
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: overdue ? 'var(--red)' : 'var(--amber)', background: overdue ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)' }}>
-                            {overdue ? 'Overdue' : 'Awaiting'}
-                          </span>
-                        )}
-                      </td>
-                      <td><button className="btn btn-sm" onClick={e => { e.stopPropagation(); navigate(`/disciplinary/${w.id}`); }}>View</button></td>
+      {activeTab === 'qc' && (
+        <div className="card mb-6">
+          <div className="card-title" style={{ marginBottom: 16 }}>QC Check History</div>
+          {qcChecks.length === 0 ? <p style={{ color: 'var(--t3)' }}>No completed QC checks yet.</p> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Property</th><th>Checklist</th><th>Score</th><th>Signed off by</th></tr></thead>
+                <tbody>
+                  {[...qcChecks].sort((a, b) => b.date.localeCompare(a.date)).map(c => (
+                    <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/qc/checks/${c.id}`)}>
+                      <td>{fmtDate(c.date)}</td>
+                      <td>{c.property_name}</td>
+                      <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>
+                      <td><ScoreBadge score={c.score_pct} /></td>
+                      <td style={{ color: 'var(--t2)' }}>{c.signed_off_by}</td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'training' && (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Training History</div>
+          {trainSessions.length === 0 ? <p style={{ color: 'var(--t3)' }}>No training sessions yet.</p> : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Checklist</th><th>Completion</th><th>Status</th><th>Signed off by</th></tr></thead>
+                <tbody>
+                  {trainSessions.map(t => (
+                    <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
+                      <td>{fmtDate(t.date)}</td>
+                      <td>{t.checklist_name}</td>
+                      <td>{Math.round(t.completion_pct)}%</td>
+                      <td><StatusBadge status={t.status} /></td>
+                      <td style={{ color: 'var(--t2)' }}>{t.signed_off_by || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'coaching' && (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: 16 }}>Coaching Sessions</div>
+          {coachingSessions.length === 0 ? (
+            <p style={{ color: 'var(--t3)' }}>No coaching sessions recorded yet.</p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Topic</th><th>Problem</th><th>Sessions</th><th>Status</th></tr></thead>
+                <tbody>
+                  {coachingSessions.map(s => {
+                    const PCOLORS = { cant: { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' }, didnt: { color: 'var(--cyan)', bg: 'rgba(58,181,217,0.12)' }, wont: { color: 'var(--red)', bg: 'rgba(239,68,68,0.12)' } };
+                    const pc = PCOLORS[s.problem_type] || PCOLORS.cant;
+                    const openStatus = s.status === 'open';
+                    return (
+                      <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/coaching/${s.id}`)}>
+                        <td>{fmtDate(s.date)}</td>
+                        <td style={{ color: 'var(--t2)' }}>{s.topic}</td>
+                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: pc.color, background: pc.bg }}>{{ cant: "Can't", didnt: "Didn't", wont: "Won't" }[s.problem_type]}</span></td>
+                        <td style={{ textAlign: 'center' }}>{s.sessions_required}</td>
+                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: openStatus ? 'var(--amber)' : 'var(--ok)', background: openStatus ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)' }}>{openStatus ? 'Open' : 'Resolved'}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
