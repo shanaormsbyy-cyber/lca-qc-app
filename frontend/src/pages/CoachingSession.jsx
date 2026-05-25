@@ -191,6 +191,7 @@ export default function CoachingSession() {
         </div>
 
         <Field label="Topic" value={session.topic} />
+        <Field label="Responsible Manager" value={session.manager_name} />
         <Field label="How It Was Coached" value={session.how_coached} multiline />
         <Field label="Outcome / Follow-up Action" value={session.outcome} multiline />
         {session.followup_date && <Field label="Follow-up Date" value={fmtDate(session.followup_date)} />}
