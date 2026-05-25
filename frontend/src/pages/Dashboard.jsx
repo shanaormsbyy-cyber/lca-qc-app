@@ -23,6 +23,8 @@ export default function Dashboard() {
   const [flaggedWeek, setFlaggedWeek] = useState([]);
   const [flaggedMonth, setFlaggedMonth] = useState([]);
   const [flagTab, setFlagTab] = useState('week');
+  const [heatpumpsDue, setHeatpumpsDue] = useState(0);
+  const [coachingFollowUp, setCoachingFollowUp] = useState(0);
   const [flagDetail, setFlagDetail] = useState(null);
   const [flagTrend, setFlagTrend] = useState(null);
 
@@ -62,6 +64,17 @@ export default function Dashboard() {
     api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
+    api.get('/heatpump').then(r => {
+      const in7 = new Date(); in7.setDate(in7.getDate() + 7);
+      const cutoff = in7.toISOString().slice(0, 10);
+      const count = r.data.filter(h => h.due_date && h.due_date <= cutoff).length;
+      setHeatpumpsDue(count);
+    }).catch(() => {});
+    api.get('/coaching').then(r => {
+      const today = new Date().toISOString().slice(0, 10);
+      const count = r.data.filter(s => s.status === 'open' && s.followup_date && s.followup_date <= today).length;
+      setCoachingFollowUp(count);
+    }).catch(() => {});
   };
 
   useEffect(() => { load(); }, [manager.id]);
@@ -190,6 +203,16 @@ export default function Dashboard() {
           <div className="stat-label">My Pending Tasks</div>
           <div className={`stat-value${totalPending > 0 ? ' cyan' : ''}`}>{totalPending}</div>
           <div className="stat-sub">{myQC.length} QC · {myTrain.length} training</div>
+        </div>
+        <div className={`stat-card${heatpumpsDue > 0 ? ' danger' : ''}`} onClick={() => navigate('/heatpump')} style={{ cursor: 'pointer' }}>
+          <div className="stat-label">Heat Pumps Due (7 days)</div>
+          <div className={`stat-value${heatpumpsDue > 0 ? ' red' : ' green'}`}>{heatpumpsDue}</div>
+          <div className="stat-sub">{heatpumpsDue > 0 ? 'Filters need attention' : 'All up to date'}</div>
+        </div>
+        <div className={`stat-card${coachingFollowUp > 0 ? ' danger' : ''}`} onClick={() => navigate('/coaching')} style={{ cursor: 'pointer' }}>
+          <div className="stat-label">Coaching Follow-ups Due</div>
+          <div className={`stat-value${coachingFollowUp > 0 ? ' amber' : ' green'}`}>{coachingFollowUp}</div>
+          <div className="stat-sub">{coachingFollowUp > 0 ? 'Follow-up dates reached' : 'No follow-ups due'}</div>
         </div>
       </div>
 

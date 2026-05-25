@@ -232,6 +232,7 @@ input, select, textarea { font-family: inherit; }
 .stat-value.cyan  { color: var(--cyan); }
 .stat-value.red   { color: var(--red); }
 .stat-value.green { color: var(--green); }
+.stat-value.amber { color: var(--amber); }
 .stat-sub {
   font-size: 12px;
   color: var(--t3);
