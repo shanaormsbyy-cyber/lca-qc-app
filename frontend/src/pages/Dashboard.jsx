@@ -64,15 +64,14 @@ export default function Dashboard() {
     api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
-    api.get('/heatpump').then(r => {
+    api.get('/heatpump/records').then(r => {
       const in7 = new Date(); in7.setDate(in7.getDate() + 7);
       const cutoff = in7.toISOString().slice(0, 10);
       const count = r.data.filter(h => h.due_date && h.due_date <= cutoff).length;
       setHeatpumpsDue(count);
     }).catch(() => {});
     api.get('/coaching').then(r => {
-      const today = new Date().toISOString().slice(0, 10);
-      const count = r.data.filter(s => s.status === 'open' && s.followup_date && s.followup_date <= today).length;
+      const count = r.data.filter(s => s.status === 'open' && s.followup_date).length;
       setCoachingFollowUp(count);
     }).catch(() => {});
   };
@@ -212,7 +211,7 @@ export default function Dashboard() {
         <div className={`stat-card${coachingFollowUp > 0 ? ' danger' : ''}`} onClick={() => navigate('/coaching')} style={{ cursor: 'pointer' }}>
           <div className="stat-label">Coaching Follow-ups Due</div>
           <div className={`stat-value${coachingFollowUp > 0 ? ' amber' : ' green'}`}>{coachingFollowUp}</div>
-          <div className="stat-sub">{coachingFollowUp > 0 ? 'Follow-up dates reached' : 'No follow-ups due'}</div>
+          <div className="stat-sub">{coachingFollowUp > 0 ? 'Open sessions with follow-up' : 'No follow-ups scheduled'}</div>
         </div>
       </div>
 
