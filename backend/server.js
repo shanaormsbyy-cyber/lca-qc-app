@@ -310,6 +310,31 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Auto-migrate: complaints table
+{
+  const s = db.prepare("PRAGMA table_info(complaints)");
+  const cols = s.all();
+  s.finalize();
+  if (cols.length === 0) {
+    db.exec(`
+      CREATE TABLE complaints (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        staff_id INTEGER NOT NULL REFERENCES staff(id),
+        property_id INTEGER REFERENCES properties(id),
+        source TEXT NOT NULL CHECK(source IN ('guest', 'property_manager', 'property_owner')),
+        severity TEXT NOT NULL CHECK(severity IN ('minor', 'moderate', 'serious')),
+        date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        resolution TEXT,
+        resolved_at TEXT,
+        issued_by TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+    console.log('Migration complete: created complaints table.');
+  }
+}
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));
@@ -322,6 +347,7 @@ app.use('/api/heatpump',   require('./routes/heatpump'));
 app.use('/api/staff-portal', require('./routes/staff-portal'));
 app.use('/api/warnings', require('./routes/warnings'));
 app.use('/api/coaching', require('./routes/coaching'));
+app.use('/api/complaints', require('./routes/complaints'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');

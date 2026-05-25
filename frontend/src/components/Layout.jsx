@@ -5,8 +5,9 @@ import { useAuth } from '../context/AuthContext';
 const NAV = [
   { to: '/',             label: 'Dashboard',   end: true },
   { to: '/staff',        label: 'Staff' },
-  { to: '/coaching', label: 'Coaching' },
-  { to: '/properties',   label: 'Properties' },
+  { to: '/coaching',    label: 'Coaching' },
+  { to: '/complaints',  label: 'Complaints' },
+  { to: '/properties',  label: 'Properties' },
   { to: '/qc',           label: 'QC Checks' },
   { to: '/checklists',   label: 'Checklists' },
   { to: '/training',     label: 'Training' },

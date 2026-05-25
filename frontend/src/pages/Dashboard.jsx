@@ -320,25 +320,47 @@ export default function Dashboard() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {watchlist.map(w => (
-                <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, cursor: 'pointer' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</span>
-                      {coachingStaffIds.has(w.id)
-                        ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(58,181,217,0.15)', color: 'var(--cyan)', border: '1px solid rgba(58,181,217,0.3)' }}>In coaching</span>
-                        : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}>No coaching</span>
-                      }
+              {watchlist.map(w => {
+                const isComplaintRisk = w.watchlist_reason === 'complaints';
+                const rowBg = isComplaintRisk ? 'rgba(245,158,11,0.07)' : 'var(--red-dim)';
+                const rowBorder = isComplaintRisk ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(239,68,68,0.25)';
+                return (
+                  <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: rowBg, border: rowBorder, borderRadius: 10, cursor: 'pointer' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</span>
+                        {isComplaintRisk && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(245,158,11,0.15)', color: 'var(--amber)', border: '1px solid rgba(245,158,11,0.3)' }}>Complaint risk</span>
+                        )}
+                        {coachingStaffIds.has(w.id)
+                          ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(58,181,217,0.15)', color: 'var(--cyan)', border: '1px solid rgba(58,181,217,0.3)' }}>In coaching</span>
+                          : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}>No coaching</span>
+                        }
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+                        {isComplaintRisk
+                          ? `${(w.serious_complaints || 0) > 0 ? `${w.serious_complaints} serious` : ''}${(w.serious_complaints || 0) > 0 && (w.moderate_complaints || 0) > 0 ? ', ' : ''}${(w.moderate_complaints || 0) > 0 ? `${w.moderate_complaints} moderate` : ''} complaint${((w.serious_complaints||0)+(w.moderate_complaints||0)) !== 1 ? 's' : ''} in 90d`
+                          : `${w.total_checks} check${w.total_checks !== 1 ? 's' : ''} completed`
+                        }
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{w.total_checks} check{w.total_checks !== 1 ? 's' : ''} completed</div>
+                    <div style={{ textAlign: 'right' }}>
+                      {isComplaintRisk ? (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--amber)' }}>Complaints</div>
+                          <div style={{ fontSize: 11, color: 'var(--t3)' }}>{w.avg_score != null ? `QC avg: ${w.avg_score}%` : 'No QC data'}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--red)' }}>{w.avg_score}%</div>
+                          <div style={{ fontSize: 11, color: 'var(--t3)' }}>below {w.threshold}% threshold</div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--red)' }}>{w.avg_score}%</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>below {w.threshold}% threshold</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

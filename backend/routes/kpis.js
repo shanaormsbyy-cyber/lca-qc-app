@@ -246,7 +246,7 @@ router.get('/top-performers', (req, res) => {
   res.json({ topPerformers, threshold, minChecks });
 });
 
-// Performance watchlist
+// Performance watchlist — includes QC underperformers + complaint-risk staff
 router.get('/watchlist', (req, res) => {
   const settingsRows = db.prepare('SELECT * FROM settings').all();
   const settings = {};
@@ -255,7 +255,9 @@ router.get('/watchlist', (req, res) => {
 
   const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
   const watchlist = [];
+  const seenIds = new Set();
 
+  // QC underperformers
   staff.forEach(s => {
     const result = db.prepare(`
       SELECT COUNT(*) as cnt, AVG(score_pct) as avg
@@ -278,11 +280,54 @@ router.get('/watchlist', (req, res) => {
         total_checks: result.cnt,
         recent_checks: recent,
         threshold,
+        watchlist_reason: 'qc',
       });
+      seenIds.add(s.id);
     }
   });
 
-  watchlist.sort((a, b) => a.avg_score - b.avg_score);
+  // Complaint-risk staff (1+ serious or 2+ moderate in last 90 days) not already on watchlist
+  staff.forEach(s => {
+    if (seenIds.has(s.id)) return;
+    const complaints = db.prepare(`
+      SELECT severity, COUNT(*) as cnt
+      FROM complaints
+      WHERE staff_id = ? AND date >= date('now', '-90 days')
+      GROUP BY severity
+    `).all(s.id);
+
+    let moderateCount = 0, seriousCount = 0;
+    complaints.forEach(c => {
+      if (c.severity === 'moderate') moderateCount = c.cnt;
+      if (c.severity === 'serious')  seriousCount  = c.cnt;
+    });
+
+    if (seriousCount >= 1 || moderateCount >= 2) {
+      const qcResult = db.prepare(`
+        SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+        FROM qc_checks
+        WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+      `).get(s.id);
+
+      watchlist.push({
+        ...s,
+        avg_score: qcResult.avg ? Math.round(qcResult.avg) : null,
+        total_checks: qcResult.cnt,
+        recent_checks: [],
+        threshold,
+        watchlist_reason: 'complaints',
+        serious_complaints: seriousCount,
+        moderate_complaints: moderateCount,
+      });
+      seenIds.add(s.id);
+    }
+  });
+
+  watchlist.sort((a, b) => {
+    // QC underperformers first, then complaint-risk; within each group sort by score asc
+    if (a.watchlist_reason !== b.watchlist_reason) return a.watchlist_reason === 'qc' ? -1 : 1;
+    return (a.avg_score ?? 101) - (b.avg_score ?? 101);
+  });
   res.json({ watchlist, threshold });
 });
 

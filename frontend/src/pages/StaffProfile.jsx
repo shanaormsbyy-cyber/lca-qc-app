@@ -14,6 +14,7 @@ export default function StaffProfile() {
   const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
   const [coachingSessions, setCoachingSessions] = useState([]);
+  const [complaints, setComplaints] = useState([]);
   const [activeTab, setActiveTab] = useState('qc');
   const [issuesMonth, setIssuesMonth] = useState(() => {
     const now = new Date();
@@ -38,6 +39,7 @@ export default function StaffProfile() {
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
     api.get(`/coaching?staff_id=${id}`).then(r => setCoachingSessions(r.data)).catch(() => {});
+    api.get(`/complaints?staff_id=${id}`).then(r => setComplaints(r.data)).catch(() => {});
   };
 
   const loadIssues = (month) => {
@@ -111,6 +113,19 @@ export default function StaffProfile() {
         <div className="stat-card"><div className="stat-label">Avg QC Score</div><div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{avgScore ? Math.round(avgScore) + '%' : '—'}</div></div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
         <div className="stat-card"><div className="stat-label">Coaching Sessions</div><div className="stat-value">{coachingSessions.length}</div></div>
+        {(() => {
+          const recent = complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10));
+          const serious = recent.filter(c => c.severity === 'serious').length;
+          const moderate = recent.filter(c => c.severity === 'moderate').length;
+          const atRisk = serious >= 1 || moderate >= 2;
+          return (
+            <div className={`stat-card${atRisk ? ' danger' : ''}`} onClick={() => setActiveTab('complaints')} style={{ cursor: 'pointer' }}>
+              <div className="stat-label">Complaints (90d)</div>
+              <div className={`stat-value${atRisk ? ' red' : recent.length > 0 ? ' amber' : ' green'}`}>{recent.length}</div>
+              <div className="stat-sub">{atRisk ? 'Watchlist risk' : recent.length > 0 ? 'Monitoring' : 'None recorded'}</div>
+            </div>
+          );
+        })()}
         <div className="stat-card"><div className="stat-label">Service Time</div><div className="stat-value" style={{ fontSize: 28, letterSpacing: -1 }}>{(() => { const days = Math.floor((new Date() - new Date(staff.start_date)) / 86400000); return days >= 365 ? `${Math.floor(days/365)}y ${Math.floor((days%365)/30)}m` : days >= 30 ? `${Math.floor(days/30)}m` : `${days}d`; })()}</div></div>
       </div>
 
@@ -219,21 +234,26 @@ export default function StaffProfile() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        {['qc', 'training', 'coaching'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              fontWeight: 700, fontSize: 13,
-              background: activeTab === tab ? 'var(--cyan)' : 'var(--navy2)',
-              color: activeTab === tab ? '#000' : 'var(--t2)',
-            }}
-          >
-            {tab === 'qc' ? 'QC Checks' : tab === 'training' ? 'Training' : 'Coaching'}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
+        {['qc', 'training', 'coaching', 'complaints'].map(tab => {
+          const labels = { qc: 'QC Checks', training: 'Training', coaching: 'Coaching', complaints: 'Complaints' };
+          const recentComplaints = tab === 'complaints' ? complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10)) : [];
+          const hasRisk = tab === 'complaints' && (recentComplaints.filter(c=>c.severity==='serious').length >= 1 || recentComplaints.filter(c=>c.severity==='moderate').length >= 2);
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '7px 16px', borderRadius: 8, border: hasRisk ? '1px solid rgba(239,68,68,0.4)' : 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: 13,
+                background: activeTab === tab ? 'var(--cyan)' : 'var(--navy2)',
+                color: activeTab === tab ? '#000' : hasRisk ? 'var(--red)' : 'var(--t2)',
+              }}
+            >
+              {labels[tab]}{tab === 'complaints' && complaints.length > 0 ? ` (${complaints.length})` : ''}
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'qc' && (
@@ -305,6 +325,45 @@ export default function StaffProfile() {
                         <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: pc.color, background: pc.bg }}>{{ cant: "Can't", didnt: "Didn't", wont: "Won't" }[s.problem_type]}</span></td>
                         <td style={{ textAlign: 'center' }}>{s.sessions_required}</td>
                         <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: openStatus ? 'var(--amber)' : 'var(--ok)', background: openStatus ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)' }}>{openStatus ? 'Open' : 'Resolved'}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'complaints' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div className="card-title">Complaint History</div>
+            <button className="btn btn-sm btn-primary" onClick={() => navigate(`/complaints`)}>+ Log Complaint</button>
+          </div>
+          {complaints.length === 0 ? (
+            <p style={{ color: 'var(--t3)' }}>No complaints recorded for this team member.</p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Date</th><th>Source</th><th>Severity</th><th>Property</th><th>Description</th><th>Resolution</th></tr>
+                </thead>
+                <tbody>
+                  {[...complaints].sort((a, b) => b.date.localeCompare(a.date)).map(c => {
+                    const SMETA = { minor: { label: 'Minor', color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' }, moderate: { label: 'Moderate', color: 'var(--cyan)', bg: 'rgba(58,181,217,0.12)' }, serious: { label: 'Serious', color: 'var(--red)', bg: 'rgba(239,68,68,0.12)' } };
+                    const SLABELS = { guest: 'Guest', property_manager: 'Property Manager', property_owner: 'Property Owner' };
+                    const sm = SMETA[c.severity] || SMETA.minor;
+                    return (
+                      <tr key={c.id}>
+                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(c.date)}</td>
+                        <td style={{ fontSize: 12, color: 'var(--t2)' }}>{SLABELS[c.source] || c.source}</td>
+                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: sm.color, background: sm.bg }}>{sm.label}</span></td>
+                        <td style={{ color: 'var(--t2)', fontSize: 13 }}>{c.property_name || '—'}</td>
+                        <td style={{ maxWidth: 240, fontSize: 13, color: 'var(--t1)' }}>{c.description}</td>
+                        <td style={{ maxWidth: 200, fontSize: 13, color: c.resolution ? 'var(--ok)' : 'var(--t3)', fontStyle: c.resolution ? 'normal' : 'italic' }}>
+                          {c.resolution || 'Unresolved'}
+                        </td>
                       </tr>
                     );
                   })}

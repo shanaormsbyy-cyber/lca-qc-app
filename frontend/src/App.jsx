@@ -24,6 +24,7 @@ import StaffPortalDashboard from './pages/StaffPortalDashboard';
 import StaffPortalCheck from './pages/StaffPortalCheck';
 import Coaching from './pages/Coaching';
 import CoachingSession from './pages/CoachingSession';
+import Complaints from './pages/Complaints';
 
 function RequireAuth({ children }) {
   const { manager, loading } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="coaching" element={<Coaching />} />
         <Route path="coaching/:id" element={<CoachingSession />} />
+        <Route path="complaints" element={<Complaints />} />
       </Route>
       {/* Staff Portal (no manager auth required) */}
       <Route path="/portal/login" element={<StaffPortalLogin />} />
