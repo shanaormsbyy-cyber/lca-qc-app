@@ -56,6 +56,8 @@ export default function QCCheckForm() {
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [voiceDefaultUnmentioned, setVoiceDefaultUnmentioned] = useState('pass');
   const speechRef = useRef(null);
+  const [recleanRequired, setRecleanRequired] = useState(null); // null | 0 | 1
+  const [recleanMinutes, setRecleanMinutes] = useState('');
 
   const load = (overwriteItems = true) => {
     api.get(`/qc/checks/${id}`).then(r => {
@@ -69,6 +71,8 @@ export default function QCCheckForm() {
         if (!editing) setCorrectiveActions(r.data.notes || '');
         return editing;
       });
+      if (r.data.reclean_required !== undefined && r.data.reclean_required !== null) setRecleanRequired(r.data.reclean_required);
+      if (r.data.reclean_minutes !== undefined && r.data.reclean_minutes !== null) setRecleanMinutes(String(r.data.reclean_minutes));
     }).finally(() => setLoading(false));
   };
 
@@ -313,6 +317,10 @@ export default function QCCheckForm() {
     // Never overwrite items on a completed check unless explicitly editing it
     const sendItems = complete || check.status !== 'complete' || editingComplete;
     const payload = { ...(sendItems ? { items } : {}), notes: correctiveActions };
+    if (recleanRequired !== null) {
+      payload.reclean_required = recleanRequired;
+      payload.reclean_minutes = recleanRequired === 1 && recleanMinutes ? parseInt(recleanMinutes) : null;
+    }
     if (complete) { payload.status = 'complete'; payload.signed_off_by = manager.name; }
     await api.put(`/qc/checks/${id}`, payload);
     if (complete) navigate('/qc');
@@ -857,6 +865,65 @@ export default function QCCheckForm() {
           </div>
         )}
       </div>
+
+      {/* Re-cleaning section — only shown when not locked or when editing a complete check */}
+      {(!isLocked || editingComplete) && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Re-cleaning Required?</div>
+          <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>
+            Did this property need a re-clean after the inspection?
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginBottom: recleanRequired === 1 ? 16 : 0 }}>
+            {[{ label: 'Yes', val: 1 }, { label: 'No', val: 0 }].map(({ label, val }) => (
+              <button
+                key={val}
+                onClick={() => { setRecleanRequired(val); if (val === 0) setRecleanMinutes(''); }}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                  border: `2px solid ${recleanRequired === val ? (val === 1 ? 'var(--red)' : 'var(--ok)') : 'var(--border)'}`,
+                  background: recleanRequired === val ? (val === 1 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)') : 'transparent',
+                  color: recleanRequired === val ? (val === 1 ? 'var(--red)' : 'var(--ok)') : 'var(--t2)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {recleanRequired === 1 && (
+            <div>
+              <label className="form-label">Time spent re-cleaning (minutes)</label>
+              <input
+                className="form-input"
+                type="number"
+                min={1}
+                placeholder="e.g. 30"
+                value={recleanMinutes}
+                onChange={e => setRecleanMinutes(e.target.value)}
+                style={{ maxWidth: 180 }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show saved reclean info on locked checks */}
+      {isLocked && check.reclean_required !== null && check.reclean_required !== undefined && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>Re-cleaning</div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{
+              fontSize: 13, fontWeight: 700, padding: '4px 12px', borderRadius: 6,
+              color: check.reclean_required ? 'var(--red)' : 'var(--ok)',
+              background: check.reclean_required ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)',
+            }}>
+              {check.reclean_required ? 'Re-clean required' : 'No re-clean needed'}
+            </span>
+            {check.reclean_required === 1 && check.reclean_minutes && (
+              <span style={{ fontSize: 13, color: 'var(--t2)' }}>{check.reclean_minutes} min spent</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3 mt-4" style={{ justifyContent: 'space-between' }}>
         <div className="flex gap-3">

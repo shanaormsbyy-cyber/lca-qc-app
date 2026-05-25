@@ -269,6 +269,21 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Auto-migrate: reclean columns on qc_checks
+{
+  const s = db.prepare('PRAGMA table_info(qc_checks)');
+  const cols = s.all();
+  s.finalize();
+  if (!cols.find(c => c.name === 'reclean_required')) {
+    db.exec('ALTER TABLE qc_checks ADD COLUMN reclean_required INTEGER DEFAULT NULL');
+    console.log('Migration complete: added reclean_required to qc_checks.');
+  }
+  if (!cols.find(c => c.name === 'reclean_minutes')) {
+    db.exec('ALTER TABLE qc_checks ADD COLUMN reclean_minutes INTEGER DEFAULT NULL');
+    console.log('Migration complete: added reclean_minutes to qc_checks.');
+  }
+}
+
 // Auto-migrate: coaching_sessions table
 {
   const s = db.prepare("PRAGMA table_info(coaching_sessions)");

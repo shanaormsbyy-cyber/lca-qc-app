@@ -649,17 +649,20 @@ router.get('/properties/:id/insights', (req, res) => {
   res.json({ insights, summary });
 });
 
-// First-pass rate — % of completed staff QC checks that scored >= pass threshold
+// First-pass rate — % of completed staff QC checks that passed without re-cleaning.
+// Uses explicit reclean_required flag when set; falls back to score >= threshold when null.
 router.get('/first-pass-rate', (req, res) => {
   const settingsRows = db.prepare('SELECT * FROM settings').all();
   const settings = {};
   settingsRows.forEach(s => { settings[s.key] = s.value; });
   const threshold = parseFloat(settings.watchlist_threshold || '85');
 
-  // Overall rate (all time)
   const all = db.prepare(`
     SELECT COUNT(*) as total,
-           SUM(CASE WHEN score_pct >= ? THEN 1 ELSE 0 END) as passed
+           SUM(CASE WHEN
+             (reclean_required IS NOT NULL AND reclean_required = 0)
+             OR (reclean_required IS NULL AND score_pct >= ?)
+           THEN 1 ELSE 0 END) as passed
     FROM qc_checks
     WHERE status='complete' AND score_pct IS NOT NULL
       AND (check_type='staff' OR check_type IS NULL)
@@ -667,7 +670,6 @@ router.get('/first-pass-rate', (req, res) => {
 
   const overallRate = all.total > 0 ? Math.round((all.passed / all.total) * 100) : null;
 
-  // Monthly trend — last 12 months
   const months = [];
   const now = new Date();
   for (let i = 11; i >= 0; i--) {
@@ -675,7 +677,10 @@ router.get('/first-pass-rate', (req, res) => {
     const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const row = db.prepare(`
       SELECT COUNT(*) as total,
-             SUM(CASE WHEN score_pct >= ? THEN 1 ELSE 0 END) as passed
+             SUM(CASE WHEN
+               (reclean_required IS NOT NULL AND reclean_required = 0)
+               OR (reclean_required IS NULL AND score_pct >= ?)
+             THEN 1 ELSE 0 END) as passed
       FROM qc_checks
       WHERE status='complete' AND score_pct IS NOT NULL
         AND (check_type='staff' OR check_type IS NULL)
@@ -687,6 +692,38 @@ router.get('/first-pass-rate', (req, res) => {
   }
 
   res.json({ rate: overallRate, total: all.total, passed: all.passed, threshold, trend: months });
+});
+
+// Average re-clean time — only checks where reclean_required=1 and reclean_minutes is set
+router.get('/reclean-time', (req, res) => {
+  const all = db.prepare(`
+    SELECT COUNT(*) as total_recleans, AVG(reclean_minutes) as avg_minutes
+    FROM qc_checks
+    WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
+      AND (check_type='staff' OR check_type IS NULL)
+  `).get();
+
+  const months = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const row = db.prepare(`
+      SELECT COUNT(*) as total_recleans, AVG(reclean_minutes) as avg_minutes
+      FROM qc_checks
+      WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
+        AND (check_type='staff' OR check_type IS NULL)
+        AND strftime('%Y-%m', date) = ?
+    `).get(monthStr);
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    months.push({ month: monthStr, label: monthNames[d.getMonth()], total_recleans: row.total_recleans, avg_minutes: row.avg_minutes ? Math.round(row.avg_minutes) : null });
+  }
+
+  res.json({
+    avg_minutes: all.avg_minutes ? Math.round(all.avg_minutes) : null,
+    total_recleans: all.total_recleans,
+    trend: months,
+  });
 });
 
 function fmtDate(d) {

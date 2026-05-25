@@ -25,7 +25,9 @@ export default function Dashboard() {
   const [flagTab, setFlagTab] = useState('week');
   const [heatpumpsDue, setHeatpumpsDue] = useState(0);
   const [coachingFollowUp, setCoachingFollowUp] = useState(0);
+  const [coachingStaffIds, setCoachingStaffIds] = useState(new Set());
   const [firstPassData, setFirstPassData] = useState(null);
+  const [recleanTimeData, setRecleanTimeData] = useState(null);
   const [flagDetail, setFlagDetail] = useState(null);
   const [flagTrend, setFlagTrend] = useState(null);
 
@@ -74,8 +76,10 @@ export default function Dashboard() {
     api.get('/coaching').then(r => {
       const count = r.data.filter(s => s.status === 'open' && s.followup_date).length;
       setCoachingFollowUp(count);
+      setCoachingStaffIds(new Set(r.data.filter(s => s.status === 'open').map(s => s.staff_id)));
     }).catch(() => {});
     api.get('/kpis/first-pass-rate').then(r => setFirstPassData(r.data)).catch(() => {});
+    api.get('/kpis/reclean-time').then(r => setRecleanTimeData(r.data)).catch(() => {});
   };
 
   useEffect(() => { load(); }, [manager.id]);
@@ -215,68 +219,92 @@ export default function Dashboard() {
           <div className={`stat-value${coachingFollowUp > 0 ? ' amber' : ' green'}`}>{coachingFollowUp}</div>
           <div className="stat-sub">{coachingFollowUp > 0 ? 'Open sessions with follow-up' : 'No follow-ups scheduled'}</div>
         </div>
-      </div>
 
-      {/* First-Pass Rate */}
-      {firstPassData && firstPassData.total > 0 && (
-        <div className="card mb-6">
-          <div className="card-header" style={{ marginBottom: 16 }}>
-            <div>
-              <span className="card-title">First-Time Pass Rate</span>
-              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
-                Cleans that pass QC without needing a redo — if this climbs, coaching is sticking
+        {/* First-Time Pass Rate stat card */}
+        {firstPassData && (
+          <div className="stat-card" style={{ gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <div className="stat-label">First-Time Pass Rate</div>
+                <div className={`stat-value${firstPassData.rate == null ? '' : firstPassData.rate >= 85 ? ' green' : firstPassData.rate >= 70 ? ' amber' : ' red'}`} style={{ marginTop: 4 }}>
+                  {firstPassData.rate != null ? `${firstPassData.rate}%` : '—'}
+                </div>
+                <div className="stat-sub" style={{ marginTop: 4 }}>
+                  {firstPassData.total > 0 ? `${firstPassData.passed} of ${firstPassData.total} passed ≥${firstPassData.threshold}%` : 'No data yet'}
+                </div>
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{
-                fontSize: 36, fontWeight: 900, lineHeight: 1,
-                color: firstPassData.rate >= 85 ? 'var(--ok)' : firstPassData.rate >= 70 ? 'var(--amber)' : 'var(--red)',
-              }}>
-                {firstPassData.rate}%
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
-                {firstPassData.passed} of {firstPassData.total} checks passed ≥{firstPassData.threshold}%
-              </div>
-            </div>
+            {(() => {
+              const trend = (firstPassData.trend || []).filter(m => m.total > 0);
+              if (trend.length < 1) return null;
+              const barW = 20, gap = 4, chartH = 60;
+              const svgW = trend.length * (barW + gap);
+              return (
+                <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                  <svg width={svgW} height={chartH + 22} style={{ display: 'block' }}>
+                    <line x1={0} y1={chartH - 0.85 * chartH} x2={svgW} y2={chartH - 0.85 * chartH} stroke="rgba(34,197,94,0.3)" strokeWidth={1} strokeDasharray="3 2" />
+                    {trend.map((m, i) => {
+                      const x = i * (barW + gap);
+                      const h = ((m.rate || 0) / 100) * chartH;
+                      const y = chartH - h;
+                      const col = m.rate >= 85 ? 'var(--ok)' : m.rate >= 70 ? 'var(--amber)' : 'var(--red)';
+                      return (
+                        <g key={m.month}>
+                          <rect x={x} y={y} width={barW} height={h} rx={3} fill={col} opacity={0.85} />
+                          <text x={x + barW / 2} y={chartH + 12} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.label}</text>
+                          <text x={x + barW / 2} y={chartH + 20} fill="var(--t3)" fontSize={7} textAnchor="middle">{m.total}✓</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              );
+            })()}
           </div>
-          {/* Monthly sparkline */}
-          {(() => {
-            const trend = firstPassData.trend.filter(m => m.total > 0);
-            if (trend.length < 2) return null;
-            const barW = 28, gap = 6;
-            const chartH = 80;
-            return (
-              <div style={{ overflowX: 'auto' }}>
-                <svg width={Math.max(trend.length * (barW + gap), 300)} height={chartH + 28} style={{ display: 'block' }}>
-                  {[0, 50, 85, 100].map(v => {
-                    const y = chartH - (v / 100) * chartH;
-                    return (
-                      <g key={v}>
-                        <line x1={0} y1={y} x2={trend.length * (barW + gap)} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth={1} />
-                        {v === 85 && <line x1={0} y1={y} x2={trend.length * (barW + gap)} y2={y} stroke="rgba(34,197,94,0.3)" strokeWidth={1} strokeDasharray="4 3" />}
-                      </g>
-                    );
-                  })}
-                  {trend.map((m, i) => {
-                    const x = i * (barW + gap);
-                    const h = (m.rate / 100) * chartH;
-                    const y = chartH - h;
-                    const col = m.rate >= 85 ? 'var(--ok)' : m.rate >= 70 ? 'var(--amber)' : 'var(--red)';
-                    return (
-                      <g key={m.month}>
-                        <rect x={x} y={y} width={barW} height={h} rx={4} fill={col} opacity={0.8} />
-                        <text x={x + barW / 2} y={y - 4} fill="var(--t1)" fontSize={9} fontWeight={700} textAnchor="middle">{m.rate}%</text>
-                        <text x={x + barW / 2} y={chartH + 14} fill="var(--t3)" fontSize={9} textAnchor="middle">{m.label}</text>
-                        <text x={x + barW / 2} y={chartH + 24} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.total}✓</text>
-                      </g>
-                    );
-                  })}
-                </svg>
+        )}
+
+        {/* Avg Re-clean Time stat card */}
+        {recleanTimeData && (
+          <div className="stat-card" style={{ gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div>
+                <div className="stat-label">Avg Re-clean Time</div>
+                <div className="stat-value amber" style={{ marginTop: 4 }}>
+                  {recleanTimeData.avg_minutes != null ? `${recleanTimeData.avg_minutes}m` : '—'}
+                </div>
+                <div className="stat-sub" style={{ marginTop: 4 }}>
+                  {recleanTimeData.total_recleans > 0 ? `${recleanTimeData.total_recleans} re-clean${recleanTimeData.total_recleans !== 1 ? 's' : ''} recorded` : 'No re-cleans yet'}
+                </div>
               </div>
-            );
-          })()}
-        </div>
-      )}
+            </div>
+            {(() => {
+              const trend = (recleanTimeData.trend || []).filter(m => m.total_recleans > 0);
+              if (trend.length < 1) return null;
+              const maxMins = Math.max(...trend.map(m => m.avg_minutes || 0), 1);
+              const barW = 20, gap = 4, chartH = 60;
+              const svgW = trend.length * (barW + gap);
+              return (
+                <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                  <svg width={svgW} height={chartH + 22} style={{ display: 'block' }}>
+                    {trend.map((m, i) => {
+                      const x = i * (barW + gap);
+                      const h = ((m.avg_minutes || 0) / maxMins) * chartH;
+                      const y = chartH - h;
+                      return (
+                        <g key={m.month}>
+                          <rect x={x} y={y} width={barW} height={h} rx={3} fill="var(--amber)" opacity={0.75} />
+                          <text x={x + barW / 2} y={chartH + 12} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.label}</text>
+                          <text x={x + barW / 2} y={chartH + 20} fill="var(--t3)" fontSize={7} textAnchor="middle">{m.total_recleans}x</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
 
       {/* Watchlist + Top Performers + Flagged Issues */}
       <div className="card-row mb-6">
@@ -296,7 +324,13 @@ export default function Dashboard() {
                 <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 10, cursor: 'pointer' }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</span>
+                      {coachingStaffIds.has(w.id)
+                        ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(58,181,217,0.15)', color: 'var(--cyan)', border: '1px solid rgba(58,181,217,0.3)' }}>In coaching</span>
+                        : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}>No coaching</span>
+                      }
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{w.total_checks} check{w.total_checks !== 1 ? 's' : ''} completed</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>

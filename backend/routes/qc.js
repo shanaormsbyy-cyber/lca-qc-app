@@ -241,7 +241,7 @@ router.post('/checks', (req, res) => {
 });
 
 router.put('/checks/:id', (req, res) => {
-  const { assigned_to_id, date, notes, status, signed_off_by, items } = req.body;
+  const { assigned_to_id, date, notes, status, signed_off_by, items, reclean_required, reclean_minutes } = req.body;
   db.exec('BEGIN');
   try {
     if (items) {
@@ -288,6 +288,8 @@ router.put('/checks/:id', (req, res) => {
       updates.push('signed_off_by=?', 'signed_off_at=?');
       params.push(signed_off_by, new Date().toISOString());
     }
+    if (reclean_required !== undefined) { updates.push('reclean_required=?'); params.push(reclean_required !== null ? (reclean_required ? 1 : 0) : null); }
+    if (reclean_minutes !== undefined) { updates.push('reclean_minutes=?'); params.push(reclean_minutes !== null ? parseInt(reclean_minutes) : null); }
     if (updates.length) {
       params.push(req.params.id);
       db.prepare(`UPDATE qc_checks SET ${updates.join(',')} WHERE id=?`).run(...params);
