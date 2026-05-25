@@ -57,14 +57,15 @@ router.get('/:id', (req, res) => {
 
 // POST /api/complaints
 router.post('/', (req, res) => {
-  const { staff_id, property_id, source, severity, date, description } = req.body;
+  const { staff_id, property_id, source, severity, date, description, resolution } = req.body;
   if (!staff_id || !source || !severity || !date || !description) {
     return res.status(400).json({ error: 'staff_id, source, severity, date and description are required' });
   }
+  const resolvedAt = resolution ? new Date().toISOString() : null;
   const result = db.prepare(`
-    INSERT INTO complaints (staff_id, property_id, source, severity, date, description, issued_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(staff_id, property_id || null, source, severity, date, description, req.manager.name);
+    INSERT INTO complaints (staff_id, property_id, source, severity, date, description, resolution, resolved_at, issued_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(staff_id, property_id || null, source, severity, date, description, resolution || null, resolvedAt, req.manager.name);
   res.json({ id: result.lastInsertRowid, ok: true });
 });
 
