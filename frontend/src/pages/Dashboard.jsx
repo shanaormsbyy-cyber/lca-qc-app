@@ -222,42 +222,29 @@ export default function Dashboard() {
 
         {/* First-Time Pass Rate stat card */}
         {firstPassData && (
-          <div className="stat-card" style={{ gridColumn: 'span 2' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div>
-                <div className="stat-label">First-Time Pass Rate</div>
-                <div className={`stat-value${firstPassData.rate == null ? '' : firstPassData.rate >= 85 ? ' green' : firstPassData.rate >= 70 ? ' amber' : ' red'}`} style={{ marginTop: 4 }}>
-                  {firstPassData.rate != null ? `${firstPassData.rate}%` : '—'}
-                </div>
-                <div className="stat-sub" style={{ marginTop: 4 }}>
-                  {firstPassData.total > 0 ? `${firstPassData.passed} of ${firstPassData.total} passed ≥${firstPassData.threshold}%` : 'No data yet'}
-                </div>
-              </div>
+          <div className="stat-card">
+            <div className="stat-label">First-Time Pass Rate</div>
+            <div className={`stat-value${firstPassData.rate == null ? '' : firstPassData.rate >= 85 ? ' green' : firstPassData.rate >= 70 ? ' amber' : ' red'}`}>
+              {firstPassData.rate != null ? `${firstPassData.rate}%` : '—'}
+            </div>
+            <div className="stat-sub">
+              {firstPassData.total > 0 ? `${firstPassData.passed} of ${firstPassData.total} passed ≥${firstPassData.threshold}%` : 'No data yet'}
             </div>
             {(() => {
               const trend = (firstPassData.trend || []).filter(m => m.total > 0);
-              if (trend.length < 1) return null;
-              const barW = 20, gap = 4, chartH = 60;
+              if (trend.length < 2) return null;
+              const chartH = 36, gap = 3;
+              const barW = Math.max(6, Math.floor((160 - gap * (trend.length - 1)) / trend.length));
               const svgW = trend.length * (barW + gap);
               return (
-                <div style={{ overflowX: 'auto', marginTop: 8 }}>
-                  <svg width={svgW} height={chartH + 22} style={{ display: 'block' }}>
-                    <line x1={0} y1={chartH - 0.85 * chartH} x2={svgW} y2={chartH - 0.85 * chartH} stroke="rgba(34,197,94,0.3)" strokeWidth={1} strokeDasharray="3 2" />
-                    {trend.map((m, i) => {
-                      const x = i * (barW + gap);
-                      const h = ((m.rate || 0) / 100) * chartH;
-                      const y = chartH - h;
-                      const col = m.rate >= 85 ? 'var(--ok)' : m.rate >= 70 ? 'var(--amber)' : 'var(--red)';
-                      return (
-                        <g key={m.month}>
-                          <rect x={x} y={y} width={barW} height={h} rx={3} fill={col} opacity={0.85} />
-                          <text x={x + barW / 2} y={chartH + 12} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.label}</text>
-                          <text x={x + barW / 2} y={chartH + 20} fill="var(--t3)" fontSize={7} textAnchor="middle">{m.total}✓</text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
+                <svg width={svgW} height={chartH + 2} style={{ display: 'block', marginTop: 10 }}>
+                  <line x1={0} y1={chartH * 0.15} x2={svgW} y2={chartH * 0.15} stroke="rgba(34,197,94,0.25)" strokeWidth={1} strokeDasharray="2 2" />
+                  {trend.map((m, i) => {
+                    const h = Math.max(2, ((m.rate || 0) / 100) * chartH);
+                    const col = m.rate >= 85 ? 'var(--ok)' : m.rate >= 70 ? 'var(--amber)' : 'var(--red)';
+                    return <rect key={m.month} x={i * (barW + gap)} y={chartH - h} width={barW} height={h} rx={2} fill={col} opacity={0.85} />;
+                  })}
+                </svg>
               );
             })()}
           </div>
@@ -265,41 +252,28 @@ export default function Dashboard() {
 
         {/* Avg Re-clean Time stat card */}
         {recleanTimeData && (
-          <div className="stat-card" style={{ gridColumn: 'span 2' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div>
-                <div className="stat-label">Avg Re-clean Time</div>
-                <div className="stat-value amber" style={{ marginTop: 4 }}>
-                  {recleanTimeData.avg_minutes != null ? `${recleanTimeData.avg_minutes}m` : '—'}
-                </div>
-                <div className="stat-sub" style={{ marginTop: 4 }}>
-                  {recleanTimeData.total_recleans > 0 ? `${recleanTimeData.total_recleans} re-clean${recleanTimeData.total_recleans !== 1 ? 's' : ''} recorded` : 'No re-cleans yet'}
-                </div>
-              </div>
+          <div className="stat-card">
+            <div className="stat-label">Avg Re-clean Time</div>
+            <div className="stat-value amber">
+              {recleanTimeData.avg_minutes != null ? `${recleanTimeData.avg_minutes}m` : '—'}
+            </div>
+            <div className="stat-sub">
+              {recleanTimeData.total_recleans > 0 ? `${recleanTimeData.total_recleans} re-clean${recleanTimeData.total_recleans !== 1 ? 's' : ''} recorded` : 'No re-cleans yet'}
             </div>
             {(() => {
               const trend = (recleanTimeData.trend || []).filter(m => m.total_recleans > 0);
-              if (trend.length < 1) return null;
+              if (trend.length < 2) return null;
               const maxMins = Math.max(...trend.map(m => m.avg_minutes || 0), 1);
-              const barW = 20, gap = 4, chartH = 60;
+              const chartH = 36, gap = 3;
+              const barW = Math.max(6, Math.floor((160 - gap * (trend.length - 1)) / trend.length));
               const svgW = trend.length * (barW + gap);
               return (
-                <div style={{ overflowX: 'auto', marginTop: 8 }}>
-                  <svg width={svgW} height={chartH + 22} style={{ display: 'block' }}>
-                    {trend.map((m, i) => {
-                      const x = i * (barW + gap);
-                      const h = ((m.avg_minutes || 0) / maxMins) * chartH;
-                      const y = chartH - h;
-                      return (
-                        <g key={m.month}>
-                          <rect x={x} y={y} width={barW} height={h} rx={3} fill="var(--amber)" opacity={0.75} />
-                          <text x={x + barW / 2} y={chartH + 12} fill="var(--t3)" fontSize={8} textAnchor="middle">{m.label}</text>
-                          <text x={x + barW / 2} y={chartH + 20} fill="var(--t3)" fontSize={7} textAnchor="middle">{m.total_recleans}x</text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
+                <svg width={svgW} height={chartH + 2} style={{ display: 'block', marginTop: 10 }}>
+                  {trend.map((m, i) => {
+                    const h = Math.max(2, ((m.avg_minutes || 0) / maxMins) * chartH);
+                    return <rect key={m.month} x={i * (barW + gap)} y={chartH - h} width={barW} height={h} rx={2} fill="var(--amber)" opacity={0.75} />;
+                  })}
+                </svg>
               );
             })()}
           </div>
