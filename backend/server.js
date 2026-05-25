@@ -349,6 +349,7 @@ app.use('/api/warnings', require('./routes/warnings'));
 app.use('/api/coaching', require('./routes/coaching'));
 app.use('/api/complaints', require('./routes/complaints'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/whatsapp', require('./routes/whatsapp'));
 
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');

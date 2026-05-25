@@ -34,6 +34,7 @@ export default function Settings() {
     slack_notify_below_threshold: 'true',
     portal_base_url: '',
     anthropic_api_key: '',
+    twilio_auth_token: '',
   });
   const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -359,6 +360,20 @@ export default function Settings() {
           />
           <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>
             Required for the AI chat assistant. Get your key at console.anthropic.com
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Twilio Auth Token (WhatsApp bot)</label>
+          <input
+            className="form-input"
+            type="password"
+            placeholder="Your Twilio Auth Token"
+            value={qcSettings.twilio_auth_token}
+            onChange={e => setSetting('twilio_auth_token', e.target.value)}
+          />
+          <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>
+            Found on your Twilio Console home page. Webhook URL to set in Twilio: <strong>{window.location.origin}/api/whatsapp/webhook</strong>
           </div>
         </div>
 
