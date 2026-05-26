@@ -82,7 +82,7 @@ export default function ChatAssistant() {
           position: 'fixed', bottom: 88, right: 24, zIndex: 999,
           width: 'min(420px, calc(100vw - 32px))',
           height: 'min(560px, calc(100vh - 120px))',
-          background: 'var(--card)',
+          background: '#0f0f13',
           border: '1px solid var(--glass-border)',
           borderRadius: 16,
           boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
@@ -94,7 +94,7 @@ export default function ChatAssistant() {
             padding: '14px 18px',
             borderBottom: '1px solid var(--glass-border)',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            background: 'var(--glass)',
+            background: '#161620',
           }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--cyan)' }}>✦ LCA Assistant</div>
@@ -190,6 +190,7 @@ export default function ChatAssistant() {
           <div style={{
             padding: '10px 12px',
             borderTop: '1px solid var(--glass-border)',
+            background: '#161620',
             display: 'flex', gap: 8, alignItems: 'flex-end',
           }}>
             <textarea
