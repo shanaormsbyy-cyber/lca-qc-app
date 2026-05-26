@@ -473,6 +473,7 @@ router.get('/staff/:id/insights', (req, res) => {
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.staff_id = ? AND qc.status = 'complete'
+      AND (qci.na IS NULL OR qci.na = 0)
       AND (
         (qi.score_type = 'pass_fail' AND qci.score = 0)
         OR (qi.score_type = '1_to_5' AND qci.score <= 2)
