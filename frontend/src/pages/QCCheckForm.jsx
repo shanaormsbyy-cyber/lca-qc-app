@@ -248,6 +248,9 @@ export default function QCCheckForm() {
         }
       };
 
+      // Expose stop on every instance so the button always has the right reference
+      recognition._stopByUser = () => { stoppedByUser = true; speechRef.current?.stop(); };
+
       return recognition;
     };
 
@@ -256,9 +259,6 @@ export default function QCCheckForm() {
     recognition.start();
     setVoiceState('recording');
     setVoiceError('');
-
-    // Expose stop so the button can set the flag before calling stop()
-    speechRef.current._stopByUser = () => { stoppedByUser = true; speechRef.current?.stop(); };
   };
 
   const stopRecording = () => {
