@@ -115,7 +115,8 @@ router.get('/sessions/:id', (req, res) => {
 
   const items = db.prepare(`
     SELECT tsi.*, tci.text, tci.order_idx,
-      tcs.name as section_name, tcs.id as section_id, tcs.order_idx as section_order
+      tcs.name as section_name, tcs.id as section_id, tcs.order_idx as section_order,
+      tcs.shift_label as section_shift_label
     FROM training_session_items tsi
     JOIN training_checklist_items tci ON tci.id = tsi.item_id
     JOIN training_checklist_sections tcs ON tcs.id = tci.section_id

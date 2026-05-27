@@ -143,13 +143,23 @@ export default function TrainingSession() {
 
   const sections = {};
   items.forEach(item => {
-    if (!sections[item.section_id]) sections[item.section_id] = { name: item.section_name, items: [] };
+    if (!sections[item.section_id]) sections[item.section_id] = {
+      name: item.section_name,
+      shift_label: item.section_shift_label || '',
+      items: [],
+    };
     sections[item.section_id].items.push(item);
   });
-  const sortedSections = Object.values(sections);
-  const completed = items.filter(i => i.completed).length;
-  const total = items.length;
+  const allSections = Object.values(sections);
+  const isOffice = s => /office/i.test(s.shift_label || s.name);
+  const sortedSections = allSections.filter(s => !isOffice(s));
+  const officeSections = allSections.filter(s => isOffice(s));
+  const checklistItems = sortedSections.flatMap(s => s.items);
+  const officeItems    = officeSections.flatMap(s => s.items);
+  const completed = checklistItems.filter(i => !!i.completed).length;
+  const total     = checklistItems.length;
   const pct = total ? Math.round((completed / total) * 100) : 0;
+  const officeCompleted = officeItems.filter(i => !!i.completed).length;
 
   const overallPct = calcPct(overallAvg());
 
@@ -168,7 +178,7 @@ export default function TrainingSession() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-        {[['checklist', 'Onboarding Checklist'], ['shadow', 'Shadow Period Rubric'], ['brief', 'Brief']].map(([t, label]) => (
+        {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['brief', 'Brief']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '10px 18px', fontWeight: 700, fontSize: 14,
@@ -199,36 +209,39 @@ export default function TrainingSession() {
             <div key={si} className="section-block mb-4">
               <div className="section-block-header">
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{sec.name}</span>
-                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{sec.items.filter(i => i.completed).length}/{sec.items.length}</span>
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{sec.items.filter(i => !!i.completed).length}/{sec.items.length}</span>
               </div>
               <div className="section-block-body">
-                {sec.items.map(item => (
-                  <div key={item.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
-                    <div className="flex items-center gap-3"
-                      style={{ cursor: session.status !== 'complete' ? 'pointer' : 'default' }}
-                      onClick={() => session.status !== 'complete' && toggle(item.id)}>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                        border: `2px solid ${item.completed ? 'var(--green)' : 'var(--border)'}`,
-                        background: item.completed ? 'var(--green)' : 'transparent',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
-                      }}>
-                        {item.completed && <span style={{ color: 'var(--navy)', fontWeight: 800, fontSize: 13 }}>✓</span>}
+                {sec.items.map(item => {
+                  const done = !!item.completed;
+                  return (
+                    <div key={item.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                      <div className="flex items-center gap-3"
+                        style={{ cursor: session.status !== 'complete' ? 'pointer' : 'default' }}
+                        onClick={() => session.status !== 'complete' && toggle(item.id)}>
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: `2px solid ${done ? 'var(--ok)' : 'var(--border)'}`,
+                          background: done ? 'var(--ok)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
+                        }}>
+                          {done && <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>✓</span>}
+                        </div>
+                        <span style={{ fontWeight: 500, textDecoration: done ? 'line-through' : 'none', color: done ? 'var(--t3)' : 'var(--t1)' }}>
+                          {item.text}
+                        </span>
                       </div>
-                      <span style={{ fontWeight: 500, textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--t3)' : 'var(--t1)' }}>
-                        {item.text}
-                      </span>
+                      {done && session.status !== 'complete' && (
+                        <input className="form-input" style={{ marginTop: 8, marginLeft: 34, width: 'calc(100% - 34px)' }}
+                          placeholder="Notes (optional)…" value={item.notes || ''}
+                          onChange={e => updateNote(item.id, e.target.value)} />
+                      )}
+                      {item.notes && session.status === 'complete' && (
+                        <div style={{ marginLeft: 34, marginTop: 4, fontSize: 12, color: 'var(--t3)' }}>{item.notes}</div>
+                      )}
                     </div>
-                    {item.completed && session.status !== 'complete' && (
-                      <input className="form-input" style={{ marginTop: 8, marginLeft: 34, width: 'calc(100% - 34px)' }}
-                        placeholder="Notes (optional)…" value={item.notes || ''}
-                        onChange={e => updateNote(item.id, e.target.value)} />
-                    )}
-                    {item.notes && session.status === 'complete' && (
-                      <div style={{ marginLeft: 34, marginTop: 4, fontSize: 12, color: 'var(--t3)' }}>{item.notes}</div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -242,6 +255,77 @@ export default function TrainingSession() {
               }}>
                 {saving ? <><span className="spinner" /> Saving…</> : '✓ Sign Off & Complete'}
               </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── OFFICE USE ONLY TAB ───────────────────────────────────────────────── */}
+      {tab === 'office' && (
+        <>
+          <div className="card mb-6" style={{ padding: '16px 20px' }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+              <span style={{ fontWeight: 600 }}>{officeCompleted}/{officeItems.length} items completed</span>
+              <span style={{ fontWeight: 700, color: officeCompleted === officeItems.length && officeItems.length > 0 ? 'var(--ok)' : 'var(--t1)', fontSize: 18 }}>
+                {officeItems.length ? Math.round((officeCompleted / officeItems.length) * 100) : 0}%
+              </span>
+            </div>
+            <div className="score-bar">
+              <div className={`score-fill ${officeCompleted === officeItems.length && officeItems.length > 0 ? 'green' : officeCompleted / officeItems.length >= 0.6 ? 'amber' : 'red'}`}
+                style={{ width: `${officeItems.length ? Math.round((officeCompleted / officeItems.length) * 100) : 0}%` }} />
+            </div>
+          </div>
+
+          {officeSections.length === 0 && (
+            <div style={{ color: 'var(--t3)', textAlign: 'center', padding: '32px 0' }}>
+              No Office Use Only sections in this checklist template.
+            </div>
+          )}
+
+          {officeSections.map((sec, si) => (
+            <div key={si} className="section-block mb-4">
+              <div className="section-block-header">
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{sec.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{sec.items.filter(i => !!i.completed).length}/{sec.items.length}</span>
+              </div>
+              <div className="section-block-body">
+                {sec.items.map(item => {
+                  const done = !!item.completed;
+                  return (
+                    <div key={item.id} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                      <div className="flex items-center gap-3"
+                        style={{ cursor: session.status !== 'complete' ? 'pointer' : 'default' }}
+                        onClick={() => session.status !== 'complete' && toggle(item.id)}>
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: `2px solid ${done ? 'var(--ok)' : 'var(--border)'}`,
+                          background: done ? 'var(--ok)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
+                        }}>
+                          {done && <span style={{ color: '#fff', fontWeight: 800, fontSize: 13 }}>✓</span>}
+                        </div>
+                        <span style={{ fontWeight: 500, textDecoration: done ? 'line-through' : 'none', color: done ? 'var(--t3)' : 'var(--t1)' }}>
+                          {item.text}
+                        </span>
+                      </div>
+                      {done && session.status !== 'complete' && (
+                        <input className="form-input" style={{ marginTop: 8, marginLeft: 34, width: 'calc(100% - 34px)' }}
+                          placeholder="Notes (optional)…" value={item.notes || ''}
+                          onChange={e => updateNote(item.id, e.target.value)} />
+                      )}
+                      {item.notes && session.status === 'complete' && (
+                        <div style={{ marginLeft: 34, marginTop: 4, fontSize: 12, color: 'var(--t3)' }}>{item.notes}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {session.status !== 'complete' && officeItems.length > 0 && (
+            <div className="flex gap-3 mt-4">
+              <button className="btn btn-secondary" onClick={() => save(false)} disabled={saving}>Save Progress</button>
             </div>
           )}
         </>
