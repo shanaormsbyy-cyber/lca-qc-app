@@ -56,6 +56,7 @@ export default function QCCheckForm() {
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [voiceDefaultUnmentioned, setVoiceDefaultUnmentioned] = useState('pass');
   const speechRef = useRef(null);
+  const committedRef = useRef(''); // accumulated final transcript across all sessions
   const [recleanRequired, setRecleanRequired] = useState(null); // null | 0 | 1
   const [recleanMinutes, setRecleanMinutes] = useState('');
 
@@ -199,48 +200,79 @@ export default function QCCheckForm() {
 
   const startRecording = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setVoiceState('done');
-      return;
-    }
+    if (!SpeechRecognition) { setVoiceState('done'); return; }
+
+    committedRef.current = '';
+
+    const attach = (recognition) => {
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-NZ';
+
+      // Snapshot committed text at session start, track new finals by index.
+      // Chrome re-delivers ALL results from index 0 on each new session —
+      // sessionFinalCount ensures we only append results we haven't seen yet.
+      const baseText = committedRef.current;
+      let sessionFinalCount = 0;
+
+      recognition.onresult = e => {
+        let newFinal = '';
+        let interim = '';
+        for (let i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            if (i >= sessionFinalCount) {
+              newFinal += e.results[i][0].transcript + ' ';
+              sessionFinalCount = i + 1;
+            }
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        committedRef.current = baseText + newFinal;
+        setTranscript((committedRef.current + interim).replace(/\s+/g, ' ').trimStart());
+      };
+
+      recognition.onerror = e => {
+        if (e.error === 'not-allowed') {
+          speechRef.current = null; // signal stop
+          setVoiceError('Microphone access denied. Please allow microphone access in your browser settings.');
+          setVoiceState('idle');
+        }
+        // no-speech / network / aborted — onend will restart or finish
+      };
+
+      recognition.onend = () => {
+        // If stopRecording() or onerror already cleared the ref, don't restart
+        if (speechRef.current === null) return;
+
+        // Chrome Android stops after ~60s or a long pause — restart silently
+        try {
+          const next = new SpeechRecognition();
+          speechRef.current = next;
+          attach(next);
+          next.start();
+        } catch {
+          setTranscript(committedRef.current.trim());
+          setVoiceState('done');
+        }
+      };
+    };
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-NZ';
-
-    let finalText = '';
-
-    recognition.onresult = e => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
-        else interim += e.results[i][0].transcript;
-      }
-      setTranscript(finalText + interim);
-    };
-
-    recognition.onerror = e => {
-      if (e.error === 'not-allowed') {
-        setVoiceError('Microphone access denied. Please allow microphone access in your browser settings.');
-        setVoiceState('idle');
-      }
-      // aborted = user stopped; no-speech / network = transient, onend handles it
-    };
-
-    recognition.onend = () => {
-      setTranscript(finalText.trim());
-      setVoiceState('done');
-    };
-
     speechRef.current = recognition;
+    attach(recognition);
     recognition.start();
     setVoiceState('recording');
     setVoiceError('');
   };
 
   const stopRecording = () => {
-    speechRef.current?.stop();
+    const r = speechRef.current;
+    speechRef.current = null; // onend checks this ref — null = don't restart
+    const final = committedRef.current.trim();
+    setTranscript(final);
+    setVoiceState('done');
+    try { r?.stop(); } catch { /* ignore */ }
   };
 
   const analyseVoice = async () => {
