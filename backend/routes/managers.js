@@ -12,12 +12,18 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   const { username, password, name } = req.body;
+  if (!username || !password || !name) return res.status(400).json({ error: 'Username, password and name are required' });
   const hash = bcrypt.hashSync(password, 10);
   try {
     const result = db.prepare('INSERT INTO managers (username, password_hash, name) VALUES (?, ?, ?)').run(username, hash, name);
     res.json({ id: result.lastInsertRowid });
-  } catch {
-    res.status(400).json({ error: 'Username already exists' });
+  } catch (e) {
+    const msg = e.message || '';
+    if (msg.includes('UNIQUE') || msg.includes('unique')) {
+      res.status(400).json({ error: 'Username already exists' });
+    } else {
+      res.status(400).json({ error: msg || 'Error creating manager' });
+    }
   }
 });
 
