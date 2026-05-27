@@ -208,11 +208,11 @@ export default function TrainingSession() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--glass-border)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['probation', 'Solo Probation'], ['resources', 'Resources'], ['brief', 'Brief']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            padding: '10px 18px', fontWeight: 700, fontSize: 14,
+            padding: '10px 16px', fontWeight: 700, fontSize: 13, flexShrink: 0,
             color: tab === t ? 'var(--cyan)' : 'var(--t3)',
             borderBottom: tab === t ? '2px solid var(--cyan)' : '2px solid transparent',
             marginBottom: -2, whiteSpace: 'nowrap',
