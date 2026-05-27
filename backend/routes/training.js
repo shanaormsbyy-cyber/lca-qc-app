@@ -289,6 +289,30 @@ router.put('/sessions/:id/rubric/:dimensionId/:cleanNumber', (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Rubric Sign-off ──────────────────────────────────────────────────────────
+
+// PUT update the pre-signoff note (the blue info box text)
+router.put('/sessions/:id/rubric-note', (req, res) => {
+  const { note } = req.body;
+  db.prepare('UPDATE training_sessions SET rubric_signoff_note=? WHERE id=?').run(note || '', req.params.id);
+  res.json({ ok: true });
+});
+
+// POST sign off (or decline) the shadow period rubric
+router.post('/sessions/:id/rubric-signoff', (req, res) => {
+  const { status } = req.body;
+  if (!['approved', 'declined'].includes(status)) return res.status(400).json({ error: 'status must be approved or declined' });
+  db.prepare('UPDATE training_sessions SET rubric_signoff_status=?, rubric_signoff_by=?, rubric_signoff_at=? WHERE id=?')
+    .run(status, req.manager.name, new Date().toISOString(), req.params.id);
+  res.json({ ok: true });
+});
+
+// DELETE undo a rubric sign-off
+router.delete('/sessions/:id/rubric-signoff', (req, res) => {
+  db.prepare('UPDATE training_sessions SET rubric_signoff_status=NULL, rubric_signoff_by=NULL, rubric_signoff_at=NULL WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 // ─── Staff Briefs ─────────────────────────────────────────────────────────────
 
 // GET all briefs for a staff member (newest first)

@@ -46,9 +46,16 @@ export default function TrainingSession() {
   const [briefText, setBriefText]   = useState('');
   const [postingBrief, setPostingBrief] = useState(false);
 
+  // Rubric sign-off
+  const [rubricNote, setRubricNote]         = useState('');
+  const [editingNote, setEditingNote]       = useState(false);
+  const [savingNote, setSavingNote]         = useState(false);
+  const [signingOff, setSigningOff]         = useState(false);
+
   const loadSession = () => api.get(`/training/sessions/${id}`).then(r => {
     setSession(r.data);
     setItems(r.data.items || []);
+    setRubricNote(r.data.rubric_signoff_note || '');
     return r.data;
   });
 
@@ -375,7 +382,7 @@ export default function TrainingSession() {
               return (
                 <button key={c} onClick={() => setActiveClean(c)} style={{
                   flex: 1, padding: '12px 4px', borderRadius: 12, cursor: 'pointer',
-                  border: `2px solid ${isActive ? 'var(--cyan)' : 'var(--border)'}`,
+                  border: `2px solid ${isActive ? 'var(--cyan)' : 'var(--glass-border)'}`,
                   background: isActive ? 'rgba(58,181,217,0.1)' : 'var(--glass)',
                   transition: 'all .15s',
                 }}>
@@ -420,7 +427,7 @@ export default function TrainingSession() {
                       return (
                         <button key={s} onClick={() => !isSaving && setScore(dim.id, activeClean, s)} style={{
                           flex: 1, padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
-                          border: `2px solid ${active ? cfg.border : 'var(--border)'}`,
+                          border: `2px solid ${active ? cfg.border : 'var(--glass-border)'}`,
                           background: active ? cfg.bg : 'var(--glass)',
                           color: active ? cfg.color : 'var(--t3)',
                           fontWeight: 800, fontSize: 15,
@@ -461,6 +468,115 @@ export default function TrainingSession() {
               No rubric dimensions set up yet. Go to Onboarding → Edit Template → Shadow Period Rubric tab.
             </div>
           )}
+
+          {/* ── Sign-off section ── */}
+          <div style={{ marginTop: 28, borderTop: '2px solid var(--glass-border)', paddingTop: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 16 }}>Shadow Period Sign-Off</div>
+
+            {/* Blue info box — editable */}
+            <div style={{ marginBottom: 20 }}>
+              {!editingNote ? (
+                <div
+                  onClick={() => !session.rubric_signoff_status && setEditingNote(true)}
+                  style={{
+                    padding: '12px 16px', borderRadius: 10,
+                    background: 'rgba(58,181,217,0.08)', border: '1px solid rgba(58,181,217,0.25)',
+                    fontSize: 13, color: rubricNote ? 'var(--cyan)' : 'rgba(58,181,217,0.45)',
+                    lineHeight: 1.6, whiteSpace: 'pre-wrap', cursor: session.rubric_signoff_status ? 'default' : 'pointer',
+                    minHeight: 48,
+                  }}
+                >
+                  {rubricNote || (session.rubric_signoff_status ? 'No sign-off notes.' : 'Tap to add notes for managers to read before signing off…')}
+                  {!session.rubric_signoff_status && rubricNote && (
+                    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>✎</span>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <textarea
+                    className="form-input"
+                    rows={4}
+                    style={{ resize: 'vertical', marginBottom: 8 }}
+                    autoFocus
+                    value={rubricNote}
+                    onChange={e => setRubricNote(e.target.value)}
+                    placeholder="e.g. Review overall scores before signing off. Consider improvement trend across cleans more than individual scores…"
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-primary btn-sm" disabled={savingNote} onClick={async () => {
+                      setSavingNote(true);
+                      await api.put(`/training/sessions/${id}/rubric-note`, { note: rubricNote });
+                      setSavingNote(false);
+                      setEditingNote(false);
+                    }}>
+                      {savingNote ? 'Saving…' : 'Save'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setRubricNote(session.rubric_signoff_note || ''); setEditingNote(false); }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sign-off status or buttons */}
+            {session.rubric_signoff_status ? (
+              <div>
+                <div style={{
+                  padding: '16px 20px', borderRadius: 12, marginBottom: 12,
+                  background: session.rubric_signoff_status === 'approved' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                  border: `1px solid ${session.rubric_signoff_status === 'approved' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 16, color: session.rubric_signoff_status === 'approved' ? 'var(--ok)' : 'var(--red)', marginBottom: 4 }}>
+                    {session.rubric_signoff_status === 'approved' ? '✓ Shadow Period Approved' : '✗ Shadow Period Declined'}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--t2)' }}>
+                    Signed off by <strong style={{ color: 'var(--t1)' }}>{session.rubric_signoff_by}</strong>
+                    {' · '}{new Date(session.rubric_signoff_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={async () => {
+                  if (!confirm('Undo this sign-off?')) return;
+                  await api.delete(`/training/sessions/${id}/rubric-signoff`);
+                  setSession(s => ({ ...s, rubric_signoff_status: null, rubric_signoff_by: null, rubric_signoff_at: null }));
+                }}>
+                  Undo Sign-Off
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 12 }}>
+                  Overall score: <strong style={{ color: pctColor(overallPct), fontSize: 15 }}>{overallPct !== null ? `${overallPct}%` : '—'}</strong>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="btn btn-primary"
+                    disabled={signingOff}
+                    onClick={async () => {
+                      if (!confirm(`Approve shadow period for ${session.trainee_name}?`)) return;
+                      setSigningOff(true);
+                      await api.post(`/training/sessions/${id}/rubric-signoff`, { status: 'approved' });
+                      await loadSession();
+                      setSigningOff(false);
+                    }}
+                  >
+                    ✓ Approve Shadow Period
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    disabled={signingOff}
+                    onClick={async () => {
+                      if (!confirm(`Decline shadow period for ${session.trainee_name}? This means they did not pass.`)) return;
+                      setSigningOff(true);
+                      await api.post(`/training/sessions/${id}/rubric-signoff`, { status: 'declined' });
+                      await loadSession();
+                      setSigningOff(false);
+                    }}
+                  >
+                    ✗ Decline
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
 

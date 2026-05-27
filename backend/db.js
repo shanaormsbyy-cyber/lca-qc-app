@@ -202,6 +202,10 @@ const migrations = [
   "ALTER TABLE properties      ADD COLUMN room_config TEXT DEFAULT NULL",
   "ALTER TABLE training_checklist_sections ADD COLUMN description TEXT DEFAULT NULL",
   "ALTER TABLE training_checklist_sections ADD COLUMN shift_label TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_status TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_by TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_at TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_note TEXT DEFAULT NULL",
 ];
 migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
