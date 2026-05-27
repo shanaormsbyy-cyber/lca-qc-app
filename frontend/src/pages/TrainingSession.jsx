@@ -221,7 +221,7 @@ export default function TrainingSession() {
                         onClick={() => session.status !== 'complete' && toggle(item.id)}>
                         <div style={{
                           width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                          border: `2px solid ${done ? 'var(--ok)' : 'var(--border)'}`,
+                          border: `2px solid ${done ? 'var(--ok)' : 'rgba(255,255,255,0.25)'}`,
                           background: done ? 'var(--ok)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
                         }}>
@@ -298,7 +298,7 @@ export default function TrainingSession() {
                         onClick={() => session.status !== 'complete' && toggle(item.id)}>
                         <div style={{
                           width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                          border: `2px solid ${done ? 'var(--ok)' : 'var(--border)'}`,
+                          border: `2px solid ${done ? 'var(--ok)' : 'rgba(255,255,255,0.25)'}`,
                           background: done ? 'var(--ok)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s',
                         }}>
