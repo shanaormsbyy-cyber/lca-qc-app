@@ -425,17 +425,17 @@ router.post('/checks/:id/voice-analyse', async (req, res) => {
     room_label: i.room_label || i.category || 'General',
   }));
 
-  const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager has walked through a property and recorded a voice note describing issues they found.
+  const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager recorded a voice note describing specific issues found during an inspection.
 
-Your job is to map every issue they mention to specific checklist items and mark them as fails.
+Your job: match ONLY what the manager explicitly mentioned as a problem to checklist items. Do not infer, expand, or assume.
 
-CRITICAL RULES:
-1. If the manager mentions ANYTHING negative about an item (dirty, missed, not done, stained, smells, streaks, crumbs, hair, residue, etc.) — mark it as a FAIL. Do not second-guess or soften their words.
-2. Be generous in matching — if they say "the toilet was dirty" match ALL toilet-related items. If they say "bathroom" match all bathroom items they mention issues with.
-3. Only use "ambiguous" when the same issue could apply to multiple DIFFERENT rooms (e.g. "the bed wasn't made" when there are Bedroom 1 AND Bedroom 2 items — ask which bedroom).
-4. Do NOT put something in ambiguous if it clearly belongs to one room or item.
-5. Everything NOT mentioned as an issue is considered passed.
-6. Return ONLY valid JSON — no markdown, no explanation, nothing else.
+RULES — read carefully:
+1. ONLY fail an item if the manager directly described a problem with that specific thing. E.g. "the toilet was dirty" → fail the toilet item only. Do NOT fail shower, sink, or other bathroom items unless those were also mentioned.
+2. Do NOT fail an item just because it is in the same room or category as something mentioned.
+3. If the manager says something positive or neutral about an area, do not fail anything in it.
+4. Use "ambiguous" ONLY when the same issue could apply to multiple distinct rooms (e.g. "the bed wasn't made" when there are separate Bedroom 1 and Bedroom 2 items). Do not use it otherwise.
+5. Everything not explicitly mentioned as a problem is PASSED — do not include it in fails or ambiguous.
+6. Return ONLY valid JSON. No markdown, no explanation, nothing else.
 
 Checklist items (use the "id" field in your response):
 ${JSON.stringify(itemList, null, 2)}
@@ -443,14 +443,14 @@ ${JSON.stringify(itemList, null, 2)}
 Voice note transcript:
 "${transcript.trim()}"
 
-Return JSON in this exact format:
+Return this exact JSON format:
 {
-  "summary": "2-3 sentence plain English overview of what the manager found and what is being failed",
+  "summary": "2-3 sentence plain English summary of exactly what the manager flagged",
   "fails": [
-    { "item_id": 123, "reason": "exact words or close paraphrase from transcript" }
+    { "item_id": 123, "reason": "direct quote or close paraphrase of what the manager said" }
   ],
   "ambiguous": [
-    { "item_id": 456, "reason": "what was mentioned", "note": "which room or area is unclear" }
+    { "item_id": 456, "reason": "what was mentioned", "note": "why the specific room is unclear" }
   ]
 }`;
 

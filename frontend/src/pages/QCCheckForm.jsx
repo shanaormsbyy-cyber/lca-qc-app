@@ -204,87 +204,43 @@ export default function QCCheckForm() {
       return;
     }
 
-    // committedText: everything finalised across all recognition sessions
-    // sessionFinalCount: how many final results this session has already appended
-    // (iOS re-delivers all results from index 0 on each new session)
-    let committedText = '';
-    let sessionFinalCount = 0;
-    let stoppedByUser = false;
-    let sessionCount = 0;    // how many recognition instances have been started
-    let fatalError = false;  // true only when mic is genuinely denied on first start
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-NZ';
 
-    const createRecognition = () => {
-      sessionFinalCount = 0;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-NZ';
+    let finalText = '';
 
-      recognition.onresult = e => {
-        let interim = '';
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) {
-            if (i >= sessionFinalCount) {
-              committedText += e.results[i][0].transcript + ' ';
-              sessionFinalCount = i + 1;
-            }
-          } else {
-            interim += e.results[i][0].transcript;
-          }
-        }
-        setTranscript(committedText + interim);
-      };
-
-      recognition.onerror = e => {
-        if (e.error === 'not-allowed') {
-          // iOS fires not-allowed on auto-restarts even when permission is granted —
-          // only treat it as a genuine denial on the very first session start.
-          if (sessionCount <= 1) {
-            fatalError = true;
-            stoppedByUser = true;
-            setVoiceError('Microphone access denied. Please allow microphone access and try again.');
-            setVoiceState('idle');
-          }
-          // On subsequent sessions, ignore — onend will handle the restart
-        }
-        // 'no-speech', 'network', 'aborted' are transient — onend restarts us
-      };
-
-      recognition.onend = () => {
-        if (fatalError) return; // onerror already set state, don't touch it
-        if (stoppedByUser) {
-          setTranscript(committedText.trim());
-          setVoiceState('done');
-        } else {
-          // Browser timed out or aborted — restart to keep recording
-          try {
-            const next = createRecognition();
-            speechRef.current = next;
-            sessionCount++;
-            next.start();
-          } catch {
-            setTranscript(committedText.trim());
-            setVoiceState('done');
-          }
-        }
-      };
-
-      recognition._stopByUser = () => { stoppedByUser = true; speechRef.current?.stop(); };
-
-      return recognition;
+    recognition.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
+        else interim += e.results[i][0].transcript;
+      }
+      setTranscript(finalText + interim);
     };
 
-    const recognition = createRecognition();
+    recognition.onerror = e => {
+      if (e.error === 'not-allowed') {
+        setVoiceError('Microphone access denied. Please allow microphone access in your browser settings.');
+        setVoiceState('idle');
+      }
+      // aborted = user stopped; no-speech / network = transient, onend handles it
+    };
+
+    recognition.onend = () => {
+      setTranscript(finalText.trim());
+      setVoiceState('done');
+    };
+
     speechRef.current = recognition;
-    sessionCount = 1;
     recognition.start();
     setVoiceState('recording');
     setVoiceError('');
   };
 
   const stopRecording = () => {
-    if (speechRef.current?._stopByUser) speechRef.current._stopByUser();
-    else speechRef.current?.stop();
+    speechRef.current?.stop();
   };
 
   const analyseVoice = async () => {
