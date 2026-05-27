@@ -313,6 +313,35 @@ router.delete('/sessions/:id/rubric-signoff', (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Solo Probation ───────────────────────────────────────────────────────────
+
+router.put('/sessions/:id/probation', (req, res) => {
+  const { probation_start, probation_end, probation_qc_avg, probation_trajectory,
+          probation_code_adherence, probation_standing_notes } = req.body;
+  db.prepare(`UPDATE training_sessions SET
+    probation_start=?, probation_end=?, probation_qc_avg=?,
+    probation_trajectory=?, probation_code_adherence=?, probation_standing_notes=?
+    WHERE id=?`).run(
+    probation_start || null, probation_end || null, probation_qc_avg || null,
+    probation_trajectory || null, probation_code_adherence || null, probation_standing_notes || null,
+    req.params.id
+  );
+  res.json({ ok: true });
+});
+
+router.post('/sessions/:id/probation-signoff', (req, res) => {
+  const { decision } = req.body;
+  if (!['approved', 'extend', 'part_ways'].includes(decision)) return res.status(400).json({ error: 'Invalid decision' });
+  db.prepare('UPDATE training_sessions SET probation_decision=?, probation_signoff_by=?, probation_signoff_at=? WHERE id=?')
+    .run(decision, req.manager.name, new Date().toISOString(), req.params.id);
+  res.json({ ok: true });
+});
+
+router.delete('/sessions/:id/probation-signoff', (req, res) => {
+  db.prepare('UPDATE training_sessions SET probation_decision=NULL, probation_signoff_by=NULL, probation_signoff_at=NULL WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 // ─── Staff Briefs ─────────────────────────────────────────────────────────────
 
 // GET all briefs for a staff member (newest first)

@@ -206,6 +206,15 @@ const migrations = [
   "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_by TEXT DEFAULT NULL",
   "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_at TEXT DEFAULT NULL",
   "ALTER TABLE training_sessions ADD COLUMN rubric_signoff_note TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_start TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_end TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_qc_avg TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_trajectory TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_code_adherence TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_standing_notes TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_decision TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_signoff_by TEXT DEFAULT NULL",
+  "ALTER TABLE training_sessions ADD COLUMN probation_signoff_at TEXT DEFAULT NULL",
 ];
 migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }

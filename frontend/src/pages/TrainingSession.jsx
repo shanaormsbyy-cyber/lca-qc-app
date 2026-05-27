@@ -52,10 +52,26 @@ export default function TrainingSession() {
   const [savingNote, setSavingNote]         = useState(false);
   const [signingOff, setSigningOff]         = useState(false);
 
+  // Solo probation
+  const [probation, setProbation] = useState({
+    probation_start: '', probation_end: '', probation_qc_avg: '',
+    probation_trajectory: '', probation_code_adherence: '', probation_standing_notes: '',
+  });
+  const [savingProbation, setSavingProbation] = useState(false);
+  const [probationSigningOff, setProbationSigningOff] = useState(false);
+
   const loadSession = () => api.get(`/training/sessions/${id}`).then(r => {
     setSession(r.data);
     setItems(r.data.items || []);
     setRubricNote(r.data.rubric_signoff_note || '');
+    setProbation({
+      probation_start:          r.data.probation_start          || '',
+      probation_end:            r.data.probation_end            || '',
+      probation_qc_avg:         r.data.probation_qc_avg         || '',
+      probation_trajectory:     r.data.probation_trajectory     || '',
+      probation_code_adherence: r.data.probation_code_adherence || '',
+      probation_standing_notes: r.data.probation_standing_notes || '',
+    });
     return r.data;
   });
 
@@ -186,7 +202,7 @@ export default function TrainingSession() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-        {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['brief', 'Brief']].map(([t, label]) => (
+        {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['probation', 'Solo Probation'], ['brief', 'Brief']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '10px 18px', fontWeight: 700, fontSize: 14,
@@ -573,6 +589,192 @@ export default function TrainingSession() {
                   >
                     ✗ Decline
                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── SOLO PROBATION TAB ────────────────────────────────────────────────── */}
+      {tab === 'probation' && (
+        <>
+          {/* Reference: Dashboard signals */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--cyan)', marginBottom: 6 }}>Dashboard signals to monitor</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10, fontStyle: 'italic' }}>
+              L3 reviews every QC photo and dashboard entry for the first 30 days. Watch for patterns, not single events.
+            </div>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 1.4fr', background: 'var(--cyan)', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#000' }}>
+                <span>Signal</span><span>Healthy (PASS)</span><span>Concerning (FAIL)</span>
+              </div>
+              {[
+                ['QC average (rolling)',  'Climbing toward 90%+, holds there',                   'Below 85%, or stuck 75–85% without improvement'],
+                ['Pattern of misses',     'Specific categories improving over time',              'Same misses repeating week after week'],
+                ['Photo quality',         'Full quality, every category covered',                 'Sloppy, blurry, missing'],
+                ['Checklist completion',  '100% every clean',                                    'Skipped items, half-completed'],
+                ['Reporting',            'Reports through proper channel, on time',              'Misses, hides, late'],
+                ['Speed trend',          'Improving toward standard pace, quality holds',        'Too slow (avoidant) or fast + sloppy'],
+                ['Reliability',          'Shows up to every committed shift',                    'Late, no-shows, cancellations'],
+                ['Team interactions',    'Pleasant, communicative',                              'Friction, lone-wolf energy'],
+              ].map(([signal, pass, fail], i) => (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1.4fr 1.4fr',
+                  padding: '9px 12px', fontSize: 12,
+                  background: i % 2 === 0 ? 'var(--glass)' : 'transparent',
+                  borderTop: '1px solid var(--glass-border)',
+                }}>
+                  <span style={{ fontWeight: 600, color: 'var(--t1)' }}>{signal}</span>
+                  <span style={{ color: 'var(--ok)' }}>{pass}</span>
+                  <span style={{ color: 'var(--red)' }}>{fail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Reference: Weekly check-in framework */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--cyan)', marginBottom: 6 }}>Weekly check-in — framework</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 10, fontStyle: 'italic' }}>
+              5–10 minutes. Phone or in person. Every week of the 30 days. Don't skip even if everything looks great — it's relationship-building too.
+            </div>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', background: 'var(--cyan)', padding: '8px 12px', fontWeight: 700, fontSize: 12, color: '#000' }}>
+                <span>Section</span><span>What to surface</span>
+              </div>
+              {[
+                ["What's working",           'Specific reinforcement (not generic "good job"). Reference dashboard data.'],
+                ['What needs adjustment',    'Specific, from the dashboard. One focus area for the week ahead.'],
+                ["How they're finding it",   'Listen for stress, frustration, confusion. Real conversation, not a checkbox.'],
+                ['Reaffirm standard + timeline', "You're [week X] of probation. Here's what excellent looks like at this point."],
+              ].map(([section, surface], i) => (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1fr 2fr',
+                  padding: '9px 12px', fontSize: 12,
+                  background: i % 2 === 0 ? 'var(--glass)' : 'transparent',
+                  borderTop: '1px solid var(--glass-border)',
+                }}>
+                  <span style={{ fontWeight: 600, color: 'var(--t1)' }}>{section}</span>
+                  <span style={{ color: 'var(--t2)' }}>{surface}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fillable: End-of-Probation record */}
+          <div style={{ borderTop: '2px solid var(--glass-border)', paddingTop: 24, marginBottom: 24 }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--cyan)', marginBottom: 16 }}>
+              End-of-Probation — Record Entry
+            </div>
+
+            {session.probation_decision ? (
+              /* Locked view */
+              <div>
+                <div style={{
+                  padding: '14px 18px', borderRadius: 12, marginBottom: 16,
+                  background: session.probation_decision === 'approved' ? 'rgba(34,197,94,0.1)' : session.probation_decision === 'extend' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                  border: `1px solid ${session.probation_decision === 'approved' ? 'rgba(34,197,94,0.3)' : session.probation_decision === 'extend' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4,
+                    color: session.probation_decision === 'approved' ? 'var(--ok)' : session.probation_decision === 'extend' ? 'var(--amber)' : 'var(--red)' }}>
+                    {session.probation_decision === 'approved' ? '✓ APPROVED for Standard' : session.probation_decision === 'extend' ? '⏱ EXTEND Probation 2 Weeks' : '✗ PART WAYS'}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--t2)' }}>
+                    Signed off by <strong style={{ color: 'var(--t1)' }}>{session.probation_signoff_by}</strong>
+                    {' · '}{new Date(session.probation_signoff_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
+                </div>
+                {/* Show saved record */}
+                <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--glass-border)', fontSize: 13, lineHeight: 2 }}>
+                  <div><strong style={{ color: 'var(--t2)' }}>Team member:</strong> {session.trainee_name}</div>
+                  <div><strong style={{ color: 'var(--t2)' }}>Probation period:</strong> {probation.probation_start || '—'} to {probation.probation_end || '—'}</div>
+                  <div><strong style={{ color: 'var(--t2)' }}>Rolling 30-day QC average:</strong> {probation.probation_qc_avg || '—'}</div>
+                  <div><strong style={{ color: 'var(--t2)' }}>Trajectory:</strong> {probation.probation_trajectory || '—'}</div>
+                  <div><strong style={{ color: 'var(--t2)' }}>Code adherence:</strong> {probation.probation_code_adherence || '—'}</div>
+                  <div><strong style={{ color: 'var(--t2)' }}>Standing notes for future:</strong> {probation.probation_standing_notes || '—'}</div>
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={async () => {
+                  if (!confirm('Undo this probation sign-off?')) return;
+                  await api.delete(`/training/sessions/${id}/probation-signoff`);
+                  setSession(s => ({ ...s, probation_decision: null, probation_signoff_by: null, probation_signoff_at: null }));
+                }}>
+                  Undo Sign-Off
+                </button>
+              </div>
+            ) : (
+              /* Editable form */
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Probation start date</label>
+                    <input className="form-input" type="date" value={probation.probation_start}
+                      onChange={e => setProbation(p => ({ ...p, probation_start: e.target.value }))} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Probation end date</label>
+                    <input className="form-input" type="date" value={probation.probation_end}
+                      onChange={e => setProbation(p => ({ ...p, probation_end: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rolling 30-day QC average</label>
+                  <input className="form-input" placeholder="e.g. 91%" value={probation.probation_qc_avg}
+                    onChange={e => setProbation(p => ({ ...p, probation_qc_avg: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Trajectory</label>
+                  <input className="form-input" placeholder="Brief summary of curve across 30 days…" value={probation.probation_trajectory}
+                    onChange={e => setProbation(p => ({ ...p, probation_trajectory: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Code adherence</label>
+                  <input className="form-input" placeholder="No violations / specific violations logged…" value={probation.probation_code_adherence}
+                    onChange={e => setProbation(p => ({ ...p, probation_code_adherence: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Standing notes for future</label>
+                  <textarea className="form-input" rows={3} placeholder="Anything to remember about this team member…" value={probation.probation_standing_notes}
+                    onChange={e => setProbation(p => ({ ...p, probation_standing_notes: e.target.value }))} />
+                </div>
+                <button className="btn btn-secondary btn-sm" disabled={savingProbation} style={{ marginBottom: 20 }}
+                  onClick={async () => {
+                    setSavingProbation(true);
+                    await api.put(`/training/sessions/${id}/probation`, probation);
+                    setSavingProbation(false);
+                  }}>
+                  {savingProbation ? 'Saving…' : 'Save Notes'}
+                </button>
+
+                {/* Decision buttons */}
+                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Decision</div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary" disabled={probationSigningOff} onClick={async () => {
+                      if (!confirm(`Approve ${session.trainee_name} for Standard?`)) return;
+                      setProbationSigningOff(true);
+                      await api.put(`/training/sessions/${id}/probation`, probation);
+                      await api.post(`/training/sessions/${id}/probation-signoff`, { decision: 'approved' });
+                      await loadSession();
+                      setProbationSigningOff(false);
+                    }}>✓ Approved for Standard</button>
+                    <button className="btn btn-secondary" disabled={probationSigningOff} onClick={async () => {
+                      if (!confirm(`Extend probation 2 weeks for ${session.trainee_name}?`)) return;
+                      setProbationSigningOff(true);
+                      await api.put(`/training/sessions/${id}/probation`, probation);
+                      await api.post(`/training/sessions/${id}/probation-signoff`, { decision: 'extend' });
+                      await loadSession();
+                      setProbationSigningOff(false);
+                    }}>⏱ Extend 2 Weeks</button>
+                    <button className="btn btn-danger" disabled={probationSigningOff} onClick={async () => {
+                      if (!confirm(`Part ways with ${session.trainee_name}? This cannot be undone easily.`)) return;
+                      setProbationSigningOff(true);
+                      await api.put(`/training/sessions/${id}/probation`, probation);
+                      await api.post(`/training/sessions/${id}/probation-signoff`, { decision: 'part_ways' });
+                      await loadSession();
+                      setProbationSigningOff(false);
+                    }}>✗ Part Ways</button>
+                  </div>
                 </div>
               </div>
             )}
