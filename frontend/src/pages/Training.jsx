@@ -24,6 +24,9 @@ export default function Training() {
     api.get('/managers'),
   ]).then(([s, c, st, m]) => {
     setSessions(s.data); setChecklists(c.data); setStaff(st.data); setManagers(m.data);
+    // Pre-select the induction checklist
+    const induction = c.data.find(cl => /induction|onboarding/i.test(cl.name)) || c.data[0];
+    if (induction) setSessionForm(f => ({ ...f, checklist_id: String(induction.id) }));
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
@@ -42,7 +45,7 @@ export default function Training() {
   return (
     <div className="page">
       <div className="section-header">
-        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Training</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Onboarding</h1>
         <button className="btn btn-primary" onClick={() => setShowNewSession(true)}>+ New Session</button>
       </div>
 
@@ -96,19 +99,12 @@ export default function Training() {
       {showNewSession && (
         <div className="modal-overlay" onClick={() => setShowNewSession(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">New Training Session</div>
+            <div className="modal-title">New Onboarding Session</div>
             <div className="form-group">
               <label className="form-label">Trainee</label>
               <select className="form-select" value={sessionForm.trainee_id} onChange={e => setSessionForm(f => ({ ...f, trainee_id: e.target.value }))}>
                 <option value="">Select staff member…</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Checklist</label>
-              <select className="form-select" value={sessionForm.checklist_id} onChange={e => setSessionForm(f => ({ ...f, checklist_id: e.target.value }))}>
-                <option value="">Select checklist…</option>
-                {checklists.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div className="form-group">
