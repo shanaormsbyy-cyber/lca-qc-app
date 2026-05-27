@@ -1086,8 +1086,6 @@ export default function QCCheckForm() {
           </div>
         </>
       )}
-    </div>
-
       {/* ── Photo fullscreen viewer ─────────────────────────────────────────── */}
       {viewingPhoto && (
         <div
@@ -1107,5 +1105,6 @@ export default function QCCheckForm() {
           </div>
         </div>
       )}
+    </div>
   );
 }
