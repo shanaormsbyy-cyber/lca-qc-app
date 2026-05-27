@@ -740,14 +740,19 @@ router.get('/first-pass-rate', (req, res) => {
   res.json({ rate: overallRate, total: all.total, passed: all.passed, threshold, trend: months });
 });
 
-// Average re-clean time — only checks where reclean_required=1 and reclean_minutes is set
+// Re-clean time — total minutes spent on re-cleans in last 30 days
 router.get('/reclean-time', (req, res) => {
-  const all = db.prepare(`
-    SELECT COUNT(*) as total_recleans, AVG(reclean_minutes) as avg_minutes
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
+
+  const last30 = db.prepare(`
+    SELECT COUNT(*) as total_recleans, SUM(reclean_minutes) as total_minutes, AVG(reclean_minutes) as avg_minutes
     FROM qc_checks
     WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
       AND (check_type='staff' OR check_type IS NULL)
-  `).get();
+      AND date >= ?
+  `).get(cutoff);
 
   const months = [];
   const now = new Date();
@@ -755,14 +760,14 @@ router.get('/reclean-time', (req, res) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const row = db.prepare(`
-      SELECT COUNT(*) as total_recleans, AVG(reclean_minutes) as avg_minutes
+      SELECT COUNT(*) as total_recleans, SUM(reclean_minutes) as total_minutes
       FROM qc_checks
       WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
         AND (check_type='staff' OR check_type IS NULL)
         AND strftime('%Y-%m', date) = ?
     `).get(monthStr);
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    months.push({ month: monthStr, label: monthNames[d.getMonth()], total_recleans: row.total_recleans, avg_minutes: row.avg_minutes ? Math.round(row.avg_minutes) : null });
+    months.push({ month: monthStr, label: monthNames[d.getMonth()], total_recleans: row.total_recleans, total_minutes: row.total_minutes || 0 });
   }
 
   const byStaff = db.prepare(`
@@ -779,8 +784,9 @@ router.get('/reclean-time', (req, res) => {
   `).all();
 
   res.json({
-    avg_minutes: all.avg_minutes ? Math.round(all.avg_minutes) : null,
-    total_recleans: all.total_recleans,
+    total_minutes_30d: last30.total_minutes || 0,
+    total_recleans_30d: last30.total_recleans || 0,
+    avg_minutes_30d: last30.avg_minutes ? Math.round(last30.avg_minutes) : null,
     trend: months,
     by_staff: byStaff.map(r => ({
       ...r,

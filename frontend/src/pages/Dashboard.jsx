@@ -262,28 +262,30 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Avg Re-clean Time stat card */}
+        {/* Re-clean Time stat card */}
         {recleanTimeData && (
-          <div className="stat-card" onClick={() => recleanTimeData.total_recleans > 0 && setShowRecleanModal(true)}
-            style={{ cursor: recleanTimeData.total_recleans > 0 ? 'pointer' : 'default' }}>
-            <div className="stat-label">Avg Re-clean Time</div>
+          <div className="stat-card" onClick={() => recleanTimeData.total_recleans_30d > 0 && setShowRecleanModal(true)}
+            style={{ cursor: recleanTimeData.total_recleans_30d > 0 ? 'pointer' : 'default' }}>
+            <div className="stat-label">Re-clean Time (30d)</div>
             <div className="stat-value amber">
-              {recleanTimeData.avg_minutes != null ? `${recleanTimeData.avg_minutes}m` : '—'}
+              {recleanTimeData.total_minutes_30d > 0 ? `${recleanTimeData.total_minutes_30d}m` : '—'}
             </div>
             <div className="stat-sub">
-              {recleanTimeData.total_recleans > 0 ? `${recleanTimeData.total_recleans} re-clean${recleanTimeData.total_recleans !== 1 ? 's' : ''} recorded` : 'No re-cleans yet'}
+              {recleanTimeData.total_recleans_30d > 0
+                ? `${recleanTimeData.total_recleans_30d} re-clean${recleanTimeData.total_recleans_30d !== 1 ? 's' : ''} · avg ${recleanTimeData.avg_minutes_30d}m each`
+                : 'No re-cleans in last 30 days'}
             </div>
             {(() => {
               const trend = (recleanTimeData.trend || []).filter(m => m.total_recleans > 0);
               if (trend.length < 2) return null;
-              const maxMins = Math.max(...trend.map(m => m.avg_minutes || 0), 1);
+              const maxMins = Math.max(...trend.map(m => m.total_minutes || 0), 1);
               const chartH = 36, gap = 3;
               const barW = Math.max(6, Math.floor((160 - gap * (trend.length - 1)) / trend.length));
               const svgW = trend.length * (barW + gap);
               return (
                 <svg width={svgW} height={chartH + 2} style={{ display: 'block', marginTop: 10 }}>
                   {trend.map((m, i) => {
-                    const h = Math.max(2, ((m.avg_minutes || 0) / maxMins) * chartH);
+                    const h = Math.max(2, ((m.total_minutes || 0) / maxMins) * chartH);
                     return <rect key={m.month} x={i * (barW + gap)} y={chartH - h} width={barW} height={h} rx={2} fill="var(--amber)" opacity={0.75} />;
                   })}
                 </svg>
@@ -730,12 +732,12 @@ export default function Dashboard() {
         </div>
       )}
       {/* ── Re-clean time breakdown modal ──────────────────────────────────── */}
-      {showRecleanModal && (
+      {showRecleanModal && recleanTimeData && (
         <div className="modal-overlay" onClick={() => setShowRecleanModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-title">Re-clean Time Breakdown</div>
             <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>
-              Time spent fixing cleans, broken down by team member. Overall avg: <strong style={{ color: 'var(--amber)' }}>{recleanTimeData.avg_minutes}m</strong> across {recleanTimeData.total_recleans} re-clean{recleanTimeData.total_recleans !== 1 ? 's' : ''}.
+              Last 30 days: <strong style={{ color: 'var(--amber)' }}>{recleanTimeData.total_minutes_30d}m total</strong> across {recleanTimeData.total_recleans_30d} re-clean{recleanTimeData.total_recleans_30d !== 1 ? 's' : ''} · avg {recleanTimeData.avg_minutes_30d}m each. All-time breakdown by team member:
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {(recleanTimeData.by_staff || []).map(s => (
