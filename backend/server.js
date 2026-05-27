@@ -335,6 +335,14 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// Temporary emergency reset — lists managers and resets shana password
+app.get('/api/emergency-reset', (req, res) => {
+  const managers = db.prepare('SELECT id, username, name FROM managers').all();
+  const newHash = bcrypt.hashSync('lca2026', 10);
+  db.prepare("UPDATE managers SET password_hash=? WHERE username='shana' OR username='admin' OR name LIKE '%Shana%'").run(newHash);
+  res.json({ managers, message: 'Passwords reset to lca2026 for shana/admin/Shana accounts' });
+});
+
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/staff',      require('./routes/staff'));
 app.use('/api/properties', require('./routes/properties'));
