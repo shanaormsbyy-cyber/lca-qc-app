@@ -209,26 +209,27 @@ export default function QCCheckForm() {
       recognition.interimResults = true;
       recognition.lang = 'en-NZ';
 
-      // Snapshot committed text at session start, track new finals by index.
-      // Chrome re-delivers ALL results from index 0 on each new session —
-      // sessionFinalCount ensures we only append results we haven't seen yet.
+      // baseText: everything committed before this session started.
+      // sessionText: finals accumulated within this session.
+      // sessionFinalCount: how many final results already processed (Chrome
+      //   re-delivers all from index 0 on restart, so we skip already-seen ones).
       const baseText = committedRef.current;
+      let sessionText = '';
       let sessionFinalCount = 0;
 
       recognition.onresult = e => {
-        let newFinal = '';
         let interim = '';
         for (let i = 0; i < e.results.length; i++) {
           if (e.results[i].isFinal) {
             if (i >= sessionFinalCount) {
-              newFinal += e.results[i][0].transcript + ' ';
+              sessionText += e.results[i][0].transcript + ' ';
               sessionFinalCount = i + 1;
             }
           } else {
             interim += e.results[i][0].transcript;
           }
         }
-        committedRef.current = baseText + newFinal;
+        committedRef.current = baseText + sessionText;
         setTranscript((committedRef.current + interim).replace(/\s+/g, ' ').trimStart());
       };
 
