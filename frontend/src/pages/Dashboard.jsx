@@ -729,8 +729,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </div>
-
       {/* ── Re-clean time breakdown modal ──────────────────────────────────── */}
       {showRecleanModal && (
         <div className="modal-overlay" onClick={() => setShowRecleanModal(false)}>
@@ -780,5 +778,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+    </div>
   );
 }
