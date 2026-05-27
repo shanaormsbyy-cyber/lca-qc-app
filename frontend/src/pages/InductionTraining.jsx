@@ -23,6 +23,10 @@ export default function InductionTraining() {
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [activeShiftLabel, setActiveShiftLabel] = useState(null);
+  const [editTab, setEditTab] = useState('shifts'); // 'shifts' | 'rubric'
+
+  // Rubric dimensions (editable)
+  const [rubricDims, setRubricDims] = useState([]);
 
   const [staff, setStaff] = useState([]);
   const [showStart, setShowStart] = useState(false);
@@ -31,13 +35,15 @@ export default function InductionTraining() {
 
   const load = async () => {
     try {
-      const [clRes, staffRes] = await Promise.all([
+      const [clRes, staffRes, rubricRes] = await Promise.all([
         api.get('/training/checklists'),
         api.get('/staff'),
+        api.get('/training/rubric/dimensions'),
       ]);
       const induction = clRes.data.find(c => c.name.toLowerCase().includes('induction')) || null;
       setChecklist(induction);
       setStaff(staffRes.data);
+      setRubricDims(rubricRes.data);
     } finally {
       setLoading(false);
     }
@@ -49,9 +55,9 @@ export default function InductionTraining() {
     const base = checklist
       ? JSON.parse(JSON.stringify(checklist))
       : { name: 'New Hire Induction', description: '', sections: [] };
-    // Ensure every section has shift_label
     base.sections = base.sections.map(s => ({ ...s, shift_label: s.shift_label || 'Shift 1' }));
     setDraft(base);
+    setEditTab('shifts');
     setEditing(true);
   };
 
@@ -66,12 +72,33 @@ export default function InductionTraining() {
       } else {
         await api.post('/training/checklists', draft);
       }
+      await api.put('/training/rubric/dimensions', { dimensions: rubricDims });
       await load();
       setEditing(false);
       setDraft(null);
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Rubric dimension helpers ──────────────────────────────────────────────
+  const updateDim = (i, field, val) => {
+    setRubricDims(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
+  };
+  const addDim = () => {
+    setRubricDims(prev => [...prev, { name: '', pass_desc: '', fail_desc: '', order_idx: prev.length }]);
+  };
+  const removeDim = (i) => {
+    setRubricDims(prev => prev.filter((_, idx) => idx !== i));
+  };
+  const moveDim = (i, dir) => {
+    setRubricDims(prev => {
+      const next = [...prev];
+      const t = i + dir;
+      if (t < 0 || t >= next.length) return prev;
+      [next[i], next[t]] = [next[t], next[i]];
+      return next;
+    });
   };
 
   const startSession = async () => {
@@ -318,8 +345,21 @@ export default function InductionTraining() {
                 </div>
               </div>
 
-              {/* Shift tabs */}
-              {draftShiftOrder.length > 0 && (
+              {/* Top-level edit tabs: Shifts vs Rubric */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+                {[['shifts', 'Onboarding Shifts'], ['rubric', 'Shadow Period Rubric']].map(([t, label]) => (
+                  <button key={t} onClick={() => setEditTab(t)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '8px 16px', fontWeight: 700, fontSize: 14,
+                    color: editTab === t ? 'var(--cyan)' : 'var(--t3)',
+                    borderBottom: editTab === t ? '2px solid var(--cyan)' : '2px solid transparent',
+                    marginBottom: -1,
+                  }}>{label}</button>
+                ))}
+              </div>
+
+              {/* Shift tabs (only shown when on shifts tab) */}
+              {editTab === 'shifts' && draftShiftOrder.length > 0 && (
                 <div className="tab-row" style={{ marginBottom: 0 }}>
                   {draftShiftOrder.map((label) => (
                     <button key={label} className={`tab-btn${currentShiftLabel === label ? ' active' : ''}`}
@@ -330,11 +370,54 @@ export default function InductionTraining() {
                 </div>
               )}
 
-              {draftShiftOrder.length === 0 ? (
+              {/* ── Rubric editor ─────────────────────────────────────────── */}
+              {editTab === 'rubric' && (
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <p style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+                    These dimensions are scored PASS / MIXED / FAIL across each of the 5 shadow period cleans.
+                    Scores appear in the Shadow Period Rubric tab inside each training session.
+                  </p>
+                  {rubricDims.map((dim, i) => (
+                    <div key={i} style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, marginBottom: 12, border: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+                          <button className="btn btn-sm btn-ghost" style={{ padding: '1px 7px', fontSize: 11 }}
+                            onClick={() => moveDim(i, -1)} disabled={i === 0}>↑</button>
+                          <button className="btn btn-sm btn-ghost" style={{ padding: '1px 7px', fontSize: 11 }}
+                            onClick={() => moveDim(i, 1)} disabled={i === rubricDims.length - 1}>↓</button>
+                        </div>
+                        <input className="form-input" style={{ flex: 1, fontWeight: 600 }}
+                          placeholder="Dimension name (e.g. Technical competence)"
+                          value={dim.name}
+                          onChange={e => updateDim(i, 'name', e.target.value)} />
+                        <button className="btn btn-sm btn-danger" onClick={() => removeDim(i)}>✕</button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label className="form-label" style={{ color: 'var(--ok)' }}>✓ Pass description</label>
+                          <input className="form-input" placeholder="e.g. Hits QC standard consistently"
+                            value={dim.pass_desc || ''}
+                            onChange={e => updateDim(i, 'pass_desc', e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="form-label" style={{ color: 'var(--red)' }}>✗ Fail description</label>
+                          <input className="form-input" placeholder="e.g. Misses things consistently"
+                            value={dim.fail_desc || ''}
+                            onChange={e => updateDim(i, 'fail_desc', e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn btn-ghost btn-sm" onClick={addDim}>+ Add Dimension</button>
+                </div>
+              )}
+
+              {/* ── Shifts editor ─────────────────────────────────────────── */}
+              {editTab === 'shifts' && draftShiftOrder.length === 0 ? (
                 <div className="card" style={{ textAlign: 'center', padding: 32, marginBottom: 16 }}>
                   <p style={{ color: 'var(--t3)', marginBottom: 12 }}>No shifts yet.</p>
                 </div>
-              ) : currentShiftLabel && (
+              ) : editTab === 'shifts' && currentShiftLabel && (
                 <div className="card" style={{ marginTop: 0, marginBottom: 16, borderTopLeftRadius: draftShiftOrder[0] === currentShiftLabel ? 0 : undefined }}>
                   {/* Shift name editor + remove */}
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -412,7 +495,9 @@ export default function InductionTraining() {
                 </div>
               )}
 
-              <button className="btn btn-ghost" onClick={addShift}>+ Add Shift</button>
+              {editTab === 'shifts' && (
+                <button className="btn btn-ghost" onClick={addShift}>+ Add Shift</button>
+              )}
             </>
           );
         })()

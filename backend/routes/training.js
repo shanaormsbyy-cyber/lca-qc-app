@@ -236,4 +236,54 @@ router.patch('/sessions/:id/progress', (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Shadow Period Rubric ─────────────────────────────────────────────────────
+
+// GET all dimensions (ordered)
+router.get('/rubric/dimensions', (req, res) => {
+  res.json(db.prepare('SELECT * FROM shadow_rubric_dimensions ORDER BY order_idx').all());
+});
+
+// PUT replace all dimensions (editor save)
+router.put('/rubric/dimensions', (req, res) => {
+  const { dimensions } = req.body;
+  if (!Array.isArray(dimensions)) return res.status(400).json({ error: 'dimensions array required' });
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM shadow_rubric_dimensions').run();
+    const ins = db.prepare('INSERT INTO shadow_rubric_dimensions (name, pass_desc, fail_desc, order_idx) VALUES (?, ?, ?, ?)');
+    dimensions.forEach((d, i) => ins.run(d.name || '', d.pass_desc || '', d.fail_desc || '', i));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    return res.status(500).json({ error: e.message });
+  }
+  res.json({ ok: true });
+});
+
+// GET rubric scores for a session (all dimensions × cleans)
+router.get('/sessions/:id/rubric', (req, res) => {
+  const dims = db.prepare('SELECT * FROM shadow_rubric_dimensions ORDER BY order_idx').all();
+  const scores = db.prepare('SELECT * FROM shadow_rubric_scores WHERE session_id=?').all(req.params.id);
+  // Index scores by dimension_id + clean_number for easy lookup
+  const scoreMap = {};
+  scores.forEach(s => { scoreMap[`${s.dimension_id}_${s.clean_number}`] = s; });
+  res.json({ dimensions: dims, scoreMap });
+});
+
+// PUT upsert a single rubric score cell
+router.put('/sessions/:id/rubric/:dimensionId/:cleanNumber', (req, res) => {
+  const { score, notes } = req.body;
+  const { id, dimensionId, cleanNumber } = req.params;
+  if (score && !['pass', 'mixed', 'fail'].includes(score)) {
+    return res.status(400).json({ error: 'score must be pass, mixed, or fail' });
+  }
+  db.prepare(`
+    INSERT INTO shadow_rubric_scores (session_id, dimension_id, clean_number, score, notes)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(session_id, dimension_id, clean_number)
+    DO UPDATE SET score=excluded.score, notes=excluded.notes
+  `).run(id, dimensionId, cleanNumber, score || null, notes || '');
+  res.json({ ok: true });
+});
+
 module.exports = router;

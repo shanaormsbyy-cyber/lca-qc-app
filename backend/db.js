@@ -207,6 +207,50 @@ migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
 });
 
+// Shadow period rubric tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS shadow_rubric_dimensions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    pass_desc TEXT NOT NULL DEFAULT '',
+    fail_desc TEXT NOT NULL DEFAULT '',
+    order_idx INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS shadow_rubric_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES training_sessions(id) ON DELETE CASCADE,
+    dimension_id INTEGER NOT NULL REFERENCES shadow_rubric_dimensions(id) ON DELETE CASCADE,
+    clean_number INTEGER NOT NULL CHECK(clean_number BETWEEN 1 AND 5),
+    score TEXT CHECK(score IN ('pass', 'mixed', 'fail')),
+    notes TEXT DEFAULT '',
+    UNIQUE(session_id, dimension_id, clean_number)
+  )
+`);
+
+// Seed the 12 default dimensions if none exist
+{
+  const count = db.prepare('SELECT COUNT(*) as c FROM shadow_rubric_dimensions').get().c;
+  if (count === 0) {
+    const ins = db.prepare('INSERT INTO shadow_rubric_dimensions (name, pass_desc, fail_desc, order_idx) VALUES (?, ?, ?, ?)');
+    const dims = [
+      ['Technical competence',  'Hits QC standard at every category',          'Misses things consistently',              0],
+      ['Improvement curve',     'Visible improvement clean-to-clean',           'Same mistakes repeating',                 1],
+      ['Feedback integration',  'Applies feedback in next clean',               "Doesn't adjust, defensive",               2],
+      ['Independence',          'Asks less, decides more as they progress',     'Still asking same questions at Clean 4',  3],
+      ['Speed',                 'Steadily faster, quality holds',               'Slow throughout, or fast and sloppy',     4],
+      ['Breezeway use',         'Checklist fully completed every clean',        'Skips items, half-completed',             5],
+      ['Photo discipline',      'Full quality photos, every category',          'Sloppy, missing, blurry',                 6],
+      ['Reporting',             'Found items, breakages, low supplies — all flagged', 'Misses, hides, forgets',            7],
+      ['Property + furnishings','Careful, respectful',                          'Careless, rough',                         8],
+      ['Stamina',               'Holds energy across all 5 cleans',            'Fades, gets sloppy late',                 9],
+      ['Code adherence',        'Honest, reliable, no shortcuts',              'Cuts corners, hides mistakes',            10],
+      ['Pleasant alongside',    'Easy to work with, professional',             'Cold, conflict-prone, distracting',       11],
+    ];
+    dims.forEach(d => ins.run(...d));
+  }
+}
+
 // Default settings
 const insertSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
 insertSetting.run('qc_freq_staff_days', '30');
