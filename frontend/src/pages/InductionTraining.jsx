@@ -40,7 +40,10 @@ export default function InductionTraining() {
         api.get('/staff'),
         api.get('/training/rubric/dimensions'),
       ]);
-      const induction = clRes.data.find(c => c.name.toLowerCase().includes('induction')) || null;
+      // Use a checklist that mentions induction/onboarding, or just the first one
+      const induction = clRes.data.find(c => /induction|onboarding/i.test(c.name))
+        || clRes.data[0]
+        || null;
       setChecklist(induction);
       setStaff(staffRes.data);
       setRubricDims(rubricRes.data);
@@ -105,7 +108,10 @@ export default function InductionTraining() {
     if (!selectedStaff) return;
     setStarting(true);
     try {
-      const r = await api.post('/training/sessions/induction/ensure', { trainee_id: selectedStaff });
+      const r = await api.post('/training/sessions/induction/ensure', {
+        trainee_id: selectedStaff,
+        checklist_id: checklist?.id,
+      });
       navigate(`/training/sessions/${r.data.id}`);
     } finally {
       setStarting(false);

@@ -197,12 +197,14 @@ router.delete('/sessions/:id', (req, res) => {
 
 // Find or create an induction session for a staff member
 router.post('/sessions/induction/ensure', (req, res) => {
-  const { trainee_id } = req.body;
+  const { trainee_id, checklist_id } = req.body;
   if (!trainee_id) return res.status(400).json({ error: 'trainee_id required' });
 
-  // Find the "New Hire Induction" checklist
-  const checklist = db.prepare("SELECT id FROM training_checklists WHERE name LIKE '%Induction%' ORDER BY id LIMIT 1").get();
-  if (!checklist) return res.status(404).json({ error: 'New Hire Induction checklist not found' });
+  // Use provided checklist_id, or fall back to finding by name
+  const checklist = checklist_id
+    ? db.prepare('SELECT id FROM training_checklists WHERE id = ?').get(checklist_id)
+    : db.prepare("SELECT id FROM training_checklists WHERE name LIKE '%nduction%' ORDER BY id LIMIT 1").get();
+  if (!checklist) return res.status(404).json({ error: 'Onboarding checklist not found' });
 
   // Check for existing induction session for this trainee
   const existing = db.prepare(`
