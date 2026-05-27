@@ -210,9 +210,11 @@ export default function QCCheckForm() {
     let committedText = '';
     let sessionFinalCount = 0;
     let stoppedByUser = false;
+    let sessionCount = 0;    // how many recognition instances have been started
+    let fatalError = false;  // true only when mic is genuinely denied on first start
 
     const createRecognition = () => {
-      sessionFinalCount = 0; // reset per-session counter on each new instance
+      sessionFinalCount = 0;
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -222,7 +224,6 @@ export default function QCCheckForm() {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) {
-            // Only append results we haven't seen yet this session
             if (i >= sessionFinalCount) {
               committedText += e.results[i][0].transcript + ' ';
               sessionFinalCount = i + 1;
@@ -236,22 +237,30 @@ export default function QCCheckForm() {
 
       recognition.onerror = e => {
         if (e.error === 'not-allowed') {
-          setVoiceError('Microphone access denied. Please allow microphone access and try again.');
-          stoppedByUser = true;
-          setVoiceState('idle');
+          // iOS fires not-allowed on auto-restarts even when permission is granted —
+          // only treat it as a genuine denial on the very first session start.
+          if (sessionCount <= 1) {
+            fatalError = true;
+            stoppedByUser = true;
+            setVoiceError('Microphone access denied. Please allow microphone access and try again.');
+            setVoiceState('idle');
+          }
+          // On subsequent sessions, ignore — onend will handle the restart
         }
-        // 'no-speech' and 'network' errors are transient — onend will restart us
+        // 'no-speech', 'network', 'aborted' are transient — onend restarts us
       };
 
       recognition.onend = () => {
+        if (fatalError) return; // onerror already set state, don't touch it
         if (stoppedByUser) {
           setTranscript(committedText.trim());
           setVoiceState('done');
         } else {
-          // Browser timed out — restart automatically to keep recording
+          // Browser timed out or aborted — restart to keep recording
           try {
             const next = createRecognition();
             speechRef.current = next;
+            sessionCount++;
             next.start();
           } catch {
             setTranscript(committedText.trim());
@@ -260,7 +269,6 @@ export default function QCCheckForm() {
         }
       };
 
-      // Expose stop on every instance so the button always has the right reference
       recognition._stopByUser = () => { stoppedByUser = true; speechRef.current?.stop(); };
 
       return recognition;
@@ -268,6 +276,7 @@ export default function QCCheckForm() {
 
     const recognition = createRecognition();
     speechRef.current = recognition;
+    sessionCount = 1;
     recognition.start();
     setVoiceState('recording');
     setVoiceError('');
