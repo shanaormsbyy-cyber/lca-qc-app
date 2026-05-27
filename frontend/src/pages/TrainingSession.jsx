@@ -146,6 +146,7 @@ export default function TrainingSession() {
     if (!sections[item.section_id]) sections[item.section_id] = {
       name: item.section_name,
       shift_label: item.section_shift_label || '',
+      description: item.section_description || '',
       items: [],
     };
     sections[item.section_id].items.push(item);
@@ -211,6 +212,15 @@ export default function TrainingSession() {
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{sec.name}</span>
                 <span style={{ fontSize: 12, color: 'var(--t3)' }}>{sec.items.filter(i => !!i.completed).length}/{sec.items.length}</span>
               </div>
+              {sec.description && (
+                <div style={{
+                  margin: '0 0 0 0', padding: '10px 16px',
+                  background: 'rgba(58,181,217,0.08)', borderBottom: '1px solid rgba(58,181,217,0.2)',
+                  fontSize: 13, color: 'var(--cyan)', lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                }}>
+                  {sec.description}
+                </div>
+              )}
               <div className="section-block-body">
                 {sec.items.map(item => {
                   const done = !!item.completed;
@@ -288,6 +298,15 @@ export default function TrainingSession() {
                 <span style={{ fontWeight: 700, fontSize: 14 }}>{sec.name}</span>
                 <span style={{ fontSize: 12, color: 'var(--t3)' }}>{sec.items.filter(i => !!i.completed).length}/{sec.items.length}</span>
               </div>
+              {sec.description && (
+                <div style={{
+                  padding: '10px 16px',
+                  background: 'rgba(58,181,217,0.08)', borderBottom: '1px solid rgba(58,181,217,0.2)',
+                  fontSize: 13, color: 'var(--cyan)', lineHeight: 1.5, whiteSpace: 'pre-wrap',
+                }}>
+                  {sec.description}
+                </div>
+              )}
               <div className="section-block-body">
                 {sec.items.map(item => {
                   const done = !!item.completed;
