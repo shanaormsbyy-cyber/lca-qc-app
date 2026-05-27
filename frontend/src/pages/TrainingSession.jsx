@@ -52,6 +52,11 @@ export default function TrainingSession() {
   const [savingNote, setSavingNote]         = useState(false);
   const [signingOff, setSigningOff]         = useState(false);
 
+  // Resources
+  const [resources, setResources]       = useState([]);
+  const [uploading, setUploading]       = useState(false);
+  const [viewingResource, setViewingResource] = useState(null);
+
   // Solo probation
   const [probation, setProbation] = useState({
     probation_start: '', probation_end: '', probation_qc_avg: '',
@@ -82,8 +87,10 @@ export default function TrainingSession() {
 
   const loadBriefs = (staffId) => api.get(`/training/briefs/${staffId}`).then(r => setBriefs(r.data));
 
+  const loadResources = () => api.get('/training/resources').then(r => setResources(r.data));
+
   useEffect(() => {
-    Promise.all([loadSession(), loadRubric()])
+    Promise.all([loadSession(), loadRubric(), loadResources()])
       .then(([sessionData]) => {
         if (sessionData?.trainee_id) loadBriefs(sessionData.trainee_id);
       })
@@ -202,7 +209,7 @@ export default function TrainingSession() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-        {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['probation', 'Solo Probation'], ['brief', 'Brief']].map(([t, label]) => (
+        {[['checklist', 'Onboarding Checklist'], ['office', 'Office Use Only'], ['shadow', 'Shadow Period Rubric'], ['probation', 'Solo Probation'], ['resources', 'Resources'], ['brief', 'Brief']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '10px 18px', fontWeight: 700, fontSize: 14,
@@ -780,6 +787,143 @@ export default function TrainingSession() {
             )}
           </div>
         </>
+      )}
+
+      {/* ── RESOURCES TAB ─────────────────────────────────────────────────────── */}
+      {tab === 'resources' && (
+        <>
+          {/* Upload area */}
+          <div className="card mb-5" style={{ padding: '20px' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Upload Resource</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 14 }}>PDFs and images (max 20MB). Shared across all onboarding sessions.</div>
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '20px', borderRadius: 10, cursor: 'pointer',
+              border: '2px dashed rgba(58,181,217,0.4)', background: 'rgba(58,181,217,0.05)',
+              color: uploading ? 'var(--t3)' : 'var(--cyan)', fontWeight: 700, fontSize: 14,
+              transition: 'all .15s',
+            }}>
+              {uploading ? <><span className="spinner" /> Uploading…</> : '+ Tap to upload PDF or image'}
+              <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                disabled={uploading}
+                onChange={async e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  setUploading(true);
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  await api.post('/training/resources', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+                  await loadResources();
+                  setUploading(false);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+          {/* Resource list */}
+          {resources.length === 0 ? (
+            <div style={{ color: 'var(--t3)', textAlign: 'center', padding: '32px 0' }}>
+              No resources uploaded yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {resources.map(r => {
+                const isImage = r.mimetype.startsWith('image/');
+                const url = `/uploads/${r.filename}`;
+                return (
+                  <div key={r.id} className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                    {/* Thumbnail / icon */}
+                    <div
+                      onClick={() => setViewingResource(r)}
+                      style={{ flexShrink: 0, width: 52, height: 52, borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+                        background: 'var(--glass)', border: '1px solid var(--glass-border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      {isImage
+                        ? <img src={url} alt={r.original_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <span style={{ fontSize: 26 }}>📄</span>
+                      }
+                    </div>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.original_name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+                        Uploaded by {r.uploaded_by} · {new Date(r.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button className="btn btn-sm btn-secondary" onClick={() => setViewingResource(r)}>Open</button>
+                      <button className="btn btn-sm btn-danger" onClick={async () => {
+                        if (!confirm(`Delete "${r.original_name}"?`)) return;
+                        await api.delete(`/training/resources/${r.id}`);
+                        setResources(prev => prev.filter(x => x.id !== r.id));
+                      }}>Delete</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Resource viewer modal (fullscreen) ────────────────────────────────── */}
+      {viewingResource && (
+        <div
+          onClick={() => setViewingResource(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.92)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+          }}
+        >
+          {/* Header */}
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', padding: '12px 20px', display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between', background: 'rgba(0,0,0,0.6)', flexShrink: 0,
+            }}
+          >
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 'calc(100% - 100px)' }}>
+              {viewingResource.original_name}
+            </span>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <a
+                href={`/uploads/${viewingResource.filename}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="btn btn-sm btn-secondary"
+              >
+                ↗ Open
+              </a>
+              <button className="btn btn-sm btn-ghost" onClick={() => setViewingResource(null)}>✕ Close</button>
+            </div>
+          </div>
+          {/* Content */}
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 16 }}
+          >
+            {viewingResource.mimetype.startsWith('image/') ? (
+              <img
+                src={`/uploads/${viewingResource.filename}`}
+                alt={viewingResource.original_name}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }}
+              />
+            ) : (
+              <iframe
+                src={`/uploads/${viewingResource.filename}`}
+                title={viewingResource.original_name}
+                style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)', border: 'none', borderRadius: 8 }}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── BRIEF TAB ─────────────────────────────────────────────────────────── */}

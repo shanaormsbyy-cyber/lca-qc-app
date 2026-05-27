@@ -1,6 +1,30 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const UPLOADS_DIR = process.env.NODE_ENV === 'production'
+  ? '/app/data/uploads'
+  : path.join(__dirname, '..', 'uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const resourceStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `resource_${Date.now()}${ext}`);
+  },
+});
+const uploadResource = multer({
+  storage: resourceStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
 
 const router = express.Router();
 router.use(requireAuth);
@@ -365,6 +389,29 @@ router.post('/briefs/:staffId', (req, res) => {
 // DELETE a brief entry (author or any manager)
 router.delete('/briefs/entry/:id', (req, res) => {
   db.prepare('DELETE FROM staff_briefs WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ─── Onboarding Resources ─────────────────────────────────────────────────────
+
+router.get('/resources', (req, res) => {
+  res.json(db.prepare('SELECT * FROM onboarding_resources ORDER BY created_at DESC').all());
+});
+
+router.post('/resources', uploadResource.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded or invalid type (PDF/image only)' });
+  const result = db.prepare(
+    'INSERT INTO onboarding_resources (filename, original_name, mimetype, uploaded_by) VALUES (?, ?, ?, ?)'
+  ).run(req.file.filename, req.file.originalname, req.file.mimetype, req.manager.name);
+  res.json({ id: result.lastInsertRowid });
+});
+
+router.delete('/resources/:id', (req, res) => {
+  const resource = db.prepare('SELECT * FROM onboarding_resources WHERE id=?').get(req.params.id);
+  if (!resource) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(UPLOADS_DIR, resource.filename);
+  try { fs.unlinkSync(filePath); } catch (_) {}
+  db.prepare('DELETE FROM onboarding_resources WHERE id=?').run(req.params.id);
   res.json({ ok: true });
 });
 

@@ -241,6 +241,18 @@ db.exec(`
   )
 `);
 
+// Onboarding resources (shared across all sessions — not per-session)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS onboarding_resources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mimetype TEXT NOT NULL,
+    uploaded_by TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 // Staff brief log
 db.exec(`
   CREATE TABLE IF NOT EXISTS staff_briefs (

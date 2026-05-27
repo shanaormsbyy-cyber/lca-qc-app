@@ -37,6 +37,7 @@ export default function QCCheckForm() {
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState({});
   const [photoPickerItem, setPhotoPickerItem] = useState(null);
+  const [viewingPhoto, setViewingPhoto] = useState(null);
   const rollInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   // Corrective actions — stored in check.notes
@@ -795,8 +796,8 @@ export default function QCCheckForm() {
                                     <img
                                       src={photo.blobUrl || `/uploads/${photo.filename}`}
                                       alt={photo.original_name}
-                                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', cursor: photo.uploading ? 'default' : 'pointer', opacity: photo.uploading ? 0.5 : 1 }}
-                                      onClick={() => { if (!photo.uploading) window.open(`/uploads/${photo.filename}`, '_blank'); }}
+                                      style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--glass-border)', cursor: photo.uploading ? 'default' : 'pointer', opacity: photo.uploading ? 0.5 : 1 }}
+                                      onClick={() => { if (!photo.uploading) setViewingPhoto(photo.blobUrl || `/uploads/${photo.filename}`); }}
                                     />
                                     {photo.uploading
                                       ? <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}><span className="spinner" /></div>
@@ -1081,10 +1082,30 @@ export default function QCCheckForm() {
                   onChange={e => { const it = items.find(i => i.id === photoPickerItem); Array.from(e.target.files).forEach(f => uploadPhoto(photoPickerItem, it?.category, f)); e.target.value = ''; }} />
               </label>
             </div>
-            <button onClick={() => setPhotoPickerItem(null)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', fontSize: 15, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => setPhotoPickerItem(null)} style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--glass-border)', background: 'transparent', fontSize: 15, fontWeight: 600, color: 'var(--t3)', cursor: 'pointer' }}>Cancel</button>
           </div>
         </>
       )}
     </div>
+
+      {/* ── Photo fullscreen viewer ─────────────────────────────────────────── */}
+      {viewingPhoto && (
+        <div
+          onClick={() => setViewingPhoto(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+        >
+          <div style={{ width: '100%', padding: '12px 16px', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+            <button className="btn btn-sm btn-ghost" onClick={() => setViewingPhoto(null)} style={{ color: '#fff' }}>✕ Close</button>
+          </div>
+          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px 16px' }}>
+            <img
+              src={viewingPhoto}
+              alt=""
+              onClick={e => e.stopPropagation()}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }}
+            />
+          </div>
+        </div>
+      )}
   );
 }
