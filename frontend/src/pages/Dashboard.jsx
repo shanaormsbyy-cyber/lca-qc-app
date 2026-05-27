@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [coachingStaffIds, setCoachingStaffIds] = useState(new Set());
   const [firstPassData, setFirstPassData] = useState(null);
   const [recleanTimeData, setRecleanTimeData] = useState(null);
+  const [showRecleanModal, setShowRecleanModal] = useState(false);
   const [complaints30d, setComplaints30d] = useState(null);
   const [flagDetail, setFlagDetail] = useState(null);
   const [flagTrend, setFlagTrend] = useState(null);
@@ -263,7 +264,8 @@ export default function Dashboard() {
 
         {/* Avg Re-clean Time stat card */}
         {recleanTimeData && (
-          <div className="stat-card">
+          <div className="stat-card" onClick={() => recleanTimeData.total_recleans > 0 && setShowRecleanModal(true)}
+            style={{ cursor: recleanTimeData.total_recleans > 0 ? 'pointer' : 'default' }}>
             <div className="stat-label">Avg Re-clean Time</div>
             <div className="stat-value amber">
               {recleanTimeData.avg_minutes != null ? `${recleanTimeData.avg_minutes}m` : '—'}
@@ -728,5 +730,55 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+
+      {/* ── Re-clean time breakdown modal ──────────────────────────────────── */}
+      {showRecleanModal && (
+        <div className="modal-overlay" onClick={() => setShowRecleanModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-title">Re-clean Time Breakdown</div>
+            <div style={{ fontSize: 13, color: 'var(--t3)', marginBottom: 16 }}>
+              Time spent fixing cleans, broken down by team member. Overall avg: <strong style={{ color: 'var(--amber)' }}>{recleanTimeData.avg_minutes}m</strong> across {recleanTimeData.total_recleans} re-clean{recleanTimeData.total_recleans !== 1 ? 's' : ''}.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(recleanTimeData.by_staff || []).map(s => (
+                <div
+                  key={s.staff_id}
+                  onClick={() => { setShowRecleanModal(false); navigate(`/staff/${s.staff_id}`); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                    borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--glass-border)',
+                    cursor: 'pointer', transition: 'border-color .15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--amber)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--glass-border)'}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{s.staff_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
+                      {s.recleans} re-clean{s.recleans !== 1 ? 's' : ''} · {s.total_minutes}m total
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--amber)', lineHeight: 1 }}>{s.avg_minutes}m</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>avg</div>
+                  </div>
+                  {/* Bar showing proportion of total minutes */}
+                  <div style={{ width: 60 }}>
+                    <div style={{ height: 6, borderRadius: 3, background: 'var(--glass-border)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 3, background: 'var(--amber)',
+                        width: `${Math.round((s.total_minutes / (recleanTimeData.by_staff[0]?.total_minutes || 1)) * 100)}%`,
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button className="btn btn-ghost" onClick={() => setShowRecleanModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
   );
 }

@@ -765,10 +765,28 @@ router.get('/reclean-time', (req, res) => {
     months.push({ month: monthStr, label: monthNames[d.getMonth()], total_recleans: row.total_recleans, avg_minutes: row.avg_minutes ? Math.round(row.avg_minutes) : null });
   }
 
+  const byStaff = db.prepare(`
+    SELECT s.id as staff_id, s.name as staff_name,
+           COUNT(*) as recleans,
+           AVG(qc.reclean_minutes) as avg_minutes,
+           SUM(qc.reclean_minutes) as total_minutes
+    FROM qc_checks qc
+    JOIN staff s ON s.id = qc.staff_id
+    WHERE qc.status='complete' AND qc.reclean_required=1 AND qc.reclean_minutes IS NOT NULL
+      AND (qc.check_type='staff' OR qc.check_type IS NULL)
+    GROUP BY s.id
+    ORDER BY total_minutes DESC
+  `).all();
+
   res.json({
     avg_minutes: all.avg_minutes ? Math.round(all.avg_minutes) : null,
     total_recleans: all.total_recleans,
     trend: months,
+    by_staff: byStaff.map(r => ({
+      ...r,
+      avg_minutes: r.avg_minutes ? Math.round(r.avg_minutes) : null,
+      total_minutes: r.total_minutes || 0,
+    })),
   });
 });
 
