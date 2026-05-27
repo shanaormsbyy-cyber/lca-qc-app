@@ -22,8 +22,11 @@ export default function InductionTraining() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savingRubric, setSavingRubric] = useState(false);
+  const [rubricSaved, setRubricSaved] = useState(false);
   const [activeShiftLabel, setActiveShiftLabel] = useState(null);
   const [editTab, setEditTab] = useState('shifts'); // 'shifts' | 'rubric'
+  const [viewTab, setViewTab] = useState('checklist'); // 'checklist' | 'rubric'
 
   // Rubric dimensions (editable)
   const [rubricDims, setRubricDims] = useState([]);
@@ -65,6 +68,17 @@ export default function InductionTraining() {
   };
 
   const cancelEdit = () => { setEditing(false); setDraft(null); };
+
+  const saveRubricOnly = async () => {
+    setSavingRubric(true);
+    try {
+      await api.put('/training/rubric/dimensions', { dimensions: rubricDims });
+      setRubricSaved(true);
+      setTimeout(() => setRubricSaved(false), 2500);
+    } finally {
+      setSavingRubric(false);
+    }
+  };
 
   const saveTemplate = async () => {
     if (!draft.name.trim()) return alert('Template name required');
@@ -244,15 +258,21 @@ export default function InductionTraining() {
             </div>
           </div>
 
-          {!checklist || shiftOrder.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+          {/* Top-level view tabs */}
+          <div className="tab-row" style={{ marginBottom: 0 }}>
+            <button className={`tab-btn${viewTab === 'checklist' ? ' active' : ''}`} onClick={() => setViewTab('checklist')}>Onboarding Checklist</button>
+            <button className={`tab-btn${viewTab === 'rubric' ? ' active' : ''}`} onClick={() => setViewTab('rubric')}>Shadow Period Rubric</button>
+          </div>
+
+          {viewTab === 'checklist' && (!checklist || shiftOrder.length === 0) ? (
+            <div className="card" style={{ textAlign: 'center', padding: 48, marginTop: 0, borderTopLeftRadius: 0 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
               <p style={{ color: 'var(--t2)', fontSize: 15, marginBottom: 16 }}>No induction template set up yet.</p>
               <button className="btn btn-primary" onClick={startEdit}>Create Template</button>
             </div>
-          ) : (
+          ) : viewTab === 'checklist' ? (
             <>
-              <div className="tab-row" style={{ marginBottom: 0 }}>
+              <div className="tab-row" style={{ marginBottom: 0, marginTop: 0, borderTop: '1px solid var(--glass-border)' }}>
                 {shiftOrder.map((label) => (
                   <button key={label} className={`tab-btn${activeViewLabel === label ? ' active' : ''}`}
                     onClick={() => setActiveShiftLabel(label)}>
@@ -262,10 +282,9 @@ export default function InductionTraining() {
               </div>
 
               {activeViewLabel && (
-                <div className="card" style={{ marginTop: 0, borderTopLeftRadius: shiftOrder[0] === activeViewLabel ? 0 : undefined }}>
+                <div className="card" style={{ marginTop: 0, borderTopLeftRadius: 0 }}>
                   {shiftMap[activeViewLabel].map((sec, si) => (
                     <div key={si} style={{ marginBottom: si < shiftMap[activeViewLabel].length - 1 ? 24 : 0 }}>
-                      {/* Section name as sub-heading */}
                       {sec.name && (
                         <div style={{
                           fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
@@ -274,8 +293,6 @@ export default function InductionTraining() {
                           {sec.name}
                         </div>
                       )}
-
-                      {/* Section intro/notes */}
                       {sec.description && (
                         <div style={{
                           background: 'rgba(58,181,217,0.08)',
@@ -287,8 +304,6 @@ export default function InductionTraining() {
                           {sec.description}
                         </div>
                       )}
-
-                      {/* Items */}
                       {sec.items?.map((item, ii) => (
                         <div key={ii} style={{
                           display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -306,7 +321,6 @@ export default function InductionTraining() {
                       {sec.items?.length === 0 && (
                         <p style={{ color: 'var(--t3)', fontSize: 13 }}>No tasks yet.</p>
                       )}
-
                       {si < shiftMap[activeViewLabel].length - 1 && (
                         <div style={{ height: 1, background: 'var(--glass-border)', margin: '16px 0 0' }} />
                       )}
@@ -315,6 +329,53 @@ export default function InductionTraining() {
                 </div>
               )}
             </>
+          ) : (
+            /* ── Rubric editor (view mode) ── */
+            <div className="card" style={{ marginTop: 0, borderTopLeftRadius: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <p style={{ color: 'var(--t3)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                  Edit the dimensions scored PASS / MIXED / FAIL across the 5 shadow period cleans.
+                </p>
+                <button className="btn btn-primary btn-sm" onClick={saveRubricOnly} disabled={savingRubric} style={{ flexShrink: 0, marginLeft: 12 }}>
+                  {savingRubric ? 'Saving…' : rubricSaved ? '✓ Saved' : 'Save Rubric'}
+                </button>
+              </div>
+              {rubricDims.map((dim, i) => (
+                <div key={i} style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, marginBottom: 12, border: '1px solid var(--glass-border)' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+                      <button className="btn btn-sm btn-ghost" style={{ padding: '1px 7px', fontSize: 11 }}
+                        onClick={() => moveDim(i, -1)} disabled={i === 0}>↑</button>
+                      <button className="btn btn-sm btn-ghost" style={{ padding: '1px 7px', fontSize: 11 }}
+                        onClick={() => moveDim(i, 1)} disabled={i === rubricDims.length - 1}>↓</button>
+                    </div>
+                    <input className="form-input" style={{ flex: 1, fontWeight: 600 }}
+                      placeholder="Dimension name (e.g. Technical competence)"
+                      value={dim.name}
+                      onChange={e => updateDim(i, 'name', e.target.value)} />
+                    <button className="btn btn-sm btn-danger" onClick={() => removeDim(i)}>✕</button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label className="form-label" style={{ color: 'var(--ok)' }}>✓ Pass description</label>
+                      <input className="form-input" placeholder="e.g. Hits QC standard consistently"
+                        value={dim.pass_desc || ''}
+                        onChange={e => updateDim(i, 'pass_desc', e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ color: 'var(--red)' }}>✗ Fail description</label>
+                      <input className="form-input" placeholder="e.g. Misses things consistently"
+                        value={dim.fail_desc || ''}
+                        onChange={e => updateDim(i, 'fail_desc', e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button className="btn btn-ghost btn-sm" onClick={addDim}>+ Add Dimension</button>
+                {rubricSaved && <span style={{ color: 'var(--green)', fontSize: 13 }}>✓ Changes saved</span>}
+              </div>
+            </div>
           )}
         </>
       ) : (
@@ -352,7 +413,7 @@ export default function InductionTraining() {
               </div>
 
               {/* Top-level edit tabs: Shifts vs Rubric */}
-              <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--glass-border)' }}>
                 {[['shifts', 'Onboarding Shifts'], ['rubric', 'Shadow Period Rubric']].map(([t, label]) => (
                   <button key={t} onClick={() => setEditTab(t)} style={{
                     background: 'none', border: 'none', cursor: 'pointer',
@@ -384,7 +445,7 @@ export default function InductionTraining() {
                     Scores appear in the Shadow Period Rubric tab inside each training session.
                   </p>
                   {rubricDims.map((dim, i) => (
-                    <div key={i} style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, marginBottom: 12, border: '1px solid var(--border)' }}>
+                    <div key={i} style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, marginBottom: 12, border: '1px solid var(--glass-border)' }}>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
                           <button className="btn btn-sm btn-ghost" style={{ padding: '1px 7px', fontSize: 11 }}
