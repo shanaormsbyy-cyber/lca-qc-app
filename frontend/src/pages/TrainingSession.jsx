@@ -39,12 +39,17 @@ export default function TrainingSession() {
   const [scoreMap, setScoreMap]     = useState({});
   const [noteModal, setNoteModal]   = useState(null);
   const [savingCell, setSavingCell] = useState(null);
-  // Which clean is active in the rubric (1–5)
   const [activeClean, setActiveClean] = useState(1);
+
+  // Brief
+  const [briefs, setBriefs]         = useState([]);
+  const [briefText, setBriefText]   = useState('');
+  const [postingBrief, setPostingBrief] = useState(false);
 
   const loadSession = () => api.get(`/training/sessions/${id}`).then(r => {
     setSession(r.data);
     setItems(r.data.items || []);
+    return r.data;
   });
 
   const loadRubric = () => api.get(`/training/sessions/${id}/rubric`).then(r => {
@@ -52,8 +57,14 @@ export default function TrainingSession() {
     setScoreMap(r.data.scoreMap || {});
   });
 
+  const loadBriefs = (staffId) => api.get(`/training/briefs/${staffId}`).then(r => setBriefs(r.data));
+
   useEffect(() => {
-    Promise.all([loadSession(), loadRubric()]).finally(() => setLoading(false));
+    Promise.all([loadSession(), loadRubric()])
+      .then(([sessionData]) => {
+        if (sessionData?.trainee_id) loadBriefs(sessionData.trainee_id);
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   // ── Checklist ────────────────────────────────────────────────────────────────
@@ -157,7 +168,7 @@ export default function TrainingSession() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-        {[['checklist', 'Onboarding Checklist'], ['shadow', 'Shadow Period Rubric']].map(([t, label]) => (
+        {[['checklist', 'Onboarding Checklist'], ['shadow', 'Shadow Period Rubric'], ['brief', 'Brief']].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '10px 18px', fontWeight: 700, fontSize: 14,
@@ -345,6 +356,69 @@ export default function TrainingSession() {
           {dimensions.length === 0 && (
             <div style={{ color: 'var(--t3)', padding: 32, textAlign: 'center' }}>
               No rubric dimensions set up yet. Go to Onboarding → Edit Template → Shadow Period Rubric tab.
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── BRIEF TAB ─────────────────────────────────────────────────────────── */}
+      {tab === 'brief' && (
+        <>
+          {/* Post new entry */}
+          <div className="card mb-5" style={{ padding: '16px 20px' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Add Brief Update</div>
+            <textarea
+              className="form-input"
+              rows={4}
+              style={{ resize: 'vertical', marginBottom: 12 }}
+              placeholder="e.g. Great attitude, needs more confidence with bed-making. Arrived on time, asked good questions…"
+              value={briefText}
+              onChange={e => setBriefText(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              disabled={postingBrief || !briefText.trim()}
+              onClick={async () => {
+                setPostingBrief(true);
+                await api.post(`/training/briefs/${session.trainee_id}`, { body: briefText.trim() });
+                setBriefText('');
+                await loadBriefs(session.trainee_id);
+                setPostingBrief(false);
+              }}
+            >
+              {postingBrief ? <><span className="spinner" /> Posting…</> : 'Post Update'}
+            </button>
+          </div>
+
+          {/* Brief log */}
+          {briefs.length === 0 ? (
+            <div style={{ color: 'var(--t3)', textAlign: 'center', padding: '32px 0' }}>
+              No brief entries yet. Add one above.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {briefs.map(b => (
+                <div key={b.id} className="card" style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--cyan)' }}>{b.author_name}</span>
+                      <span style={{ fontSize: 12, color: 'var(--t3)', marginLeft: 10 }}>
+                        {new Date(b.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Delete this brief entry?')) return;
+                        await api.delete(`/training/briefs/entry/${b.id}`);
+                        setBriefs(prev => prev.filter(x => x.id !== b.id));
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+                      title="Delete"
+                    >✕</button>
+                  </div>
+                  <div style={{ fontSize: 14, color: 'var(--t1)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{b.body}</div>
+                </div>
+              ))}
             </div>
           )}
         </>

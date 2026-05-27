@@ -288,4 +288,30 @@ router.put('/sessions/:id/rubric/:dimensionId/:cleanNumber', (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Staff Briefs ─────────────────────────────────────────────────────────────
+
+// GET all briefs for a staff member (newest first)
+router.get('/briefs/:staffId', (req, res) => {
+  const briefs = db.prepare(
+    'SELECT * FROM staff_briefs WHERE staff_id=? ORDER BY created_at DESC'
+  ).all(req.params.staffId);
+  res.json(briefs);
+});
+
+// POST add a new brief entry
+router.post('/briefs/:staffId', (req, res) => {
+  const { body } = req.body;
+  if (!body || !body.trim()) return res.status(400).json({ error: 'Brief body required' });
+  const result = db.prepare(
+    'INSERT INTO staff_briefs (staff_id, author_name, body) VALUES (?, ?, ?)'
+  ).run(req.params.staffId, req.manager.name, body.trim());
+  res.json({ id: result.lastInsertRowid });
+});
+
+// DELETE a brief entry (author or any manager)
+router.delete('/briefs/entry/:id', (req, res) => {
+  db.prepare('DELETE FROM staff_briefs WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;

@@ -228,6 +228,17 @@ db.exec(`
   )
 `);
 
+// Staff brief log
+db.exec(`
+  CREATE TABLE IF NOT EXISTS staff_briefs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 // Seed the 12 default dimensions if none exist
 {
   const count = db.prepare('SELECT COUNT(*) as c FROM shadow_rubric_dimensions').get().c;
