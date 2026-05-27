@@ -204,10 +204,15 @@ export default function QCCheckForm() {
       return;
     }
 
-    let finalText = '';
+    // committedText: everything finalised across all recognition sessions
+    // sessionFinalCount: how many final results this session has already appended
+    // (iOS re-delivers all results from index 0 on each new session)
+    let committedText = '';
+    let sessionFinalCount = 0;
     let stoppedByUser = false;
 
     const createRecognition = () => {
+      sessionFinalCount = 0; // reset per-session counter on each new instance
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
@@ -216,10 +221,17 @@ export default function QCCheckForm() {
       recognition.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) finalText += e.results[i][0].transcript + ' ';
-          else interim += e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            // Only append results we haven't seen yet this session
+            if (i >= sessionFinalCount) {
+              committedText += e.results[i][0].transcript + ' ';
+              sessionFinalCount = i + 1;
+            }
+          } else {
+            interim += e.results[i][0].transcript;
+          }
         }
-        setTranscript(finalText + interim);
+        setTranscript(committedText + interim);
       };
 
       recognition.onerror = e => {
@@ -233,7 +245,7 @@ export default function QCCheckForm() {
 
       recognition.onend = () => {
         if (stoppedByUser) {
-          setTranscript(finalText.trim());
+          setTranscript(committedText.trim());
           setVoiceState('done');
         } else {
           // Browser timed out — restart automatically to keep recording
@@ -242,7 +254,7 @@ export default function QCCheckForm() {
             speechRef.current = next;
             next.start();
           } catch {
-            setTranscript(finalText.trim());
+            setTranscript(committedText.trim());
             setVoiceState('done');
           }
         }

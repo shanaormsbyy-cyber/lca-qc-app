@@ -395,8 +395,9 @@ Be constructive, professional, and direct. Do not use bullet points — write in
 
 // POST /qc/checks/:id/voice-analyse — AI maps voice transcript to checklist items
 router.post('/checks/:id/voice-analyse', async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'AI not configured — set ANTHROPIC_API_KEY' });
+  const apiKey = process.env.ANTHROPIC_API_KEY
+    || db.prepare("SELECT value FROM settings WHERE key='anthropic_api_key'").get()?.value;
+  if (!apiKey) return res.status(503).json({ error: 'AI not configured — add your Anthropic API key in Settings' });
 
   const { transcript } = req.body;
   if (!transcript || transcript.trim().length < 10) {
@@ -424,15 +425,17 @@ router.post('/checks/:id/voice-analyse', async (req, res) => {
     room_label: i.room_label || i.category || 'General',
   }));
 
-  const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager has walked through a property and recorded a voice note describing issues they found during their inspection.
+  const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager has walked through a property and recorded a voice note describing issues they found.
 
-Your job is to map their observations to specific checklist items.
+Your job is to map every issue they mention to specific checklist items and mark them as fails.
 
-Rules:
-- If an item is clearly mentioned as an issue in the transcript, add it to "fails"
-- If the transcript mentions something that could match an item but the specific room/area is unclear (e.g. "bedroom" when there are multiple bedroom sections like "Bedroom 1", "Bedroom 2"), add it to "ambiguous"
-- Everything else is considered passed — do not include passed items in your response
-- Return ONLY valid JSON, no explanation, no markdown, no other text
+CRITICAL RULES:
+1. If the manager mentions ANYTHING negative about an item (dirty, missed, not done, stained, smells, streaks, crumbs, hair, residue, etc.) — mark it as a FAIL. Do not second-guess or soften their words.
+2. Be generous in matching — if they say "the toilet was dirty" match ALL toilet-related items. If they say "bathroom" match all bathroom items they mention issues with.
+3. Only use "ambiguous" when the same issue could apply to multiple DIFFERENT rooms (e.g. "the bed wasn't made" when there are Bedroom 1 AND Bedroom 2 items — ask which bedroom).
+4. Do NOT put something in ambiguous if it clearly belongs to one room or item.
+5. Everything NOT mentioned as an issue is considered passed.
+6. Return ONLY valid JSON — no markdown, no explanation, nothing else.
 
 Checklist items (use the "id" field in your response):
 ${JSON.stringify(itemList, null, 2)}
@@ -442,12 +445,12 @@ Voice note transcript:
 
 Return JSON in this exact format:
 {
-  "summary": "2-3 sentence plain English overview of what was found and what will be failed",
+  "summary": "2-3 sentence plain English overview of what the manager found and what is being failed",
   "fails": [
-    { "item_id": 123, "reason": "short phrase from transcript explaining the issue" }
+    { "item_id": 123, "reason": "exact words or close paraphrase from transcript" }
   ],
   "ambiguous": [
-    { "item_id": 456, "reason": "what was mentioned in the transcript", "note": "brief explanation of why it is unclear which room or item this refers to" }
+    { "item_id": 456, "reason": "what was mentioned", "note": "which room or area is unclear" }
   ]
 }`;
 
