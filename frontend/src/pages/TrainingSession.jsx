@@ -380,8 +380,8 @@ export default function TrainingSession() {
           {/* Overall score banner */}
           <div className="card mb-4" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Shadow Period Score</div>
-              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>All scored dimensions across all 5 cleans</div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--t1)' }}>Shadow Period Score</div>
+              <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 2 }}>All scored dimensions across all 5 cleans</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontWeight: 900, fontSize: 32, color: pctColor(overallPct), lineHeight: 1 }}>
