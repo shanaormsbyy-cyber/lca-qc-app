@@ -36,6 +36,7 @@ export default function QCCheckForm() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [photos, setPhotos] = useState({});
+  const uploadingRef = useRef(0);
   const [photoPickerItem, setPhotoPickerItem] = useState(null);
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const rollInputRef = useRef(null);
@@ -92,7 +93,9 @@ export default function QCCheckForm() {
   useLiveSync(() => load(false));
 
   const loadPhotos = () => {
+    if (uploadingRef.current > 0) return; // skip while uploads are in flight
     api.get(`/qc/checks/${id}/photos`).then(r => {
+      if (uploadingRef.current > 0) return; // re-check after async gap
       const grouped = {};
       r.data.forEach(p => {
         const key = p.item_id != null ? String(p.item_id) : `cat_${p.category || 'general'}`;
@@ -152,11 +155,11 @@ export default function QCCheckForm() {
   });
 
   const uploadPhoto = async (itemId, category, file) => {
-    // Close picker and show preview immediately
     setPhotoPickerItem(null);
     const blobUrl = URL.createObjectURL(file);
-    const tempId  = `temp_${Date.now()}`;
+    const tempId  = `temp_${Date.now()}_${Math.random()}`;
     const key     = String(itemId);
+    uploadingRef.current += 1;
     setPhotos(prev => ({ ...prev, [key]: [...(prev[key] || []), { id: tempId, blobUrl, uploading: true }] }));
     try {
       const compressed = await compressImage(file);
@@ -173,6 +176,8 @@ export default function QCCheckForm() {
       setPhotos(prev => ({ ...prev, [key]: (prev[key] || []).filter(p => p.id !== tempId) }));
       URL.revokeObjectURL(blobUrl);
       alert('Photo upload failed — please try again.');
+    } finally {
+      uploadingRef.current -= 1;
     }
   };
 
