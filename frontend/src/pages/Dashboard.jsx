@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [allQC, setAllQC] = useState([]);
   const [loading, setLoading] = useState(true);
   const [watchlist, setWatchlist] = useState([]);
+  const [overrideIds, setOverrideIds] = useState(new Set());
   const [topPerformers, setTopPerformers] = useState([]);
   const [flaggedWeek, setFlaggedWeek] = useState([]);
   const [flaggedMonth, setFlaggedMonth] = useState([]);
@@ -65,7 +66,7 @@ export default function Dashboard() {
       setProperties(pR.data);
       setManagers(mR.data);
     }).finally(() => setLoading(false));
-    api.get('/kpis/watchlist').then(r => setWatchlist(r.data.watchlist || [])).catch(() => {});
+    api.get('/kpis/watchlist').then(r => { setWatchlist(r.data.watchlist || []); setOverrideIds(new Set(r.data.overrideIds || [])); }).catch(() => {});
     api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
@@ -311,16 +312,20 @@ export default function Dashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {watchlist.map(w => {
                 const isComplaintRisk = w.watchlist_reason === 'complaints';
-                const rowBg = isComplaintRisk ? 'rgba(245,158,11,0.07)' : 'var(--red-dim)';
-                const rowBorder = isComplaintRisk ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(239,68,68,0.25)';
+                const isOverride = w.watchlist_reason === 'override';
+                const rowBg = isComplaintRisk ? 'rgba(245,158,11,0.07)' : isOverride ? 'rgba(139,92,246,0.07)' : 'var(--red-dim)';
+                const rowBorder = isComplaintRisk ? '1px solid rgba(245,158,11,0.25)' : isOverride ? '1px solid rgba(139,92,246,0.25)' : '1px solid rgba(239,68,68,0.25)';
                 return (
-                  <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: rowBg, border: rowBorder, borderRadius: 10, cursor: 'pointer' }}>
-                    <div>
+                  <div key={w.id}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: rowBg, border: rowBorder, borderRadius: 10 }}>
+                    <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/staff/${w.id}`)}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontWeight: 700, color: 'var(--t1)' }}>{w.name}</span>
                         {isComplaintRisk && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(245,158,11,0.15)', color: 'var(--amber)', border: '1px solid rgba(245,158,11,0.3)' }}>Complaint risk</span>
+                        )}
+                        {isOverride && (
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>Manual</span>
                         )}
                         {coachingStaffIds.has(w.id)
                           ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(58,181,217,0.15)', color: 'var(--cyan)', border: '1px solid rgba(58,181,217,0.3)' }}>In coaching</span>
@@ -334,17 +339,27 @@ export default function Dashboard() {
                         }
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      {isComplaintRisk ? (
-                        <>
-                          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--amber)' }}>Complaints</div>
-                          <div style={{ fontSize: 11, color: 'var(--t3)' }}>{w.avg_score != null ? `QC avg: ${w.avg_score}%` : 'No QC data'}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--red)' }}>{w.avg_score}%</div>
-                          <div style={{ fontSize: 11, color: 'var(--t3)' }}>below {w.threshold}% threshold</div>
-                        </>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => navigate(`/staff/${w.id}`)}>
+                        {isComplaintRisk ? (
+                          <>
+                            <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--amber)' }}>Complaints</div>
+                            <div style={{ fontSize: 11, color: 'var(--t3)' }}>{w.avg_score != null ? `QC avg: ${w.avg_score}%` : 'No QC data'}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontWeight: 800, fontSize: 20, color: isOverride ? '#a78bfa' : 'var(--red)' }}>{w.avg_score != null ? `${w.avg_score}%` : '—'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--t3)' }}>{isOverride ? 'avg score' : `below ${w.threshold}% threshold`}</div>
+                          </>
+                        )}
+                      </div>
+                      {isOverride && (
+                        <button
+                          onClick={async e => { e.stopPropagation(); await api.delete(`/kpis/watchlist-override/${w.id}`); api.get('/kpis/watchlist').then(r => { setWatchlist(r.data.watchlist || []); setOverrideIds(new Set(r.data.overrideIds || [])); }); api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])); }}
+                          title="Remove override"
+                          style={{ flexShrink: 0, padding: '4px 8px', fontSize: 11, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.08)', color: '#a78bfa', cursor: 'pointer' }}>
+                          ✕ Remove
+                        </button>
                       )}
                     </div>
                   </div>
@@ -367,9 +382,9 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {topPerformers.map((w, i) => (
-                <div key={w.id} onClick={() => navigate(`/staff/${w.id}`)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--cyan-dim)', border: '1px solid rgba(58,181,217,0.25)', borderRadius: 10, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div key={w.id}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--cyan-dim)', border: '1px solid rgba(58,181,217,0.25)', borderRadius: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/staff/${w.id}`)}>
                     <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 11, flexShrink: 0 }}>
                       {i + 1}
                     </div>
@@ -378,9 +393,17 @@ export default function Dashboard() {
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>{w.total_checks} check{w.total_checks !== 1 ? 's' : ''} completed</div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--cyan)' }}>{w.avg_score}%</div>
-                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>avg score</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => navigate(`/staff/${w.id}`)}>
+                      <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--cyan)' }}>{w.avg_score}%</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>avg score</div>
+                    </div>
+                    <button
+                      onClick={async e => { e.stopPropagation(); await api.post(`/kpis/watchlist-override/${w.id}`); api.get('/kpis/watchlist').then(r => { setWatchlist(r.data.watchlist || []); setOverrideIds(new Set(r.data.overrideIds || [])); }); api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])); }}
+                      title="Move to Watchlist"
+                      style={{ flexShrink: 0, padding: '4px 8px', fontSize: 11, fontWeight: 700, borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.08)', color: 'var(--red)', cursor: 'pointer' }}>
+                      ↓ Watchlist
+                    </button>
                   </div>
                 </div>
               ))}

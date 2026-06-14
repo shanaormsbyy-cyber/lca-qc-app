@@ -205,6 +205,16 @@ router.get('/properties', (req, res) => {
   res.json(props);
 });
 
+// Watchlist override routes
+router.post('/watchlist-override/:staffId', (req, res) => {
+  db.prepare('INSERT OR IGNORE INTO staff_watchlist_overrides (staff_id) VALUES (?)').run(req.params.staffId);
+  res.json({ ok: true });
+});
+router.delete('/watchlist-override/:staffId', (req, res) => {
+  db.prepare('DELETE FROM staff_watchlist_overrides WHERE staff_id=?').run(req.params.staffId);
+  res.json({ ok: true });
+});
+
 // Top performers
 router.get('/top-performers', (req, res) => {
   const settingsRows = db.prepare('SELECT * FROM settings').all();
@@ -213,10 +223,15 @@ router.get('/top-performers', (req, res) => {
   const threshold = parseFloat(settings.top_performers_threshold || '90');
   const minChecks = parseInt(settings.top_performers_min_checks || '3');
 
+  const overrideIds = new Set(
+    db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
+  );
+
   const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
   const topPerformers = [];
 
   staff.forEach(s => {
+    if (overrideIds.has(s.id)) return; // manually moved to watchlist
     const result = db.prepare(`
       SELECT COUNT(*) as cnt, AVG(score_pct) as avg
       FROM qc_checks
@@ -246,12 +261,16 @@ router.get('/top-performers', (req, res) => {
   res.json({ topPerformers, threshold, minChecks });
 });
 
-// Performance watchlist — includes QC underperformers + complaint-risk staff
+// Performance watchlist — includes QC underperformers + complaint-risk staff + manual overrides
 router.get('/watchlist', (req, res) => {
   const settingsRows = db.prepare('SELECT * FROM settings').all();
   const settings = {};
   settingsRows.forEach(s => { settings[s.key] = s.value; });
   const threshold = parseFloat(settings.watchlist_threshold || '70');
+
+  const overrideIds = new Set(
+    db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
+  );
 
   const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
   const watchlist = [];
@@ -323,12 +342,38 @@ router.get('/watchlist', (req, res) => {
     }
   });
 
+  // Manual overrides — staff forced onto watchlist by manager
+  staff.forEach(s => {
+    if (!overrideIds.has(s.id) || seenIds.has(s.id)) return;
+    const result = db.prepare(`
+      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+      FROM qc_checks
+      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+    `).get(s.id);
+    const recent = db.prepare(`
+      SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
+      FROM qc_checks
+      JOIN properties ON properties.id = qc_checks.property_id
+      WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+      ORDER BY qc_checks.date DESC LIMIT 3
+    `).all(s.id);
+    watchlist.push({
+      ...s,
+      avg_score: result.avg ? Math.round(result.avg) : null,
+      total_checks: result.cnt,
+      recent_checks: recent,
+      threshold,
+      watchlist_reason: 'override',
+    });
+    seenIds.add(s.id);
+  });
+
   watchlist.sort((a, b) => {
-    // QC underperformers first, then complaint-risk; within each group sort by score asc
-    if (a.watchlist_reason !== b.watchlist_reason) return a.watchlist_reason === 'qc' ? -1 : 1;
+    const order = { qc: 0, override: 1, complaints: 2 };
+    if (a.watchlist_reason !== b.watchlist_reason) return (order[a.watchlist_reason] ?? 3) - (order[b.watchlist_reason] ?? 3);
     return (a.avg_score ?? 101) - (b.avg_score ?? 101);
   });
-  res.json({ watchlist, threshold });
+  res.json({ watchlist, threshold, overrideIds: [...overrideIds] });
 });
 
 // Commonly flagged items

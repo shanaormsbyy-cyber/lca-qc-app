@@ -264,6 +264,13 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS staff_watchlist_overrides (
+    staff_id INTEGER PRIMARY KEY REFERENCES staff(id) ON DELETE CASCADE,
+    created_at TEXT DEFAULT (datetime('now'))
+  )
+`);
+
 // Seed the 12 default dimensions if none exist
 {
   const count = db.prepare('SELECT COUNT(*) as c FROM shadow_rubric_dimensions').get().c;
