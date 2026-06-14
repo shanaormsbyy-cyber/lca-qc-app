@@ -337,6 +337,11 @@ export default function Dashboard() {
                           ? `${(w.serious_complaints || 0) > 0 ? `${w.serious_complaints} serious` : ''}${(w.serious_complaints || 0) > 0 && (w.moderate_complaints || 0) > 0 ? ', ' : ''}${(w.moderate_complaints || 0) > 0 ? `${w.moderate_complaints} moderate` : ''} complaint${((w.serious_complaints||0)+(w.moderate_complaints||0)) !== 1 ? 's' : ''} in 90d`
                           : `${w.total_checks} check${w.total_checks !== 1 ? 's' : ''} completed`
                         }
+                        {isOverride && ((w.serious_complaints || 0) + (w.moderate_complaints || 0)) > 0 && (
+                          <span style={{ marginLeft: 6, color: 'var(--amber)' }}>
+                            · {(w.serious_complaints || 0) > 0 ? `${w.serious_complaints} serious` : ''}{(w.serious_complaints || 0) > 0 && (w.moderate_complaints || 0) > 0 ? ', ' : ''}{(w.moderate_complaints || 0) > 0 ? `${w.moderate_complaints} moderate` : ''} complaint{((w.serious_complaints||0)+(w.moderate_complaints||0)) !== 1 ? 's' : ''} in 90d
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

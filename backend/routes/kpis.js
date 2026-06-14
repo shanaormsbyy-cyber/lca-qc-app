@@ -276,6 +276,43 @@ router.get('/watchlist', (req, res) => {
   const watchlist = [];
   const seenIds = new Set();
 
+  // Manual overrides — run first so they take priority over QC/complaints reason
+  staff.forEach(s => {
+    if (!overrideIds.has(s.id)) return;
+    const result = db.prepare(`
+      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+      FROM qc_checks
+      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+    `).get(s.id);
+    const recent = db.prepare(`
+      SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
+      FROM qc_checks
+      JOIN properties ON properties.id = qc_checks.property_id
+      WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+      ORDER BY qc_checks.date DESC LIMIT 3
+    `).all(s.id);
+    const complaints = db.prepare(`
+      SELECT severity, COUNT(*) as cnt FROM complaints
+      WHERE staff_id=? AND date >= date('now', '-90 days') GROUP BY severity
+    `).all(s.id);
+    let moderateCount = 0, seriousCount = 0;
+    complaints.forEach(c => {
+      if (c.severity === 'moderate') moderateCount = c.cnt;
+      if (c.severity === 'serious') seriousCount = c.cnt;
+    });
+    watchlist.push({
+      ...s,
+      avg_score: result.avg ? Math.round(result.avg) : null,
+      total_checks: result.cnt,
+      recent_checks: recent,
+      threshold,
+      watchlist_reason: 'override',
+      serious_complaints: seriousCount,
+      moderate_complaints: moderateCount,
+    });
+    seenIds.add(s.id);
+  });
+
   // QC underperformers
   staff.forEach(s => {
     const result = db.prepare(`
@@ -342,31 +379,6 @@ router.get('/watchlist', (req, res) => {
     }
   });
 
-  // Manual overrides — staff forced onto watchlist by manager
-  staff.forEach(s => {
-    if (!overrideIds.has(s.id) || seenIds.has(s.id)) return;
-    const result = db.prepare(`
-      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
-      FROM qc_checks
-      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-    `).get(s.id);
-    const recent = db.prepare(`
-      SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
-      FROM qc_checks
-      JOIN properties ON properties.id = qc_checks.property_id
-      WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
-      ORDER BY qc_checks.date DESC LIMIT 3
-    `).all(s.id);
-    watchlist.push({
-      ...s,
-      avg_score: result.avg ? Math.round(result.avg) : null,
-      total_checks: result.cnt,
-      recent_checks: recent,
-      threshold,
-      watchlist_reason: 'override',
-    });
-    seenIds.add(s.id);
-  });
 
   watchlist.sort((a, b) => {
     const order = { qc: 0, override: 1, complaints: 2 };
