@@ -75,8 +75,12 @@ export default function Staff() {
   const archiveStaff = async (id, name, e) => {
     e.stopPropagation();
     if (!confirm(`Archive ${name}? They'll be hidden from active lists but all their data is kept.`)) return;
-    await api.post(`/staff/${id}/archive`);
-    load();
+    try {
+      await api.post(`/staff/${id}/archive`);
+      load();
+    } catch (err) {
+      alert(`Archive failed: ${err.response?.data?.error || err.message}`);
+    }
   };
 
   const restoreStaff = async (id, e) => {

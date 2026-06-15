@@ -15,13 +15,21 @@ router.get('/', (req, res) => {
 });
 
 router.post('/:id/archive', (req, res) => {
-  db.prepare('UPDATE staff SET archived=1, archived_at=datetime("now") WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  try {
+    db.prepare("UPDATE staff SET archived=1, archived_at=datetime('now') WHERE id=?").run(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/:id/restore', (req, res) => {
-  db.prepare('UPDATE staff SET archived=0, archived_at=NULL WHERE id=?').run(req.params.id);
-  res.json({ ok: true });
+  try {
+    db.prepare("UPDATE staff SET archived=0, archived_at=NULL WHERE id=?").run(req.params.id);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/', (req, res) => {
