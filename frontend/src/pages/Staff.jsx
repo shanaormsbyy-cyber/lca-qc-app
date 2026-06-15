@@ -24,6 +24,8 @@ export default function Staff() {
   const [search, setSearch] = useState('');
   const [inactiveModal, setInactiveModal] = useState(null);
   const [inactiveDate, setInactiveDate] = useState('');
+  const [archivedStaff, setArchivedStaff] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
 
   const load = () => Promise.all([
     api.get('/staff'),
@@ -34,6 +36,7 @@ export default function Staff() {
     api.get('/properties'),
   ]).then(([s, q, d, cl, m, p]) => {
     setStaff(s.data);
+    api.get('/staff?archived=true').then(r => setArchivedStaff(r.data));
     setChecks(q.data);
     setDue(d.data);
     setChecklists(cl.data);
@@ -69,11 +72,17 @@ export default function Staff() {
     load();
   };
 
-  const delStaff = async (id, e) => {
+  const archiveStaff = async (id, name, e) => {
     e.stopPropagation();
-    if (!confirm('Delete this staff member?')) return;
-    await api.delete(`/staff/${id}`);
-    setStaff(s => s.filter(x => x.id !== id));
+    if (!confirm(`Archive ${name}? They'll be hidden from active lists but all their data is kept.`)) return;
+    await api.post(`/staff/${id}/archive`);
+    load();
+  };
+
+  const restoreStaff = async (id, e) => {
+    e.stopPropagation();
+    await api.post(`/staff/${id}/restore`);
+    load();
   };
 
   const createCheck = async () => {
@@ -162,7 +171,7 @@ export default function Staff() {
                           : <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setInactiveModal(s); setInactiveDate(''); }}>Inactive</button>
                         }
                         <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setEditing(s); setStaffForm({ name: s.name, role: s.role, start_date: s.start_date }); setShowStaffModal(true); }}>Edit</button>
-                        <button className="btn btn-sm btn-danger" onClick={e => delStaff(s.id, e)}>Del</button>
+                        <button className="btn btn-sm btn-danger" onClick={e => archiveStaff(s.id, s.name, e)}>Archive</button>
                       </div>
                     </td>
                   </tr>
@@ -171,6 +180,45 @@ export default function Staff() {
             </tbody>
           </table>
         </div>
+
+        {/* Archived staff */}
+        {archivedStaff.length > 0 && (
+          <div style={{ marginTop: 32 }}>
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t3)', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, padding: 0, marginBottom: 12 }}>
+              {showArchived ? '▾' : '▸'} Archived Staff ({archivedStaff.length})
+            </button>
+            {showArchived && (
+              <div className="table-wrap" style={{ opacity: 0.75 }}>
+                <table>
+                  <thead><tr>
+                    <th>Name</th><th>Role</th><th>Archived</th><th></th>
+                  </tr></thead>
+                  <tbody>
+                    {archivedStaff.map(s => (
+                      <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/staff/${s.id}`)}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--t3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 13, flexShrink: 0 }}>
+                              {s.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </div>
+                            <span style={{ fontWeight: 700 }}>{s.name}</span>
+                          </div>
+                        </td>
+                        <td style={{ color: 'var(--t2)' }}>{s.role}</td>
+                        <td style={{ color: 'var(--t3)', fontSize: 12 }}>{s.archived_at ? new Date(s.archived_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                        <td onClick={e => e.stopPropagation()}>
+                          <button className="btn btn-sm btn-ghost" onClick={e => restoreStaff(s.id, e)}>Restore</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         </>
       )}
 

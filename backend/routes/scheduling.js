@@ -32,6 +32,7 @@ router.get('/due', (req, res) => {
       COUNT(qc.id) as total_checks
     FROM staff s
     LEFT JOIN qc_checks qc ON qc.staff_id = s.id AND qc.status = 'complete'
+    WHERE s.archived=0 OR s.archived IS NULL
     GROUP BY s.id
   `).all();
 

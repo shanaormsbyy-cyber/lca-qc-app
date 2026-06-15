@@ -150,6 +150,7 @@ router.get('/trainees', (req, res) => {
     LEFT JOIN training_sessions ts ON ts.trainee_id=s.id AND ts.status='complete' AND ts.completion_pct=100
     LEFT JOIN managers m ON m.id=ts.assigned_to_id
     LEFT JOIN training_checklists tc ON tc.id=ts.checklist_id
+    WHERE s.archived=0 OR s.archived IS NULL
     GROUP BY s.id
     ORDER BY s.name
   `).all();
@@ -227,7 +228,7 @@ router.get('/top-performers', (req, res) => {
     db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
   );
 
-  const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
+  const staff = db.prepare('SELECT id, name, role FROM staff WHERE archived=0 OR archived IS NULL ORDER BY name').all();
   const topPerformers = [];
 
   staff.forEach(s => {
@@ -272,7 +273,7 @@ router.get('/watchlist', (req, res) => {
     db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
   );
 
-  const staff = db.prepare('SELECT id, name, role FROM staff ORDER BY name').all();
+  const staff = db.prepare('SELECT id, name, role FROM staff WHERE archived=0 OR archived IS NULL ORDER BY name').all();
   const watchlist = [];
   const seenIds = new Set();
 

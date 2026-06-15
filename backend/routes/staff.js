@@ -6,7 +6,22 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', (req, res) => {
-  res.json(db.prepare('SELECT * FROM staff ORDER BY name').all());
+  const { archived } = req.query;
+  if (archived === 'true') {
+    res.json(db.prepare('SELECT * FROM staff WHERE archived=1 ORDER BY name').all());
+  } else {
+    res.json(db.prepare('SELECT * FROM staff WHERE archived=0 OR archived IS NULL ORDER BY name').all());
+  }
+});
+
+router.post('/:id/archive', (req, res) => {
+  db.prepare('UPDATE staff SET archived=1, archived_at=datetime("now") WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+router.post('/:id/restore', (req, res) => {
+  db.prepare('UPDATE staff SET archived=0, archived_at=NULL WHERE id=?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 router.post('/', (req, res) => {

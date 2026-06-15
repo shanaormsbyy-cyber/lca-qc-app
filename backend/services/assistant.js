@@ -19,7 +19,7 @@ function buildContext() {
       (SELECT score_pct FROM qc_checks WHERE staff_id=s.id AND status='complete' ORDER BY date DESC LIMIT 1) as latest_score
     FROM staff s
     LEFT JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
-    WHERE s.inactive_until IS NULL OR s.inactive_until <= date('now')
+    WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
     ORDER BY s.name
   `).all();
@@ -47,7 +47,7 @@ function buildContext() {
     FROM staff s
     JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
       AND q.date >= date('now', '-90 days')
-    WHERE s.inactive_until IS NULL OR s.inactive_until <= date('now')
+    WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
     HAVING avg_score < ?
     ORDER BY avg_score ASC
@@ -57,7 +57,7 @@ function buildContext() {
     SELECT s.name, MAX(q.date) as last_check
     FROM staff s
     LEFT JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
-    WHERE s.inactive_until IS NULL OR s.inactive_until <= date('now')
+    WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
     HAVING last_check IS NULL OR last_check < date('now', '-' || ? || ' days')
     ORDER BY last_check ASC

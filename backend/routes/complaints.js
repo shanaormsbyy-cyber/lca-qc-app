@@ -107,7 +107,7 @@ router.delete('/:id', (req, res) => {
 // Impact score: starts at 100, subtract severity weights for complaints in window
 // Also flags staff with 2+ moderate or 1+ serious in 90d as "complaint risk"
 router.get('/impact/all', (req, res) => {
-  const staff = db.prepare('SELECT id, name FROM staff WHERE inactive_until IS NULL OR inactive_until <= date("now")').all();
+  const staff = db.prepare('SELECT id, name FROM staff WHERE (inactive_until IS NULL OR inactive_until <= date("now")) AND (archived=0 OR archived IS NULL)').all();
 
   const results = staff.map(s => {
     const complaints = db.prepare(`

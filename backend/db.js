@@ -215,6 +215,8 @@ const migrations = [
   "ALTER TABLE training_sessions ADD COLUMN probation_decision TEXT DEFAULT NULL",
   "ALTER TABLE training_sessions ADD COLUMN probation_signoff_by TEXT DEFAULT NULL",
   "ALTER TABLE training_sessions ADD COLUMN probation_signoff_at TEXT DEFAULT NULL",
+  "ALTER TABLE staff ADD COLUMN archived INTEGER DEFAULT 0",
+  "ALTER TABLE staff ADD COLUMN archived_at TEXT DEFAULT NULL",
 ];
 migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
