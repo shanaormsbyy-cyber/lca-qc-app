@@ -34,14 +34,14 @@ router.get('/:id', (req, res) => {
 
 // POST /api/coaching — create session
 router.post('/', (req, res) => {
-  const { staff_id, date, topic, problem_type, how_coached, outcome, followup_date, sessions_required, status } = req.body;
+  const { staff_id, date, topic, how_coached, outcome, followup_date, sessions_required, status } = req.body;
   const manager_id = req.manager.id;
   const result = db.prepare(`
     INSERT INTO coaching_sessions
       (staff_id, manager_id, date, topic, problem_type, how_coached, outcome, followup_date, sessions_required, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    staff_id, manager_id, date, topic, problem_type,
+    staff_id, manager_id, date, topic, 'didnt',
     how_coached, outcome, followup_date || null,
     sessions_required || 1, status || 'open'
   );
@@ -50,14 +50,14 @@ router.post('/', (req, res) => {
 
 // PUT /api/coaching/:id — update session
 router.put('/:id', (req, res) => {
-  const { date, topic, problem_type, how_coached, outcome, followup_date, sessions_required, status } = req.body;
+  const { date, topic, how_coached, outcome, followup_date, sessions_required, status } = req.body;
   db.prepare(`
     UPDATE coaching_sessions
-    SET date=?, topic=?, problem_type=?, how_coached=?, outcome=?,
+    SET date=?, topic=?, how_coached=?, outcome=?,
         followup_date=?, sessions_required=?, status=?
     WHERE id=?
   `).run(
-    date, topic, problem_type, how_coached, outcome,
+    date, topic, how_coached, outcome,
     followup_date || null, sessions_required, status,
     req.params.id
   );

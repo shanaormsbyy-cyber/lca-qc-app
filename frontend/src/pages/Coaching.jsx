@@ -9,14 +9,6 @@ const POCKET_CARD = (
     background: 'rgba(58,181,217,0.07)', border: '1px solid rgba(58,181,217,0.2)',
     borderRadius: 10, padding: '16px 20px', fontSize: 13, lineHeight: 1.7,
   }}>
-    <div style={{ fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--cyan)', marginBottom: 10 }}>
-      Pocket Card — Can't / Didn't / Won't
-    </div>
-    <div style={{ marginBottom: 12 }}>
-      <strong style={{ color: 'var(--amber)' }}>Can't</strong> — skill gap. Retrain, demo, more reps. Coach it.<br />
-      <strong style={{ color: 'var(--cyan)' }}>Didn't</strong> — unclear or blocked. Fix the expectation or the barrier.<br />
-      <strong style={{ color: 'var(--red)' }}>Won't</strong> — can, but chooses not to. Code conversation, don't coach.
-    </div>
     <div style={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 6 }}>The Five Moves</div>
     <ol style={{ margin: 0, paddingLeft: 18, color: 'var(--t2)' }}>
       <li><strong>Show the gap.</strong> Evidence, not opinion. Private, calm.</li>
@@ -27,22 +19,6 @@ const POCKET_CARD = (
     </ol>
   </div>
 );
-
-const PROBLEM_LABELS = { cant: "Can't", didnt: "Didn't", wont: "Won't" };
-const PROBLEM_COLORS = {
-  cant:  { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' },
-  didnt: { color: 'var(--cyan)',  bg: 'rgba(58,181,217,0.12)' },
-  wont:  { color: 'var(--red)',   bg: 'rgba(239,68,68,0.12)'  },
-};
-
-function ProblemBadge({ type }) {
-  const s = PROBLEM_COLORS[type] || PROBLEM_COLORS.cant;
-  return (
-    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: s.color, background: s.bg }}>
-      {PROBLEM_LABELS[type] || type}
-    </span>
-  );
-}
 
 function CoachingStatusBadge({ status }) {
   const open = status === 'open';
@@ -59,7 +35,7 @@ function CoachingStatusBadge({ status }) {
 
 const EMPTY_FORM = {
   staff_id: '', date: new Date().toISOString().slice(0, 10),
-  topic: '', problem_type: '', how_coached: '', outcome: '',
+  topic: '', how_coached: '', outcome: '',
   followup_date: '', sessions_required: 1, status: 'open',
 };
 
@@ -103,7 +79,6 @@ export default function Coaching() {
       staff_id: session.staff_id,
       date: session.date,
       topic: session.topic,
-      problem_type: session.problem_type,
       how_coached: session.how_coached,
       outcome: session.outcome,
       followup_date: session.followup_date || '',
@@ -115,7 +90,7 @@ export default function Coaching() {
   };
 
   const saveSession = async () => {
-    if (!form.staff_id || !form.date || !form.topic || !form.problem_type || !form.how_coached || !form.outcome) {
+    if (!form.staff_id || !form.date || !form.topic || !form.how_coached || !form.outcome) {
       alert('Please fill in all required fields.');
       return;
     }
@@ -200,7 +175,6 @@ export default function Coaching() {
                   <th>Date</th>
                   <th>Staff</th>
                   <th>Topic</th>
-                  <th>Problem</th>
                   <th>Follow-up</th>
                   <th>Sessions</th>
                   <th>Status</th>
@@ -213,7 +187,6 @@ export default function Coaching() {
                     <td>{fmtDate(s.date)}</td>
                     <td style={{ fontWeight: 600 }}>{s.staff_name}</td>
                     <td style={{ color: 'var(--t2)' }}>{s.topic}</td>
-                    <td><ProblemBadge type={s.problem_type} /></td>
                     <td style={{ color: 'var(--t2)' }}>{s.followup_date ? fmtDate(s.followup_date) : '—'}</td>
                     <td style={{ textAlign: 'center' }}>{s.sessions_required}</td>
                     <td><CoachingStatusBadge status={s.status} /></td>
@@ -265,29 +238,6 @@ export default function Coaching() {
             <div style={{ marginBottom: 12 }}>
               <label className="form-label">Topic *</label>
               <input className="form-input" type="text" placeholder="e.g. Bathroom presentation" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} />
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label className="form-label">Problem Type *</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['cant', 'didnt', 'wont'].map(pt => {
-                  const s = PROBLEM_COLORS[pt];
-                  const active = form.problem_type === pt;
-                  return (
-                    <button
-                      key={pt}
-                      onClick={() => setForm(f => ({ ...f, problem_type: pt }))}
-                      style={{
-                        flex: 1, padding: '8px 0', borderRadius: 8, border: `2px solid ${active ? s.color : 'var(--border)'}`,
-                        background: active ? s.bg : 'transparent', color: active ? s.color : 'var(--t2)',
-                        fontWeight: 700, cursor: 'pointer', fontSize: 13,
-                      }}
-                    >
-                      {PROBLEM_LABELS[pt]}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             <div style={{ marginBottom: 12 }}>

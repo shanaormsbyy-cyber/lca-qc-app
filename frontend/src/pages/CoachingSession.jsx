@@ -3,13 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { fmtDate } from '../utils';
 
-const PROBLEM_LABELS = { cant: "Can't", didnt: "Didn't", wont: "Won't" };
-const PROBLEM_COLORS = {
-  cant:  { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' },
-  didnt: { color: 'var(--cyan)',  bg: 'rgba(58,181,217,0.12)' },
-  wont:  { color: 'var(--red)',   bg: 'rgba(239,68,68,0.12)'  },
-};
-
 function Field({ label, value, multiline }) {
   if (!value) return null;
   return (
@@ -39,7 +32,6 @@ export default function CoachingSession() {
         setForm({
           date: r.data.date,
           topic: r.data.topic,
-          problem_type: r.data.problem_type,
           how_coached: r.data.how_coached,
           outcome: r.data.outcome,
           followup_date: r.data.followup_date || '',
@@ -72,7 +64,6 @@ export default function CoachingSession() {
   if (loading) return <div className="loading"><div className="spinner" /></div>;
   if (!session) return null;
 
-  const ps = PROBLEM_COLORS[session.problem_type] || PROBLEM_COLORS.cant;
   const openStatus = session.status === 'open';
 
   if (editing) {
@@ -89,26 +80,6 @@ export default function CoachingSession() {
           <div style={{ marginBottom: 12 }}>
             <label className="form-label">Topic</label>
             <input className="form-input" type="text" value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <label className="form-label">Problem Type</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {['cant', 'didnt', 'wont'].map(pt => {
-                const s = PROBLEM_COLORS[pt];
-                const active = form.problem_type === pt;
-                return (
-                  <button key={pt} onClick={() => setForm(f => ({ ...f, problem_type: pt }))} style={{
-                    flex: 1, padding: '8px 0', borderRadius: 8,
-                    border: `2px solid ${active ? s.color : 'var(--border)'}`,
-                    background: active ? s.bg : 'transparent',
-                    color: active ? s.color : 'var(--t2)',
-                    fontWeight: 700, cursor: 'pointer', fontSize: 13,
-                  }}>
-                    {PROBLEM_LABELS[pt]}
-                  </button>
-                );
-              })}
-            </div>
           </div>
           <div style={{ marginBottom: 12 }}>
             <label className="form-label">How It Was Coached</label>
@@ -177,9 +148,6 @@ export default function CoachingSession() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6, color: ps.color, background: ps.bg }}>
-              {PROBLEM_LABELS[session.problem_type] || session.problem_type}
-            </span>
             <span style={{
               fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6,
               color: openStatus ? 'var(--amber)' : 'var(--ok)',

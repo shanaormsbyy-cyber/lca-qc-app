@@ -312,17 +312,14 @@ export default function StaffProfile() {
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Date</th><th>Topic</th><th>Problem</th><th>Sessions</th><th>Status</th></tr></thead>
+                <thead><tr><th>Date</th><th>Topic</th><th>Sessions</th><th>Status</th></tr></thead>
                 <tbody>
                   {coachingSessions.map(s => {
-                    const PCOLORS = { cant: { color: 'var(--amber)', bg: 'rgba(245,158,11,0.12)' }, didnt: { color: 'var(--cyan)', bg: 'rgba(58,181,217,0.12)' }, wont: { color: 'var(--red)', bg: 'rgba(239,68,68,0.12)' } };
-                    const pc = PCOLORS[s.problem_type] || PCOLORS.cant;
                     const openStatus = s.status === 'open';
                     return (
                       <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/coaching/${s.id}`)}>
                         <td>{fmtDate(s.date)}</td>
                         <td style={{ color: 'var(--t2)' }}>{s.topic}</td>
-                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: pc.color, background: pc.bg }}>{{ cant: "Can't", didnt: "Didn't", wont: "Won't" }[s.problem_type]}</span></td>
                         <td style={{ textAlign: 'center' }}>{s.sessions_required}</td>
                         <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: openStatus ? 'var(--amber)' : 'var(--ok)', background: openStatus ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)' }}>{openStatus ? 'Open' : 'Resolved'}</span></td>
                       </tr>
