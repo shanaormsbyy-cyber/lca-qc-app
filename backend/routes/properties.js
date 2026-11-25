@@ -19,10 +19,10 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, location, room_config } = req.body;
+  const { name, location, room_config, access_code } = req.body;
   const loc = (location || '').trim() || getLoc(req) || null;
   const rooms = room_config ? JSON.stringify(room_config) : null;
-  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id, location, room_config) VALUES (?, ?, ?, ?, ?)').run(name, '', '', loc, rooms);
+  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id, location, room_config, access_code) VALUES (?, ?, ?, ?, ?, ?)').run(name, '', '', loc, rooms, access_code || null);
   res.json({ id: result.lastInsertRowid });
 });
 

@@ -10,6 +10,7 @@ export default function PropertyModal({ property, onClose, onSaved }) {
   const [name, setName] = useState(property?.name || '');
   const [location, setLocation] = useState(property ? (property.location || '') : currentArea());
   const [rooms, setRooms] = useState(parseRooms(property));
+  const [access, setAccess] = useState(property?.access_code || '');
   const [sections, setSections] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +29,7 @@ export default function PropertyModal({ property, onClose, onSaved }) {
     setSaving(true); setError('');
     // Every room type gets a count (default 1), same as the old Room Config page.
     const room_config = Object.fromEntries(sections.map(s => [s, rooms[s] ?? 1]));
-    const body = { name: name.trim(), location, room_config };
+    const body = { name: name.trim(), location, room_config, access_code: access.trim() };
     try {
       if (property) await api.put(`/properties/${property.id}`, body);
       else await api.post('/properties', body);
@@ -50,6 +51,12 @@ export default function PropertyModal({ property, onClose, onSaved }) {
           <input className="form-input" value={name} autoFocus onChange={e => setName(e.target.value)} />
         </div>
         <LocationInput value={location} onChange={setLocation} />
+        <div className="form-group">
+          <label className="form-label">Access Details</label>
+          <textarea className="form-input" rows={2} style={{ resize: 'vertical' }}
+            placeholder="e.g. Lockbox: 1234, Front door: 5678…"
+            value={access} onChange={e => setAccess(e.target.value)} />
+        </div>
 
         {sections.length > 0 && (
           <>
