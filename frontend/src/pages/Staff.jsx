@@ -33,6 +33,9 @@ export default function Staff() {
   const [archivedStaff, setArchivedStaff] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [deductions, setDeductions] = useState({});
+  const [creds, setCreds] = useState([]);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '', touched: false });
+  const [staffError, setStaffError] = useState('');
 
   const load = () => Promise.all([
     api.get('/staff'),
@@ -50,6 +53,7 @@ export default function Staff() {
     setManagers(m.data);
     setProperties(p.data);
     fetchDeductions().then(setDeductions);
+    api.get('/staff-portal/credentials').then(r => setCreds(r.data)).catch(() => {});
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
@@ -63,11 +67,61 @@ export default function Staff() {
   };
   const avgScore = id => adjust(checksAvg(id), pointsFor(deductions, id));
 
+  // Portal login lives in the same form as the staff member.
+  const credFor = id => creds.find(c => c.staff_id === id);
+  const suggestUsername = name => (name || '').trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
+  const openStaffModal = s => {
+    setEditing(s);
+    setStaffError('');
+    if (s) {
+      setStaffForm({ name: s.name, role: s.role, start_date: s.start_date, location: s.location || '' });
+      setLoginForm({ username: credFor(s.id)?.username || '', password: '', touched: true });
+    } else {
+      setStaffForm({ name: '', role: 'Cleaner', start_date: new Date().toISOString().slice(0, 10), location: (() => { try { return localStorage.getItem('location_filter') || 'Hamilton'; } catch { return 'Hamilton'; } })() });
+      setLoginForm({ username: '', password: '', touched: false });
+    }
+    setShowStaffModal(true);
+  };
+  const setStaffName = name => {
+    setStaffForm(f => ({ ...f, name }));
+    setLoginForm(l => (l.touched ? l : { ...l, username: suggestUsername(name) }));
+  };
+
   const saveStaff = async () => {
     if (!staffForm.name || !staffForm.role || !staffForm.start_date) return;
+    setStaffError('');
+    const username = loginForm.username.trim();
+    const password = loginForm.password;
+    const existing = editing ? credFor(editing.id) : null;
+    if (!existing && password && !username) return setStaffError('Enter a username for their login.');
+    let staffId = editing?.id;
     if (editing) await api.put(`/staff/${editing.id}`, staffForm);
-    else await api.post('/staff', staffForm);
+    else {
+      staffId = (await api.post('/staff', staffForm)).data.id;
+      setEditing({ id: staffId, ...staffForm }); // a retry after a login error won't add them twice
+    }
+    try {
+      if (existing) {
+        const body = {};
+        if (username && username !== existing.username) body.username = username;
+        if (password) body.password = password;
+        if (Object.keys(body).length) await api.put(`/staff-portal/credentials/${existing.id}`, body);
+      } else if (username && password) {
+        await api.post('/staff-portal/credentials', { staff_id: staffId, username, password });
+      }
+    } catch (err) {
+      await load();
+      return setStaffError(`Saved, but the login wasn't: ${err.response?.data?.error || 'something went wrong'}.`);
+    }
     await load(); setShowStaffModal(false);
+  };
+
+  const removeLogin = async () => {
+    const existing = editing && credFor(editing.id);
+    if (!existing || !confirm(`Remove ${editing.name}'s portal login?`)) return;
+    await api.delete(`/staff-portal/credentials/${existing.id}`);
+    setLoginForm({ username: '', password: '', touched: true });
+    await load();
   };
 
   const setInactive = async () => {
@@ -128,7 +182,7 @@ export default function Staff() {
         </div>
         <div className="flex gap-3">
           {tab === 'team' && (
-            <button className="btn btn-ghost" onClick={() => { setEditing(null); setStaffForm({ name: '', role: 'Cleaner', start_date: new Date().toISOString().slice(0, 10), location: (() => { try { return localStorage.getItem('location_filter') || 'Hamilton'; } catch { return 'Hamilton'; } })() }); setShowStaffModal(true); }}>
+            <button className="btn btn-ghost" onClick={() => openStaffModal(null)}>
               + Add Staff
             </button>
           )}
@@ -170,7 +224,10 @@ export default function Staff() {
                         <div style={{ width: 36, height: 36, borderRadius: '50%', background: isInactive ? 'var(--t3)' : 'var(--cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#000', fontSize: 13, flexShrink: 0 }}>
                           {s.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        <span style={{ fontWeight: 700 }}>{s.name}</span>
+                        <div>
+                          <span style={{ fontWeight: 700 }}>{s.name}</span>
+                          {credFor(s.id) && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>Login: {credFor(s.id).username}</div>}
+                        </div>
                       </div>
                     </td>
                     <td style={{ color: 'var(--t2)' }}>{s.role}{s.location && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{s.location}</div>}</td>
@@ -187,7 +244,7 @@ export default function Staff() {
                           ? <button className="btn btn-sm btn-ghost" onClick={e => clearInactive(s.id, e)}>Reactivate</button>
                           : <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setInactiveModal(s); setInactiveDate(''); }}>Inactive</button>
                         }
-                        <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setEditing(s); setStaffForm({ name: s.name, role: s.role, start_date: s.start_date, location: s.location || '' }); setShowStaffModal(true); }}>Edit</button>
+                        <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); openStaffModal(s); }}>Edit</button>
                         <button className="btn btn-sm btn-danger" onClick={e => archiveStaff(s.id, s.name, e)}>Archive</button>
                       </div>
                     </td>
@@ -349,7 +406,7 @@ export default function Staff() {
             <div className="modal-title">{editing ? 'Edit Staff Member' : 'Add Staff Member'}</div>
             <div className="form-group">
               <label className="form-label">Full Name</label>
-              <input className="form-input" value={staffForm.name} onChange={e => setStaffForm(f => ({ ...f, name: e.target.value }))} />
+              <input className="form-input" value={staffForm.name} onChange={e => setStaffName(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Role</label>
@@ -365,6 +422,32 @@ export default function Staff() {
               <input className="form-input" type="date" value={staffForm.start_date} onChange={e => setStaffForm(f => ({ ...f, start_date: e.target.value }))} />
             </div>
             <LocationInput value={staffForm.location} onChange={v => setStaffForm(f => ({ ...f, location: v }))} />
+
+            <div style={{ borderTop: '1px solid var(--border, rgba(255,255,255,0.08))', margin: '18px 0 14px', paddingTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Staff portal login</div>
+                {editing && credFor(editing.id) && (
+                  <button type="button" onClick={removeLogin} style={{ background: 'none', border: 'none', color: 'var(--red)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Remove login</button>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 4 }}>
+                Optional. They sign in at {window.location.origin}/portal/login to see their QC results.
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <input className="form-input" autoComplete="off" value={loginForm.username}
+                  onChange={e => setLoginForm(l => ({ ...l, username: e.target.value, touched: true }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">{editing && credFor(editing.id) ? 'New password' : 'Password'}</label>
+                <input className="form-input" type="password" autoComplete="new-password" value={loginForm.password}
+                  placeholder={editing && credFor(editing.id) ? 'Leave blank to keep' : 'Leave blank for no login'}
+                  onChange={e => setLoginForm(l => ({ ...l, password: e.target.value }))} />
+              </div>
+            </div>
+            {staffError && <p style={{ color: 'var(--red)', fontSize: 13, marginTop: 4 }}>{staffError}</p>}
             <div className="flex gap-3 mt-4">
               <button className="btn btn-primary" onClick={saveStaff}>Save</button>
               <button className="btn btn-ghost" onClick={() => setShowStaffModal(false)}>Cancel</button>

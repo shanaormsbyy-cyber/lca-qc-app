@@ -18,7 +18,6 @@ import Settings from './pages/Settings';
 import InductionTraining from './pages/InductionTraining';
 import HeatPumpTracker from './pages/HeatPumpTracker';
 import HeatPumpDetail from './pages/HeatPumpDetail';
-import StaffLogins from './pages/StaffLogins';
 import StaffPortalLogin from './pages/StaffPortalLogin';
 import StaffPortalDashboard from './pages/StaffPortalDashboard';
 import StaffPortalCheck from './pages/StaffPortalCheck';
@@ -57,7 +56,7 @@ export default function App() {
         <Route path="kpis/:managerId" element={<ManagerProfile />} />
         <Route path="heatpump" element={<HeatPumpTracker />} />
         <Route path="heatpump/:id" element={<HeatPumpDetail />} />
-        <Route path="staff-logins" element={<StaffLogins />} />
+        <Route path="staff-logins" element={<Navigate to="/staff" replace />} />
         <Route path="settings" element={<Settings />} />
         <Route path="complaints" element={<Complaints />} />
         <Route path="training-hub/*" element={<HubRoutes />} />
