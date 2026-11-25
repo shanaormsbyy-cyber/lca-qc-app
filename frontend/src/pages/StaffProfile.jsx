@@ -5,6 +5,7 @@ import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
+import { fetchDeductions, adjust, pointsFor, fmtScore, breakdownText } from '../lib/complaintScore';
 
 export default function StaffProfile() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function StaffProfile() {
   const [commonIssues, setCommonIssues] = useState([]);
   const [coachingSessions, setCoachingSessions] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [deductions, setDeductions] = useState({});
   const [activeTab, setActiveTab] = useState('qc');
   const [issuesMonth, setIssuesMonth] = useState(() => {
     const now = new Date();
@@ -40,6 +42,7 @@ export default function StaffProfile() {
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
     api.get(`/coaching?staff_id=${id}`).then(r => setCoachingSessions(r.data)).catch(() => {});
     api.get(`/complaints?staff_id=${id}`).then(r => setComplaints(r.data)).catch(() => {});
+    fetchDeductions().then(setDeductions);
   };
 
   const loadIssues = (month) => {
@@ -69,7 +72,10 @@ export default function StaffProfile() {
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(c => ({ date: c.date, score: Math.round(c.score_pct), name: c.property_name }));
 
-  const avgScore = qcChecks.length ? qcChecks.reduce((s, c) => s + c.score_pct, 0) / qcChecks.length : null;
+  // QC average from checks, minus complaint points from the last 90 days.
+  const checksAvgScore = qcChecks.length ? qcChecks.reduce((s, c) => s + c.score_pct, 0) / qcChecks.length : null;
+  const complaintPoints = pointsFor(deductions, parseInt(id));
+  const avgScore = adjust(checksAvgScore, complaintPoints);
 
   return (
     <div className="page">
@@ -110,7 +116,11 @@ export default function StaffProfile() {
 
       <div className="stat-grid mb-6">
         <div className="stat-card"><div className="stat-label">QC Checks</div><div className="stat-value">{qcChecks.length}</div></div>
-        <div className="stat-card"><div className="stat-label">Avg QC Score</div><div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{avgScore ? Math.round(avgScore) + '%' : '—'}</div></div>
+        <div className="stat-card">
+          <div className="stat-label">Avg QC Score</div>
+          <div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{fmtScore(avgScore)}</div>
+          {breakdownText(checksAvgScore, complaintPoints) && <div className="stat-sub">{breakdownText(checksAvgScore, complaintPoints)}</div>}
+        </div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
         <div className="stat-card"><div className="stat-label">Coaching Sessions</div><div className="stat-value">{coachingSessions.length}</div></div>
         {(() => {
@@ -344,7 +354,7 @@ export default function StaffProfile() {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Date</th><th>Source</th><th>Severity</th><th>Property</th><th>Description</th><th>Resolution</th></tr>
+                  <tr><th>Date</th><th>Source</th><th>Severity</th><th>Property</th><th>Description</th><th>How it was addressed</th></tr>
                 </thead>
                 <tbody>
                   {[...complaints].sort((a, b) => b.date.localeCompare(a.date)).map(c => {
@@ -359,7 +369,7 @@ export default function StaffProfile() {
                         <td style={{ color: 'var(--t2)', fontSize: 13 }}>{c.property_name || '—'}</td>
                         <td style={{ maxWidth: 240, fontSize: 13, color: 'var(--t1)' }}>{c.description}</td>
                         <td style={{ maxWidth: 200, fontSize: 13, color: c.resolution ? 'var(--ok)' : 'var(--t3)', fontStyle: c.resolution ? 'normal' : 'italic' }}>
-                          {c.resolution || 'Unresolved'}
+                          {c.resolution || 'Not addressed'}
                         </td>
                       </tr>
                     );

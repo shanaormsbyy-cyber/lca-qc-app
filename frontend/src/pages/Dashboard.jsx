@@ -6,6 +6,7 @@ import useLiveSync from '../hooks/useLiveSync';
 import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
+import { fetchDeductions, adjust, fmtScore, breakdownText } from '../lib/complaintScore';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [watchlist, setWatchlist] = useState([]);
   const [overrideIds, setOverrideIds] = useState(new Set());
   const [topPerformers, setTopPerformers] = useState([]);
+  const [deductions, setDeductions] = useState({});
   const [flaggedWeek, setFlaggedWeek] = useState([]);
   const [flaggedMonth, setFlaggedMonth] = useState([]);
   const [flagTab, setFlagTab] = useState('week');
@@ -68,6 +70,7 @@ export default function Dashboard() {
     }).finally(() => setLoading(false));
     api.get('/kpis/watchlist').then(r => { setWatchlist(r.data.watchlist || []); setOverrideIds(new Set(r.data.overrideIds || [])); }).catch(() => {});
     api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])).catch(() => {});
+    fetchDeductions().then(setDeductions);
     api.get('/kpis/flagged-items?period=week').then(r => setFlaggedWeek(r.data.items || [])).catch(() => {});
     api.get('/kpis/flagged-items?period=month').then(r => setFlaggedMonth(r.data.items || [])).catch(() => {});
     api.get('/heatpump/records').then(r => {
@@ -157,9 +160,15 @@ export default function Dashboard() {
 
   // Staff avg: simple mean across all completed staff checks (correct — not averaged per-person first)
   const staffChecks = completeQC.filter(q => (q.check_type === 'staff' || !q.check_type) && q.score_pct != null);
-  const staffAvg = staffChecks.length
-    ? Math.round(staffChecks.reduce((sum, q) => sum + q.score_pct, 0) / staffChecks.length)
+  const rawStaffAvg = staffChecks.length
+    ? staffChecks.reduce((sum, q) => sum + q.score_pct, 0) / staffChecks.length
     : null;
+  // Complaints (last 90 days) lower the team score by the average complaint points per cleaner.
+  const cleanersWithChecks = [...new Set(staffChecks.map(q => q.staff_id))];
+  const teamComplaintPoints = cleanersWithChecks.length
+    ? Math.round((cleanersWithChecks.reduce((sum, id) => sum + (deductions[id] ? deductions[id].points : 0), 0) / cleanersWithChecks.length) * 10) / 10
+    : 0;
+  const staffAvg = adjust(rawStaffAvg, teamComplaintPoints);
 
   // Property avg: simple mean across all completed property checks
   const propertyChecks = completeQC.filter(q => q.check_type === 'property' && q.score_pct != null);
@@ -200,8 +209,8 @@ export default function Dashboard() {
         </div>
         <div className="stat-card" onClick={() => navigate('/staff')} style={{ cursor: 'pointer' }}>
           <div className="stat-label">Avg Team Score</div>
-          <div className={`stat-value${scoreColor(staffAvg)}`}>{staffAvg != null ? `${staffAvg}%` : '—'}</div>
-          <div className="stat-sub">Per cleaner average</div>
+          <div className={`stat-value${scoreColor(staffAvg)}`}>{fmtScore(staffAvg)}</div>
+          <div className="stat-sub">{teamComplaintPoints ? `Incl. −${teamComplaintPoints} avg for complaints` : 'Per cleaner average'}</div>
         </div>
         <div className="stat-card" onClick={() => navigate('/properties')} style={{ cursor: 'pointer' }}>
           <div className="stat-label">Avg Property Score</div>
@@ -349,12 +358,14 @@ export default function Dashboard() {
                         {isComplaintRisk ? (
                           <>
                             <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--amber)' }}>Complaints</div>
-                            <div style={{ fontSize: 11, color: 'var(--t3)' }}>{w.avg_score != null ? `QC avg: ${w.avg_score}%` : 'No QC data'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--t3)' }}>{w.avg_score != null ? `QC avg: ${fmtScore(w.avg_score)}` : 'No QC data'}</div>
+                            {breakdownText(w.checks_avg, w.complaint_points) && <div style={{ fontSize: 10, color: 'var(--t3)' }}>{breakdownText(w.checks_avg, w.complaint_points)}</div>}
                           </>
                         ) : (
                           <>
-                            <div style={{ fontWeight: 800, fontSize: 20, color: isOverride ? '#a78bfa' : 'var(--red)' }}>{w.avg_score != null ? `${w.avg_score}%` : '—'}</div>
+                            <div style={{ fontWeight: 800, fontSize: 20, color: isOverride ? '#a78bfa' : 'var(--red)' }}>{fmtScore(w.avg_score)}</div>
                             <div style={{ fontSize: 11, color: 'var(--t3)' }}>{isOverride ? 'avg score' : `below ${w.threshold}% threshold`}</div>
+                            {breakdownText(w.checks_avg, w.complaint_points) && <div style={{ fontSize: 10, color: 'var(--t3)' }}>{breakdownText(w.checks_avg, w.complaint_points)}</div>}
                           </>
                         )}
                       </div>
@@ -400,8 +411,8 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => navigate(`/staff/${w.id}`)}>
-                      <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--cyan)' }}>{w.avg_score}%</div>
-                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>avg score</div>
+                      <div style={{ fontWeight: 800, fontSize: 20, color: 'var(--cyan)' }}>{fmtScore(w.avg_score)}</div>
+                      <div style={{ fontSize: 11, color: 'var(--t3)' }}>{breakdownText(w.checks_avg, w.complaint_points) || 'avg score'}</div>
                     </div>
                     <button
                       onClick={async e => { e.stopPropagation(); await api.post(`/kpis/watchlist-override/${w.id}`); api.get('/kpis/watchlist').then(r => { setWatchlist(r.data.watchlist || []); setOverrideIds(new Set(r.data.overrideIds || [])); }); api.get('/kpis/top-performers').then(r => setTopPerformers(r.data.topPerformers || [])); }}

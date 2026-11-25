@@ -4,6 +4,7 @@ import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
+import { fetchDeductions, adjust, pointsFor, breakdownText } from '../lib/complaintScore';
 
 export default function Staff() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function Staff() {
   const [inactiveDate, setInactiveDate] = useState('');
   const [archivedStaff, setArchivedStaff] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
+  const [deductions, setDeductions] = useState({});
 
   const load = () => Promise.all([
     api.get('/staff'),
@@ -42,16 +44,19 @@ export default function Staff() {
     setChecklists(cl.data);
     setManagers(m.data);
     setProperties(p.data);
+    fetchDeductions().then(setDeductions);
   }).finally(() => setLoading(false));
 
   useEffect(() => { load(); }, []);
   useLiveSync(load);
 
   const dueInfo = id => due?.staff.find(s => s.id === id);
-  const avgScore = id => {
+  // QC average from checks, then minus complaint points from the last 90 days.
+  const checksAvg = id => {
     const c = checks.filter(c => c.staff_id === id && c.status === 'complete');
     return c.length ? c.reduce((s, c) => s + c.score_pct, 0) / c.length : null;
   };
+  const avgScore = id => adjust(checksAvg(id), pointsFor(deductions, id));
 
   const saveStaff = async () => {
     if (!staffForm.name || !staffForm.role || !staffForm.start_date) return;
@@ -166,7 +171,10 @@ export default function Staff() {
                     <td style={{ color: 'var(--t2)' }}>{s.role}</td>
                     <td>{isInactive ? <span className="badge badge-grey">Inactive until {s.inactive_until}</span> : d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>
-                    <td><ScoreBadge score={avg} /></td>
+                    <td>
+                      <ScoreBadge score={avg} precise title={breakdownText(checksAvg(s.id), pointsFor(deductions, s.id)) || undefined} />
+                      {pointsFor(deductions, s.id) > 0 && avg != null && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3 }}>−{pointsFor(deductions, s.id)} complaints</div>}
+                    </td>
                     <td style={{ color: 'var(--t2)' }}>{total}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 6 }}>

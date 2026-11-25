@@ -173,7 +173,7 @@ export default function StaffPortalDashboard() {
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 24 }}>
               <StatCard label="Total Checks" value={stats.total} color="var(--cyan)" />
-              <StatCard label="Average Score" value={`${stats.average}%`} color={scoreColor(stats.average)} />
+              <StatCard label="Average Score" value={`${stats.average}%`} color={scoreColor(stats.average)} sub={stats.complaint_points ? `${stats.checks_average}% checks − ${stats.complaint_points} for complaints` : undefined} />
               <StatCard label="Best Score" value={`${stats.best}%`} color={scoreColor(stats.best)} />
               <StatCard label="Latest Score" value={`${stats.latest}%`} color={scoreColor(stats.latest)} />
             </div>

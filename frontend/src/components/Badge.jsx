@@ -1,9 +1,11 @@
 import React from 'react';
 
-export function ScoreBadge({ score }) {
+// `precise` shows one decimal place (used for complaint-adjusted averages like 88.5%).
+export function ScoreBadge({ score, precise = false, title }) {
   if (score == null) return <span className="badge badge-grey">—</span>;
   const cls = score >= 85 ? 'badge-green' : score >= 70 ? 'badge-amber' : 'badge-red';
-  return <span className={`badge ${cls}`}>{Math.round(score)}%</span>;
+  const text = precise ? (Math.round(score * 10) / 10).toString() : Math.round(score);
+  return <span className={`badge ${cls}`} title={title}>{text}%</span>;
 }
 
 export function ScoreBar({ score }) {

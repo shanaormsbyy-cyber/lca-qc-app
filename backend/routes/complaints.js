@@ -5,8 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth);
 
-// Severity weights for impact score calculation
-const SEVERITY_WEIGHTS = { minor: 2, moderate: 5, serious: 10 };
+const { round1, POINTS, periodStart, todayNZ, defaultWindow, deductionsByStaff, adjustScore } = require('../lib/complaintScore');
 
 // GET /api/complaints — all complaints, optional ?staff_id= filter
 router.get('/', (req, res) => {
@@ -40,6 +39,40 @@ router.get('/', (req, res) => {
   `).all(...params);
 
   res.json(rows);
+});
+
+// GET /api/complaints/deductions — { [staff_id]: { points, minor, moderate, serious, count } }
+// Complaint points over the default 90-day window, for pages that show all-time QC averages.
+router.get('/deductions', (req, res) => {
+  res.json({ points: POINTS, window_days: 90, deductions: deductionsByStaff(db, defaultWindow()) });
+});
+
+// GET /api/complaints/scores?period=90d — how complaints change each affected cleaner's QC score
+// in the selected period: checks average in the period, complaint points, adjusted score,
+// and whether the watchlist trigger is met (1+ serious or 2+ moderate in the last 90 days).
+router.get('/scores', (req, res) => {
+  const period = req.query.period || '90d';
+  const win = { from: periodStart(period), to: todayNZ() };
+  const deductions = deductionsByStaff(db, win);
+  const trigger = deductionsByStaff(db, defaultWindow());
+  const checksAvg = db.prepare(`
+    SELECT AVG(score_pct) AS avg, COUNT(*) AS cnt FROM qc_checks
+    WHERE staff_id = ? AND status = 'complete' AND (check_type = 'staff' OR check_type IS NULL)
+      ${win.from ? 'AND date >= ?' : ''} AND date <= ?
+  `);
+  const rows = Object.entries(deductions).map(([staffId, d]) => {
+    const s = db.prepare('SELECT id, name FROM staff WHERE id = ?').get(Number(staffId));
+    if (!s) return null;
+    const c = checksAvg.get(...[s.id, win.from, win.to].filter(v => v !== null));
+    const avg = c.avg == null ? null : round1(c.avg);
+    const t = trigger[s.id] || { serious: 0, moderate: 0 };
+    return {
+      staff_id: s.id, name: s.name, ...d,
+      checks_avg: avg, checks: c.cnt, adjusted: adjustScore(avg, d.points),
+      watchlist_trigger: t.serious >= 1 || t.moderate >= 2,
+    };
+  }).filter(Boolean).sort((a, b) => b.points - a.points);
+  res.json({ period, from: win.from, to: win.to, points: POINTS, cleaners: rows });
 });
 
 // GET /api/complaints/:id
@@ -101,51 +134,6 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM complaints WHERE id=?').run(req.params.id);
   res.json({ ok: true });
-});
-
-// GET /api/complaints/impact/all — impact score per staff member (rolling 90d)
-// Impact score: starts at 100, subtract severity weights for complaints in window
-// Also flags staff with 2+ moderate or 1+ serious in 90d as "complaint risk"
-router.get('/impact/all', (req, res) => {
-  const staff = db.prepare('SELECT id, name FROM staff WHERE (inactive_until IS NULL OR inactive_until <= date("now")) AND (archived=0 OR archived IS NULL)').all();
-
-  const results = staff.map(s => {
-    const complaints = db.prepare(`
-      SELECT severity, COUNT(*) as cnt
-      FROM complaints
-      WHERE staff_id = ? AND date >= date('now', '-90 days')
-      GROUP BY severity
-    `).all(s.id);
-
-    let deduction = 0;
-    let minorCount = 0, moderateCount = 0, seriousCount = 0;
-    complaints.forEach(c => {
-      const w = SEVERITY_WEIGHTS[c.severity] || 0;
-      deduction += w * c.cnt;
-      if (c.severity === 'minor')    minorCount    = c.cnt;
-      if (c.severity === 'moderate') moderateCount = c.cnt;
-      if (c.severity === 'serious')  seriousCount  = c.cnt;
-    });
-
-    const totalCount = minorCount + moderateCount + seriousCount;
-    const impactScore = Math.max(0, 100 - deduction);
-    const riskFlag = seriousCount >= 1 || moderateCount >= 2;
-
-    return {
-      id: s.id,
-      name: s.name,
-      impact_score: impactScore,
-      deduction,
-      total_complaints: totalCount,
-      minor_count: minorCount,
-      moderate_count: moderateCount,
-      serious_count: seriousCount,
-      risk_flag: riskFlag,
-    };
-  });
-
-  // Only return staff who have at least one complaint or are flagged
-  res.json(results.filter(r => r.total_complaints > 0));
 });
 
 module.exports = router;

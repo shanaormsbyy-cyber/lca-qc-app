@@ -2,8 +2,23 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
+const { round1, complaintDeduction, adjustScore } = require("../lib/complaintScore");
+
 const router = express.Router();
 router.use(requireAuth);
+
+// A cleaner's QC score: average of their completed staff checks, minus complaint points
+// from the last 90 days. Returns the breakdown so the UI can explain the number.
+function cleanerScore(staffId) {
+  const r = db.prepare(`
+    SELECT COUNT(*) as cnt, AVG(score_pct) as avg
+    FROM qc_checks
+    WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+  `).get(staffId);
+  const ded = complaintDeduction(db, staffId);
+  const checksAvg = r.avg == null ? null : round1(r.avg);
+  return { cnt: r.cnt, checks_avg: checksAvg, complaint_points: ded.points, avg: adjustScore(checksAvg, ded.points) };
+}
 
 function getDateFilter(range) {
   const today = new Date();
@@ -233,11 +248,7 @@ router.get('/top-performers', (req, res) => {
 
   staff.forEach(s => {
     if (overrideIds.has(s.id)) return; // manually moved to watchlist
-    const result = db.prepare(`
-      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
-      FROM qc_checks
-      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-    `).get(s.id);
+    const result = cleanerScore(s.id);
 
     if (result.cnt >= minChecks && result.avg != null && result.avg >= threshold) {
       const recent = db.prepare(`
@@ -250,7 +261,7 @@ router.get('/top-performers', (req, res) => {
 
       topPerformers.push({
         ...s,
-        avg_score: Math.round(result.avg),
+        avg_score: result.avg, checks_avg: result.checks_avg, complaint_points: result.complaint_points,
         total_checks: result.cnt,
         recent_checks: recent,
         threshold,
@@ -280,11 +291,7 @@ router.get('/watchlist', (req, res) => {
   // Manual overrides — run first so they take priority over QC/complaints reason
   staff.forEach(s => {
     if (!overrideIds.has(s.id)) return;
-    const result = db.prepare(`
-      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
-      FROM qc_checks
-      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-    `).get(s.id);
+    const result = cleanerScore(s.id);
     const recent = db.prepare(`
       SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
       FROM qc_checks
@@ -303,7 +310,7 @@ router.get('/watchlist', (req, res) => {
     });
     watchlist.push({
       ...s,
-      avg_score: result.avg ? Math.round(result.avg) : null,
+      avg_score: result.avg, checks_avg: result.checks_avg, complaint_points: result.complaint_points,
       total_checks: result.cnt,
       recent_checks: recent,
       threshold,
@@ -316,11 +323,7 @@ router.get('/watchlist', (req, res) => {
 
   // QC underperformers
   staff.forEach(s => {
-    const result = db.prepare(`
-      SELECT COUNT(*) as cnt, AVG(score_pct) as avg
-      FROM qc_checks
-      WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-    `).get(s.id);
+    const result = cleanerScore(s.id);
 
     if (result.cnt > 0 && result.avg != null && result.avg < threshold) {
       const recent = db.prepare(`
@@ -333,7 +336,7 @@ router.get('/watchlist', (req, res) => {
 
       watchlist.push({
         ...s,
-        avg_score: Math.round(result.avg),
+        avg_score: result.avg, checks_avg: result.checks_avg, complaint_points: result.complaint_points,
         total_checks: result.cnt,
         recent_checks: recent,
         threshold,
@@ -360,15 +363,11 @@ router.get('/watchlist', (req, res) => {
     });
 
     if (seriousCount >= 1 || moderateCount >= 2) {
-      const qcResult = db.prepare(`
-        SELECT COUNT(*) as cnt, AVG(score_pct) as avg
-        FROM qc_checks
-        WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
-      `).get(s.id);
+      const qcResult = cleanerScore(s.id);
 
       watchlist.push({
         ...s,
-        avg_score: qcResult.avg ? Math.round(qcResult.avg) : null,
+        avg_score: qcResult.avg, checks_avg: qcResult.checks_avg, complaint_points: qcResult.complaint_points,
         total_checks: qcResult.cnt,
         recent_checks: [],
         threshold,
@@ -619,17 +618,22 @@ router.get('/staff/:id/insights', (req, res) => {
   }
 
   // ── 6. Overall summary line ───────────────────────────────────────────────
-  const avgScore = checks.reduce((s, c) => s + c.score_pct, 0) / checks.length;
+  // QC score includes complaint points from the last 90 days.
+  const ded = complaintDeduction(db, staffId);
+  const staffChecks = checks.filter(c => c.score_pct != null);
+  const rawAvg = staffChecks.length ? round1(staffChecks.reduce((s, c) => s + c.score_pct, 0) / staffChecks.length) : null;
+  const avgScore = adjustScore(rawAvg, ded.points);
+  const shown = `${avgScore}%${ded.points ? ` (after −${ded.points} for complaints)` : ''}`;
   const midThreshold = acceptableThreshold - (acceptableThreshold - (acceptableThreshold * 0.85));
   let summary;
   if (avgScore >= topThreshold && persistent.length === 0) {
-    summary = `Strong performer with an average score of ${Math.round(avgScore)}% across ${checks.length} checks.`;
+    summary = `Strong performer with an average score of ${shown} across ${checks.length} checks.`;
   } else if (avgScore >= acceptableThreshold) {
-    summary = `Averaging ${Math.round(avgScore)}% across ${checks.length} checks — meeting the ${Math.round(acceptableThreshold)}% target${persistent.length > 0 ? ', but with recurring items to address' : ''}.`;
+    summary = `Averaging ${shown} across ${checks.length} checks — meeting the ${Math.round(acceptableThreshold)}% target${persistent.length > 0 ? ', but with recurring items to address' : ''}.`;
   } else if (avgScore >= acceptableThreshold * 0.85) {
-    summary = `Averaging ${Math.round(avgScore)}% across ${checks.length} checks — below the ${Math.round(acceptableThreshold)}% acceptable average. Improvement needed in key areas.`;
+    summary = `Averaging ${shown} across ${checks.length} checks — below the ${Math.round(acceptableThreshold)}% acceptable average. Improvement needed in key areas.`;
   } else {
-    summary = `Below-target average of ${Math.round(avgScore)}% across ${checks.length} checks — recommend active coaching and follow-up.`;
+    summary = `Below-target average of ${shown} across ${checks.length} checks — recommend active coaching and follow-up.`;
   }
 
   if (insights.length === 0) {

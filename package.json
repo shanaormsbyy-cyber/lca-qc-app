@@ -8,7 +8,8 @@
     "build": "cd frontend && npm install && npm run build",
     "start": "node backend/server.js",
     "seed": "node backend/seed.js",
-    "add-properties": "node backend/add-properties.js"
+    "add-properties": "node backend/add-properties.js",
+    "test": "node --test --test-concurrency=1 backend/test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

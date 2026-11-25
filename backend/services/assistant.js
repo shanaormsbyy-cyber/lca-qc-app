@@ -1,4 +1,5 @@
 const db = require('../db');
+const { deductionsByStaff, adjustScore } = require('../lib/complaintScore');
 
 function getSettings() {
   const rows = db.prepare('SELECT * FROM settings').all();
@@ -23,6 +24,12 @@ function buildContext() {
     GROUP BY s.id
     ORDER BY s.name
   `).all();
+  // QC scores include complaint points from the last 90 days.
+  const deductions = deductionsByStaff(db);
+  staff.forEach(s => {
+    s.complaint_points = deductions[s.id] ? deductions[s.id].points : 0;
+    s.avg_score = adjustScore(s.avg_score, s.complaint_points);
+  });
 
   const complaints = db.prepare(`
     SELECT c.*, s.name as staff_name, p.name as property_name
@@ -43,15 +50,16 @@ function buildContext() {
   `).all();
 
   const watchlist = db.prepare(`
-    SELECT s.name, ROUND(AVG(q.score_pct),1) as avg_score, COUNT(q.id) as checks
+    SELECT s.id, s.name, ROUND(AVG(q.score_pct),1) as avg_score, COUNT(q.id) as checks
     FROM staff s
     JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
       AND q.date >= date('now', '-90 days')
     WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
-    HAVING avg_score < ?
-    ORDER BY avg_score ASC
-  `).all(threshold);
+  `).all()
+    .map(w => ({ ...w, avg_score: adjustScore(w.avg_score, deductions[w.id] ? deductions[w.id].points : 0) }))
+    .filter(w => w.avg_score != null && w.avg_score < threshold)
+    .sort((a, b) => a.avg_score - b.avg_score);
 
   const overdueStaff = db.prepare(`
     SELECT s.name, MAX(q.date) as last_check
@@ -79,7 +87,7 @@ function buildSystemPrompt(ctx) {
   const { staff, complaints, coaching, watchlist, overdueStaff, properties, threshold, today } = ctx;
 
   const staffLines = staff.map(s =>
-    `- ${s.name} (${s.role}): ${s.total_checks} checks, avg ${s.avg_score ?? 'N/A'}%, latest ${s.latest_score ?? 'N/A'}%, last checked ${s.last_check_date ?? 'never'}`
+    `- ${s.name} (${s.role}): ${s.total_checks} checks, avg ${s.avg_score ?? 'N/A'}%${s.complaint_points ? ` (after −${s.complaint_points} for complaints)` : ''}, latest ${s.latest_score ?? 'N/A'}%, last checked ${s.last_check_date ?? 'never'}`
   ).join('\n');
 
   const complaintLines = complaints.length === 0 ? 'None in last 90 days.' : complaints.map(c =>

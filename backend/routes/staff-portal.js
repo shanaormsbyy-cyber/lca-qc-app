@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { round1, complaintDeduction, adjustScore } = require("../lib/complaintScore");
 const { requireStaffAuth, requireAuth, SECRET } = require('../middleware/auth');
 
 const router = express.Router();
@@ -95,7 +96,10 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
   if (total === 0) return res.json({ total: 0, average: 0, best: 0, latest: 0, trend: [], threshold, topThreshold });
 
   const scores = checks.map(c => c.score_pct);
-  const average = Math.round(scores.reduce((a, b) => a + b, 0) / total);
+  // QC average includes complaint points from the last 90 days.
+  const complaintPoints = complaintDeduction(db, req.staffUser.id).points;
+  const checksAverage = round1(scores.reduce((a, b) => a + b, 0) / total);
+  const average = adjustScore(checksAverage, complaintPoints);
   const best = Math.round(Math.max(...scores));
   const latest = Math.round(scores[scores.length - 1]);
 
@@ -107,14 +111,16 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
     const month = d.toISOString().slice(0, 7); // YYYY-MM
     const monthChecks = checks.filter(c => c.date && c.date.startsWith(month));
     if (monthChecks.length > 0) {
-      const avg = Math.round(monthChecks.reduce((a, c2) => a + c2.score_pct, 0) / monthChecks.length);
+      // Each month's score counts complaints dated in that month.
+      const monthPoints = complaintDeduction(db, req.staffUser.id, { from: `${month}-01`, to: `${month}-31` }).points;
+      const avg = adjustScore(monthChecks.reduce((a, c2) => a + c2.score_pct, 0) / monthChecks.length, monthPoints);
       trend.push({ month, avg, count: monthChecks.length });
     } else {
       trend.push({ month, avg: null, count: 0 });
     }
   }
 
-  res.json({ total, average, best, latest, trend, threshold, topThreshold });
+  res.json({ total, average, checks_average: checksAverage, complaint_points: complaintPoints, best, latest, trend, threshold, topThreshold });
 });
 
 // ─── Staff: my commonly flagged issues, accepts ?month=YYYY-MM ───────────────
