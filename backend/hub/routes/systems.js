@@ -77,7 +77,11 @@ module.exports = (db) => {
     if (Array.isArray(b.modules)) {
       db.prepare('DELETE FROM system_modules WHERE system_id = ?').run(id);
       const ins = db.prepare('INSERT INTO system_modules (system_id, title, content, sort_order) VALUES (?, ?, ?, ?)');
-      b.modules.filter(m => m && m.title && String(m.title).trim()).forEach((m, i) => ins.run(id, String(m.title).trim(), m.content || null, i));
+      // A blurb needs a heading or some text (the heading is optional).
+      b.modules
+        .map(m => ({ title: String((m && m.title) || '').trim(), content: String((m && m.content) || '').trim() }))
+        .filter(m => m.title || m.content)
+        .forEach((m, i) => ins.run(id, m.title, m.content || null, i));
     }
     if (Array.isArray(b.trainer_ids)) {
       db.prepare('DELETE FROM system_trainers WHERE system_id = ?').run(id);
