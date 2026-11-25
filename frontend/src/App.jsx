@@ -9,7 +9,6 @@ import Properties from './pages/Properties';
 import PropertyProfile from './pages/PropertyProfile';
 import QCChecks from './pages/QCChecks';
 import QCCheckForm from './pages/QCCheckForm';
-import Checklists from './pages/Checklists';
 import KPIs from './pages/KPIs';
 import ManagerProfile from './pages/ManagerProfile';
 import Settings from './pages/Settings';
@@ -46,7 +45,7 @@ export default function App() {
         <Route path="training/*" element={<Navigate to="/training-hub" replace />} />
         <Route path="qc" element={<QCChecks />} />
         <Route path="qc/checks/:id" element={<QCCheckForm />} />
-        <Route path="checklists" element={<Checklists />} />
+        <Route path="checklists" element={<Navigate to="/settings?tab=checklists" replace />} />
         <Route path="kpis" element={<KPIs />} />
         <Route path="kpis/:managerId" element={<ManagerProfile />} />
         <Route path="heatpump" element={<HeatPumpTracker />} />

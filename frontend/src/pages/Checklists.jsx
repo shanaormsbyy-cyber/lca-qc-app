@@ -109,7 +109,7 @@ function QCChecklistBuilder({ checklist, onSave, onCancel }) {
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function Checklists() {
+export default function Checklists({ embedded = false }) {
   const [tab, setTab] = useState('qc');
   const [checklists, setChecklists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,7 +157,7 @@ export default function Checklists() {
   // QC editing full-page view
   if (editing) {
     return (
-      <div className="page">
+      <div className={embedded ? '' : 'page'}>
         <div className="section-header">
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>{editing === 'new' ? 'New QC Checklist' : `Edit: ${editing.name}`}</h1>
         </div>
@@ -171,9 +171,9 @@ export default function Checklists() {
   }
 
   return (
-    <div className="page">
+    <div className={embedded ? '' : 'page'}>
       <div className="section-header">
-        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Checklists</h1>
+        {embedded ? <span className="card-title">QC Checklists</span> : <h1 style={{ fontSize: 24, fontWeight: 800 }}>Checklists</h1>}
         {tab === 'qc'       && <button className="btn btn-primary" onClick={() => setEditing('new')}>+ New QC Checklist</button>}
       </div>
 

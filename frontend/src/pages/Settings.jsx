@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api';
+import Checklists from './Checklists';
 import PropertyModal from '../components/PropertyModal';
 import useLiveSync from '../hooks/useLiveSync';
 
 export default function Settings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [properties, setProperties] = useState([]);
   const [managers, setManagers] = useState([]);
   const [editingProp, setEditingProp] = useState(null);
@@ -107,9 +110,21 @@ export default function Settings() {
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
+  const tab = searchParams.get('tab') === 'checklists' ? 'checklists' : 'general';
+  const setTab = t => setSearchParams(t === 'general' ? {} : { tab: t }, { replace: true });
+
   return (
     <div className="page">
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 28 }}>Settings</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 20 }}>Settings</h1>
+
+      <div className="tab-row mb-6">
+        <button className={`tab-btn${tab === 'general' ? ' active' : ''}`} onClick={() => setTab('general')}>General</button>
+        <button className={`tab-btn${tab === 'checklists' ? ' active' : ''}`} onClick={() => setTab('checklists')}>Checklists</button>
+      </div>
+
+      {tab === 'checklists' && <Checklists embedded />}
+
+      {tab === 'general' && (<>
 
       {/* QC Frequency & Alert Settings */}
       <div className="card mb-6">
@@ -432,6 +447,8 @@ export default function Settings() {
           {settingsSaved ? '✓ Saved' : 'Save Settings'}
         </button>
       </div>
+
+      </>)}
 
       {showPropModal && (
         <PropertyModal property={editingProp} onClose={() => setShowPropModal(false)} onSaved={load} />

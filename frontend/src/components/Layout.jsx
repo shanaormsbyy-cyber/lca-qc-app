@@ -10,7 +10,6 @@ const NAV = [
   { to: '/complaints',  label: 'Complaints' },
   { to: '/properties',  label: 'Properties' },
   { to: '/qc',           label: 'QC Checks' },
-  { to: '/checklists',   label: 'Checklists' },
   { to: '/training-hub', label: 'Training Hub' },
   { to: '/heatpump',     label: 'Heat Pumps' },
   { to: '/kpis',         label: 'KPIs' },
