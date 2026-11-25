@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getLoc, and, propInLoc } = require('../lib/location');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -35,6 +36,7 @@ router.get('/records', (req, res) => {
     SELECT hr.*, p.name AS property_name, p.address AS property_address
     FROM heatpump_records hr
     JOIN properties p ON p.id = hr.property_id
+    WHERE 1=1${(loc => and(loc, propInLoc('hr.property_id', loc)))(getLoc(req))}
     ORDER BY
       CASE WHEN hr.due_date IS NULL OR hr.due_date = '' THEN 1 ELSE 0 END,
       hr.due_date ASC

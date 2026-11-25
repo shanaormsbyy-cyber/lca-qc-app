@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getLoc, and, staffInLoc } = require('../lib/location');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -116,6 +117,7 @@ router.get('/sessions', (req, res) => {
     JOIN training_checklists tc ON tc.id = ts.checklist_id
     JOIN managers m1 ON m1.id = ts.scheduled_by_id
     JOIN managers m2 ON m2.id = ts.assigned_to_id
+    WHERE 1=1${(loc => and(loc, staffInLoc('ts.trainee_id', loc)))(getLoc(req))}
     ORDER BY ts.date DESC
   `).all();
   res.json(sessions);

@@ -623,3 +623,12 @@ th.sortable:hover { color: var(--cyan); }
 .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
 .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+
+/* Location (area) filter under the sidebar name */
+.location-filter {
+  margin-top: 12px; width: 100%; padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.05); color: var(--t1); border: 1px solid rgba(255,255,255,0.12);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.location-filter:focus { outline: none; border-color: var(--cyan); }
+.location-filter option { background: #111; color: #fff; }

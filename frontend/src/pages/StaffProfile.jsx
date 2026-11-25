@@ -14,7 +14,6 @@ export default function StaffProfile() {
   const [qcChecks, setQcChecks] = useState([]);
   const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
-  const [coachingSessions, setCoachingSessions] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [deductions, setDeductions] = useState({});
   const [activeTab, setActiveTab] = useState('qc');
@@ -29,18 +28,17 @@ export default function StaffProfile() {
 
   const load = () => {
     Promise.all([
-      api.get('/staff'),
+      api.get(`/staff/${id}`),
       api.get('/qc/checks'),
       api.get('/training/sessions'),
     ]).then(([s, q, t]) => {
-      const found = s.data.find(x => x.id === parseInt(id));
+      const found = s.data;
       setStaff(found);
       setSlackEmail(found?.slack_email || '');
       setQcChecks(q.data.filter(c => (c.staff_ids || [c.staff_id]).includes(parseInt(id)) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
-    api.get(`/coaching?staff_id=${id}`).then(r => setCoachingSessions(r.data)).catch(() => {});
     api.get(`/complaints?staff_id=${id}`).then(r => setComplaints(r.data)).catch(() => {});
     fetchDeductions().then(setDeductions);
   };
@@ -90,7 +88,7 @@ export default function StaffProfile() {
         </div>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>{staff.name}</h1>
-          <p style={{ color: 'var(--t2)' }}>{staff.role} · Started {staff.start_date}</p>
+          <p style={{ color: 'var(--t2)' }}>{staff.role}{staff.location ? ` · ${staff.location}` : ''} · Started {staff.start_date}</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
             <input
               type="email"
@@ -122,7 +120,6 @@ export default function StaffProfile() {
           {breakdownText(checksAvgScore, complaintPoints) && <div className="stat-sub">{breakdownText(checksAvgScore, complaintPoints)}</div>}
         </div>
         <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
-        <div className="stat-card"><div className="stat-label">Coaching Sessions</div><div className="stat-value">{coachingSessions.length}</div></div>
         {(() => {
           const recent = complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10));
           const serious = recent.filter(c => c.severity === 'serious').length;
@@ -245,8 +242,8 @@ export default function StaffProfile() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['qc', 'training', 'coaching', 'complaints'].map(tab => {
-          const labels = { qc: 'QC Checks', training: 'Training', coaching: 'Coaching', complaints: 'Complaints' };
+        {['qc', 'training', 'complaints'].map(tab => {
+          const labels = { qc: 'QC Checks', training: 'Training', complaints: 'Complaints' };
           const recentComplaints = tab === 'complaints' ? complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10)) : [];
           const hasRisk = tab === 'complaints' && (recentComplaints.filter(c=>c.severity==='serious').length >= 1 || recentComplaints.filter(c=>c.severity==='moderate').length >= 2);
           return (
@@ -307,34 +304,6 @@ export default function StaffProfile() {
                       <td style={{ color: 'var(--t2)' }}>{t.signed_off_by || '—'}</td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'coaching' && (
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 16 }}>Coaching Sessions</div>
-          {coachingSessions.length === 0 ? (
-            <p style={{ color: 'var(--t3)' }}>No coaching sessions recorded yet.</p>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>Topic</th><th>Sessions</th><th>Status</th></tr></thead>
-                <tbody>
-                  {coachingSessions.map(s => {
-                    const openStatus = s.status === 'open';
-                    return (
-                      <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/coaching/${s.id}`)}>
-                        <td>{fmtDate(s.date)}</td>
-                        <td style={{ color: 'var(--t2)' }}>{s.topic}</td>
-                        <td style={{ textAlign: 'center' }}>{s.sessions_required}</td>
-                        <td><span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, color: openStatus ? 'var(--amber)' : 'var(--ok)', background: openStatus ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)' }}>{openStatus ? 'Open' : 'Resolved'}</span></td>
-                      </tr>
-                    );
-                  })}
                 </tbody>
               </table>
             </div>

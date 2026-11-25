@@ -222,6 +222,15 @@ migrations.forEach(sql => {
   try { db.exec(sql); } catch (_) { /* column already exists — skip */ }
 });
 
+// Location (area) on staff and properties. When the column is first added, existing
+// records are set to Hamilton (the original area); they can be changed per profile.
+['staff', 'properties'].forEach(table => {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN location TEXT DEFAULT NULL`);
+    db.exec(`UPDATE ${table} SET location = 'Hamilton' WHERE location IS NULL`);
+  } catch (_) { /* column already exists — skip */ }
+});
+
 // Shadow period rubric tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS shadow_rubric_dimensions (

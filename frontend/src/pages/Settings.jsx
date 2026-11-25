@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
+import LocationInput from '../components/LocationInput';
 import useLiveSync from '../hooks/useLiveSync';
 
 export default function Settings() {
   const [properties, setProperties] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [propForm, setPropForm] = useState({ name: '' });
+  const [propForm, setPropForm] = useState({ name: '', location: '' });
   const [editingProp, setEditingProp] = useState(null);
   const [showPropModal, setShowPropModal] = useState(false);
   const [newMgr, setNewMgr] = useState({ username: '', password: '', name: '' });
@@ -51,8 +52,8 @@ export default function Settings() {
   useEffect(() => { load(); }, []);
   useLiveSync(load);
 
-  const openAddProp = () => { setEditingProp(null); setPropForm({ name: '' }); setShowPropModal(true); };
-  const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name }); setShowPropModal(true); };
+  const openAddProp = () => { setEditingProp(null); setPropForm({ name: '', location: (() => { try { return localStorage.getItem('location_filter') || 'Hamilton'; } catch { return 'Hamilton'; } })() }); setShowPropModal(true); };
+  const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name, location: p.location || '' }); setShowPropModal(true); };
 
   const saveProp = async () => {
     if (!propForm.name) return;
@@ -229,11 +230,12 @@ export default function Settings() {
         </div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Property Name</th><th></th></tr></thead>
+            <thead><tr><th>Property Name</th><th>Location</th><th></th></tr></thead>
             <tbody>
               {properties.map(p => (
                 <tr key={p.id}>
                   <td style={{ fontWeight: 600 }}>{p.name}</td>
+                  <td style={{ color: 'var(--t2)' }}>{p.location || '—'}</td>
                   <td>
                     <div className="flex gap-2">
                       <button className="btn btn-sm btn-ghost" onClick={() => openEditProp(p)}>Edit</button>
@@ -446,6 +448,7 @@ export default function Settings() {
               <label className="form-label">Property Name</label>
               <input className="form-input" value={propForm.name} onChange={e => setPropForm(f => ({ ...f, name: e.target.value }))} />
             </div>
+            <LocationInput value={propForm.location} onChange={v => setPropForm(f => ({ ...f, location: v }))} />
             <div className="flex gap-3">
               <button className="btn btn-primary" onClick={saveProp}>Save</button>
               <button className="btn btn-ghost" onClick={() => setShowPropModal(false)}>Cancel</button>

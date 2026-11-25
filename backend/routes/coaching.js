@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getLoc, and, staffInLoc } = require('../lib/location');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -8,12 +9,13 @@ router.use(requireAuth);
 // GET /api/coaching — all sessions, optional ?staff_id=
 router.get('/', (req, res) => {
   const { staff_id } = req.query;
+  const loc = getLoc(req);
   const rows = db.prepare(`
     SELECT cs.*, s.name as staff_name, m.name as manager_name
     FROM coaching_sessions cs
     JOIN staff s ON s.id = cs.staff_id
     JOIN managers m ON m.id = cs.manager_id
-    ${staff_id ? 'WHERE cs.staff_id = ?' : ''}
+    WHERE 1=1 ${staff_id ? 'AND cs.staff_id = ?' : ''}${and(loc, staffInLoc('cs.staff_id', loc))}
     ORDER BY cs.date DESC, cs.created_at DESC
   `).all(...(staff_id ? [staff_id] : []));
   res.json(rows);

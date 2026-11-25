@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getLoc, staffInLoc, propInLoc, staffIdSet } = require('../lib/location');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,6 +23,7 @@ router.get('/', (req, res) => {
     dateClause = "AND c.date >= date('now', '-12 months')";
   }
 
+  const loc = getLoc(req);
   const staffClause = staff_id ? 'AND c.staff_id = ?' : '';
   const params = staff_id ? [staff_id] : [];
 
@@ -34,7 +36,7 @@ router.get('/', (req, res) => {
     LEFT JOIN staff s      ON s.id = c.staff_id
     LEFT JOIN properties p ON p.id = c.property_id
     LEFT JOIN managers m   ON m.name = c.issued_by
-    WHERE 1=1 ${staffClause} ${dateClause}
+    WHERE 1=1 ${staffClause} ${dateClause}${loc ? ` AND (${staffInLoc('c.staff_id', loc)} OR ${propInLoc('c.property_id', loc)})` : ''}
     ORDER BY c.date DESC, c.created_at DESC
   `).all(...params);
 
@@ -60,7 +62,10 @@ router.get('/scores', (req, res) => {
     WHERE staff_id = ? AND status = 'complete' AND (check_type = 'staff' OR check_type IS NULL)
       ${win.from ? 'AND date >= ?' : ''} AND date <= ?
   `);
+  const loc = getLoc(req);
+  const inLoc = loc ? staffIdSet(db, loc) : null;
   const rows = Object.entries(deductions).map(([staffId, d]) => {
+    if (inLoc && !inLoc.has(Number(staffId))) return null;
     const s = db.prepare('SELECT id, name FROM staff WHERE id = ?').get(Number(staffId));
     if (!s) return null;
     const c = checksAvg.get(...[s.id, win.from, win.to].filter(v => v !== null));

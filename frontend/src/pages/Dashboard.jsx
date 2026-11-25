@@ -28,8 +28,6 @@ export default function Dashboard() {
   const [flaggedMonth, setFlaggedMonth] = useState([]);
   const [flagTab, setFlagTab] = useState('week');
   const [heatpumpsDue, setHeatpumpsDue] = useState(0);
-  const [coachingFollowUp, setCoachingFollowUp] = useState(0);
-  const [coachingStaffIds, setCoachingStaffIds] = useState(new Set());
   const [firstPassData, setFirstPassData] = useState(null);
   const [recleanTimeData, setRecleanTimeData] = useState(null);
   const [showRecleanModal, setShowRecleanModal] = useState(false);
@@ -79,11 +77,6 @@ export default function Dashboard() {
       const cutoff = in7.toISOString().slice(0, 10);
       const count = r.data.filter(h => h.due_date && h.due_date <= cutoff).length;
       setHeatpumpsDue(count);
-    }).catch(() => {});
-    api.get('/coaching').then(r => {
-      const count = r.data.filter(s => s.status === 'open' && s.followup_date).length;
-      setCoachingFollowUp(count);
-      setCoachingStaffIds(new Set(r.data.filter(s => s.status === 'open').map(s => s.staff_id)));
     }).catch(() => {});
     api.get('/kpis/first-pass-rate').then(r => setFirstPassData(r.data)).catch(() => {});
     api.get('/kpis/reclean-time').then(r => setRecleanTimeData(r.data)).catch(() => {});
@@ -228,11 +221,6 @@ export default function Dashboard() {
           <div className={`stat-value${heatpumpsDue > 0 ? ' red' : ' green'}`}>{heatpumpsDue}</div>
           <div className="stat-sub">{heatpumpsDue > 0 ? 'Filters need attention' : 'All up to date'}</div>
         </div>
-        <div className={`stat-card${coachingFollowUp > 0 ? ' danger' : ''}`} onClick={() => navigate('/coaching')} style={{ cursor: 'pointer' }}>
-          <div className="stat-label">Coaching Follow-ups Due</div>
-          <div className={`stat-value${coachingFollowUp > 0 ? ' amber' : ' green'}`}>{coachingFollowUp}</div>
-          <div className="stat-sub">{coachingFollowUp > 0 ? 'Open sessions with follow-up' : 'No follow-ups scheduled'}</div>
-        </div>
 
         {/* First-Time Pass Rate stat card */}
         {firstPassData && (
@@ -337,10 +325,6 @@ export default function Dashboard() {
                         {isOverride && (
                           <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>Manual</span>
                         )}
-                        {coachingStaffIds.has(w.id)
-                          ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(58,181,217,0.15)', color: 'var(--cyan)', border: '1px solid rgba(58,181,217,0.3)' }}>In coaching</span>
-                          : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 5, background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}>No coaching</span>
-                        }
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>
                         {isComplaintRisk

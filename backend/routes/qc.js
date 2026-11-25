@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { setCheckStaff } = require('../lib/checkStaff');
+const { getLoc, and, checkInLoc } = require('../lib/location');
 
 // Turn the GROUP_CONCAT of team members into an array: staff_ids = everyone the check counts for.
 function withStaffIds(check) {
@@ -161,6 +162,7 @@ router.get('/checks', (req, res) => {
     JOIN qc_checklists cl ON cl.id = qc.checklist_id
     JOIN managers m1 ON m1.id = qc.scheduled_by_id
     JOIN managers m2 ON m2.id = qc.assigned_to_id
+    WHERE 1=1${(loc => and(loc, checkInLoc('qc', loc)))(getLoc(req))}
     ORDER BY qc.date DESC
   `).all();
   res.json(checks.map(withStaffIds));

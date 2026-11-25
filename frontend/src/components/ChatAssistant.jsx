@@ -6,7 +6,6 @@ const SUGGESTIONS = [
   'Who is on the watchlist and why?',
   'Which staff have complaints in the last 90 days?',
   'Who is overdue for a QC check?',
-  'Who is in active coaching right now?',
 ];
 
 export default function ChatAssistant() {
@@ -112,7 +111,7 @@ export default function ChatAssistant() {
             {messages.length === 0 && (
               <div>
                 <p style={{ color: 'var(--t3)', fontSize: 13, marginBottom: 14 }}>
-                  Ask me anything about your team's performance, complaints, or coaching. Try:
+                  Ask me anything about your team's performance, complaints, or QC checks. Try:
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {SUGGESTIONS.map((s, i) => (

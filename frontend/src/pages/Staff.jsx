@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import LocationInput from '../components/LocationInput';
 import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
@@ -23,7 +24,7 @@ export default function Staff() {
   const [showQCModal, setShowQCModal] = useState(false);
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [staffForm, setStaffForm] = useState({ name: '', role: 'Cleaner', start_date: '' });
+  const [staffForm, setStaffForm] = useState({ name: '', role: 'Cleaner', start_date: '', location: '' });
   const [checkForm, setCheckForm] = useState({ property_id: '', staff_id: '', checklist_id: '', assigned_to_id: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -127,7 +128,7 @@ export default function Staff() {
         </div>
         <div className="flex gap-3">
           {tab === 'team' && (
-            <button className="btn btn-ghost" onClick={() => { setEditing(null); setStaffForm({ name: '', role: 'Cleaner', start_date: new Date().toISOString().slice(0, 10) }); setShowStaffModal(true); }}>
+            <button className="btn btn-ghost" onClick={() => { setEditing(null); setStaffForm({ name: '', role: 'Cleaner', start_date: new Date().toISOString().slice(0, 10), location: (() => { try { return localStorage.getItem('location_filter') || 'Hamilton'; } catch { return 'Hamilton'; } })() }); setShowStaffModal(true); }}>
               + Add Staff
             </button>
           )}
@@ -172,7 +173,7 @@ export default function Staff() {
                         <span style={{ fontWeight: 700 }}>{s.name}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--t2)' }}>{s.role}</td>
+                    <td style={{ color: 'var(--t2)' }}>{s.role}{s.location && <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>{s.location}</div>}</td>
                     <td>{isInactive ? <span className="badge badge-grey">Inactive until {s.inactive_until}</span> : d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>
                     <td>
@@ -186,7 +187,7 @@ export default function Staff() {
                           ? <button className="btn btn-sm btn-ghost" onClick={e => clearInactive(s.id, e)}>Reactivate</button>
                           : <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setInactiveModal(s); setInactiveDate(''); }}>Inactive</button>
                         }
-                        <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setEditing(s); setStaffForm({ name: s.name, role: s.role, start_date: s.start_date }); setShowStaffModal(true); }}>Edit</button>
+                        <button className="btn btn-sm btn-ghost" onClick={e => { e.stopPropagation(); setEditing(s); setStaffForm({ name: s.name, role: s.role, start_date: s.start_date, location: s.location || '' }); setShowStaffModal(true); }}>Edit</button>
                         <button className="btn btn-sm btn-danger" onClick={e => archiveStaff(s.id, s.name, e)}>Archive</button>
                       </div>
                     </td>
@@ -363,6 +364,7 @@ export default function Staff() {
               <label className="form-label">Start Date</label>
               <input className="form-input" type="date" value={staffForm.start_date} onChange={e => setStaffForm(f => ({ ...f, start_date: e.target.value }))} />
             </div>
+            <LocationInput value={staffForm.location} onChange={v => setStaffForm(f => ({ ...f, location: v }))} />
             <div className="flex gap-3 mt-4">
               <button className="btn btn-primary" onClick={saveStaff}>Save</button>
               <button className="btn btn-ghost" onClick={() => setShowStaffModal(false)}>Cancel</button>

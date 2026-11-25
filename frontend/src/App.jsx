@@ -22,8 +22,6 @@ import StaffLogins from './pages/StaffLogins';
 import StaffPortalLogin from './pages/StaffPortalLogin';
 import StaffPortalDashboard from './pages/StaffPortalDashboard';
 import StaffPortalCheck from './pages/StaffPortalCheck';
-import Coaching from './pages/Coaching';
-import CoachingSession from './pages/CoachingSession';
 import Complaints from './pages/Complaints';
 import HubRoutes from './hub/HubRoutes';
 
@@ -61,8 +59,6 @@ export default function App() {
         <Route path="heatpump/:id" element={<HeatPumpDetail />} />
         <Route path="staff-logins" element={<StaffLogins />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="coaching" element={<Coaching />} />
-        <Route path="coaching/:id" element={<CoachingSession />} />
         <Route path="complaints" element={<Complaints />} />
         <Route path="training-hub/*" element={<HubRoutes />} />
       </Route>

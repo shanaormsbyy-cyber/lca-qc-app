@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { getLoc, and, staffInLoc, propInLoc } = require('../lib/location');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -24,6 +25,7 @@ router.get('/due', (req, res) => {
   const propDays = parseInt(settings.qc_freq_property_days || '14');
 
   const today = new Date().toISOString().slice(0, 10);
+  const loc = getLoc(req);
 
   // Last QC check per staff member
   const staffChecks = db.prepare(`
@@ -32,7 +34,7 @@ router.get('/due', (req, res) => {
       COUNT(qc.id) as total_checks
     FROM staff s
     LEFT JOIN qc_checks qc ON qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND qc.status = 'complete'
-    WHERE s.archived=0 OR s.archived IS NULL
+    WHERE (s.archived=0 OR s.archived IS NULL)${and(loc, staffInLoc('s.id', loc))}
     GROUP BY s.id
   `).all();
 
@@ -43,6 +45,7 @@ router.get('/due', (req, res) => {
       COUNT(qc.id) as total_checks
     FROM properties p
     LEFT JOIN qc_checks qc ON qc.property_id = p.id AND qc.status = 'complete'
+    WHERE 1=1${and(loc, propInLoc('p.id', loc))}
     GROUP BY p.id
   `).all();
 

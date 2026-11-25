@@ -12,6 +12,12 @@ api.interceptors.request.use(config => {
     ? localStorage.getItem('staff_token')
     : localStorage.getItem('lca_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Manager pages: send the chosen area (Location filter) so lists and numbers are filtered.
+  if (!isStaffSession && !url.startsWith('/staff-portal/')) {
+    let loc = '';
+    try { loc = localStorage.getItem('location_filter') || ''; } catch { /* ignore */ }
+    if (loc) config.headers['X-Location'] = encodeURIComponent(loc);
+  }
   return config;
 });
 

@@ -4,8 +4,16 @@ const { requireAuth } = require('../middleware/auth');
 
 const { round1, complaintDeduction, adjustScore } = require("../lib/complaintScore");
 
+const { getLoc, and, staffInLoc, propInLoc, checkInLoc } = require('../lib/location');
+
 const router = express.Router();
 router.use(requireAuth);
+
+// Active staff, limited to the chosen area (if any).
+function activeStaff(req) {
+  const loc = getLoc(req);
+  return db.prepare(`SELECT id, name, role FROM staff WHERE (archived=0 OR archived IS NULL)${and(loc, staffInLoc('id', loc))} ORDER BY name`).all();
+}
 
 // A cleaner's QC score: average of their completed staff checks, minus complaint points
 // from the last 90 days. Returns the breakdown so the UI can explain the number.
@@ -46,16 +54,19 @@ router.get('/managers', (req, res) => {
   const dateTo = to || rangeTo;
 
   const managers = db.prepare('SELECT id, name FROM managers').all();
+  const loc = getLoc(req);
+  const qcL = and(loc, checkInLoc('qc_checks', loc));          // checks in the chosen area
+  const trL = and(loc, staffInLoc('trainee_id', loc));        // training of trainees in the area
 
   const result = managers.map(mgr => {
-    const qcAll = db.prepare(`SELECT COUNT(*) as cnt, AVG(score_pct) as avg_score FROM qc_checks WHERE assigned_to_id=? AND status='complete'`).get(mgr.id);
-    const qcRange = db.prepare(`SELECT COUNT(*) as cnt FROM qc_checks WHERE assigned_to_id=? AND status='complete' ${dateFrom ? 'AND date >= ?' : ''} ${dateTo ? 'AND date <= ?' : ''}`).get(...[mgr.id, dateFrom, dateTo].filter(Boolean));
-    const trainAll = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete'`).get(mgr.id);
-    const trainRange = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete' ${dateFrom ? 'AND date >= ?' : ''} ${dateTo ? 'AND date <= ?' : ''}`).get(...[mgr.id, dateFrom, dateTo].filter(Boolean));
-    const traineesSignedOff = db.prepare(`SELECT COUNT(DISTINCT trainee_id) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete' AND completion_pct=100`).get(mgr.id);
-    const pendingTasks = db.prepare(`SELECT COUNT(*) as cnt FROM (SELECT id FROM qc_checks WHERE assigned_to_id=? AND status='pending' UNION ALL SELECT id FROM training_sessions WHERE assigned_to_id=? AND status='pending')`).get(mgr.id, mgr.id);
-    const lastQC = db.prepare(`SELECT MAX(date) as d FROM qc_checks WHERE assigned_to_id=? AND status='complete'`).get(mgr.id);
-    const lastTrain = db.prepare(`SELECT MAX(date) as d FROM training_sessions WHERE assigned_to_id=? AND status='complete'`).get(mgr.id);
+    const qcAll = db.prepare(`SELECT COUNT(*) as cnt, AVG(score_pct) as avg_score FROM qc_checks WHERE assigned_to_id=? AND status='complete'${qcL}`).get(mgr.id);
+    const qcRange = db.prepare(`SELECT COUNT(*) as cnt FROM qc_checks WHERE assigned_to_id=? AND status='complete'${qcL} ${dateFrom ? 'AND date >= ?' : ''} ${dateTo ? 'AND date <= ?' : ''}`).get(...[mgr.id, dateFrom, dateTo].filter(Boolean));
+    const trainAll = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL}`).get(mgr.id);
+    const trainRange = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL} ${dateFrom ? 'AND date >= ?' : ''} ${dateTo ? 'AND date <= ?' : ''}`).get(...[mgr.id, dateFrom, dateTo].filter(Boolean));
+    const traineesSignedOff = db.prepare(`SELECT COUNT(DISTINCT trainee_id) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete' AND completion_pct=100${trL}`).get(mgr.id);
+    const pendingTasks = db.prepare(`SELECT COUNT(*) as cnt FROM (SELECT id FROM qc_checks WHERE assigned_to_id=? AND status='pending'${qcL} UNION ALL SELECT id FROM training_sessions WHERE assigned_to_id=? AND status='pending'${trL})`).get(mgr.id, mgr.id);
+    const lastQC = db.prepare(`SELECT MAX(date) as d FROM qc_checks WHERE assigned_to_id=? AND status='complete'${qcL}`).get(mgr.id);
+    const lastTrain = db.prepare(`SELECT MAX(date) as d FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL}`).get(mgr.id);
     const lastActivity = [lastQC?.d, lastTrain?.d].filter(Boolean).sort().reverse()[0] || null;
 
     return {
@@ -165,7 +176,7 @@ router.get('/trainees', (req, res) => {
     LEFT JOIN training_sessions ts ON ts.trainee_id=s.id AND ts.status='complete' AND ts.completion_pct=100
     LEFT JOIN managers m ON m.id=ts.assigned_to_id
     LEFT JOIN training_checklists tc ON tc.id=ts.checklist_id
-    WHERE s.archived=0 OR s.archived IS NULL
+    WHERE (s.archived=0 OR s.archived IS NULL)${(loc => and(loc, staffInLoc('s.id', loc)))(getLoc(req))}
     GROUP BY s.id
     ORDER BY s.name
   `).all();
@@ -202,6 +213,7 @@ router.get('/properties', (req, res) => {
       MAX(qc.date) as last_check_date
     FROM properties p
     LEFT JOIN qc_checks qc ON qc.property_id=p.id AND ${where}
+    WHERE 1=1${(loc => and(loc, propInLoc('p.id', loc)))(getLoc(req))}
     GROUP BY p.id
     ORDER BY avg_score ASC
   `).all();
@@ -243,7 +255,7 @@ router.get('/top-performers', (req, res) => {
     db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
   );
 
-  const staff = db.prepare('SELECT id, name, role FROM staff WHERE archived=0 OR archived IS NULL ORDER BY name').all();
+  const staff = activeStaff(req);
   const topPerformers = [];
 
   staff.forEach(s => {
@@ -284,7 +296,7 @@ router.get('/watchlist', (req, res) => {
     db.prepare('SELECT staff_id FROM staff_watchlist_overrides').all().map(r => r.staff_id)
   );
 
-  const staff = db.prepare('SELECT id, name, role FROM staff WHERE archived=0 OR archived IS NULL ORDER BY name').all();
+  const staff = activeStaff(req);
   const watchlist = [];
   const seenIds = new Set();
 
@@ -419,7 +431,7 @@ router.get('/flagged-items', (req, res) => {
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.status = 'complete'
-      AND qc.date >= ?
+      AND qc.date >= ?${(loc => and(loc, checkInLoc('qc', loc)))(getLoc(req))}
       AND (qci.na IS NULL OR qci.na = 0)
       AND (
         (qi.score_type = 'pass_fail' AND qci.score = 0)
@@ -459,6 +471,7 @@ router.get('/flagged-items/trend', (req, res) => {
 
   const now = new Date();
   const trend = [];
+  const locL = (loc => and(loc, checkInLoc('qc', loc)))(getLoc(req));
   for (let w = parseInt(weeks) - 1; w >= 0; w--) {
     const end = new Date(now); end.setDate(end.getDate() - w * 7);
     const start = new Date(end); start.setDate(start.getDate() - 7);
@@ -471,7 +484,7 @@ router.get('/flagged-items/trend', (req, res) => {
       JOIN qc_checks qc ON qc.id = qci.check_id
       WHERE COALESCE(qi.category, 'General') = ?
         AND qc.status = 'complete'
-        AND qc.date >= ? AND qc.date < ?
+        AND qc.date >= ? AND qc.date < ?${locL}
         AND (qci.na IS NULL OR qci.na = 0)
         AND ((qi.score_type = 'pass_fail' AND qci.score = 0) OR (qi.score_type = '1_to_5' AND qci.score <= 2))
     `).get(category, fromStr, toStr);
@@ -484,7 +497,7 @@ router.get('/flagged-items/trend', (req, res) => {
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE COALESCE(qi.category, 'General') = ?
-      AND qc.status = 'complete'
+      AND qc.status = 'complete'${locL}
       AND (qci.na IS NULL OR qci.na = 0)
       AND ((qi.score_type = 'pass_fail' AND qci.score = 0) OR (qi.score_type = '1_to_5' AND qci.score <= 2))
     GROUP BY qi.text
@@ -764,6 +777,7 @@ router.get('/first-pass-rate', (req, res) => {
   const settings = {};
   settingsRows.forEach(s => { settings[s.key] = s.value; });
   const threshold = parseFloat(settings.watchlist_threshold || '85');
+  const locL = (loc => and(loc, checkInLoc('qc_checks', loc)))(getLoc(req));
 
   const all = db.prepare(`
     SELECT COUNT(*) as total,
@@ -773,7 +787,7 @@ router.get('/first-pass-rate', (req, res) => {
            THEN 1 ELSE 0 END) as passed
     FROM qc_checks
     WHERE status='complete' AND score_pct IS NOT NULL
-      AND (check_type='staff' OR check_type IS NULL)
+      AND (check_type='staff' OR check_type IS NULL)${locL}
   `).get(threshold);
 
   const overallRate = all.total > 0 ? Math.round((all.passed / all.total) * 100) : null;
@@ -791,7 +805,7 @@ router.get('/first-pass-rate', (req, res) => {
              THEN 1 ELSE 0 END) as passed
       FROM qc_checks
       WHERE status='complete' AND score_pct IS NOT NULL
-        AND (check_type='staff' OR check_type IS NULL)
+        AND (check_type='staff' OR check_type IS NULL)${locL}
         AND strftime('%Y-%m', date) = ?
     `).get(threshold, monthStr);
     const rate = row.total > 0 ? Math.round((row.passed / row.total) * 100) : null;
@@ -804,6 +818,8 @@ router.get('/first-pass-rate', (req, res) => {
 
 // Re-clean time — total minutes spent on re-cleans in last 30 days
 router.get('/reclean-time', (req, res) => {
+  const locL = (loc => and(loc, checkInLoc('qc_checks', loc)))(getLoc(req));
+  const locQc = (loc => and(loc, checkInLoc('qc', loc)))(getLoc(req));
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const cutoff = thirtyDaysAgo.toISOString().slice(0, 10);
@@ -812,7 +828,7 @@ router.get('/reclean-time', (req, res) => {
     SELECT COUNT(*) as total_recleans, SUM(reclean_minutes) as total_minutes, AVG(reclean_minutes) as avg_minutes
     FROM qc_checks
     WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
-      AND (check_type='staff' OR check_type IS NULL)
+      AND (check_type='staff' OR check_type IS NULL)${locL}
       AND date >= ?
   `).get(cutoff);
 
@@ -825,7 +841,7 @@ router.get('/reclean-time', (req, res) => {
       SELECT COUNT(*) as total_recleans, SUM(reclean_minutes) as total_minutes
       FROM qc_checks
       WHERE status='complete' AND reclean_required=1 AND reclean_minutes IS NOT NULL
-        AND (check_type='staff' OR check_type IS NULL)
+        AND (check_type='staff' OR check_type IS NULL)${locL}
         AND strftime('%Y-%m', date) = ?
     `).get(monthStr);
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -841,7 +857,7 @@ router.get('/reclean-time', (req, res) => {
     JOIN qc_check_staff cs ON cs.check_id = qc.id
     JOIN staff s ON s.id = cs.staff_id
     WHERE qc.status='complete' AND qc.reclean_required=1 AND qc.reclean_minutes IS NOT NULL
-      AND (qc.check_type='staff' OR qc.check_type IS NULL)
+      AND (qc.check_type='staff' OR qc.check_type IS NULL)${locQc}
     GROUP BY s.id
     ORDER BY total_minutes DESC
   `).all();

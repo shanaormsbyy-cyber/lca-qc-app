@@ -2,12 +2,14 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { emit } = require('../emitter');
+const { getLoc, and, propInLoc } = require('../lib/location');
 
 const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', (req, res) => {
-  res.json(db.prepare('SELECT * FROM properties ORDER BY name').all());
+  const loc = getLoc(req);
+  res.json(db.prepare(`SELECT * FROM properties WHERE 1=1${and(loc, propInLoc('id', loc))} ORDER BY name`).all());
 });
 
 router.get('/:id', (req, res) => {
@@ -17,13 +19,15 @@ router.get('/:id', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name } = req.body;
-  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id) VALUES (?, ?, ?)').run(name, '', '');
+  const { name, location } = req.body;
+  const loc = (location || '').trim() || getLoc(req) || null;
+  const result = db.prepare('INSERT INTO properties (name, address, airbnb_id, location) VALUES (?, ?, ?, ?)').run(name, '', '', loc);
   res.json({ id: result.lastInsertRowid });
 });
 
 router.put('/:id', (req, res) => {
-  const { name, access_code, inactive_until, room_config } = req.body;
+  const { name, access_code, inactive_until, room_config, location } = req.body;
+  if (location !== undefined) db.prepare('UPDATE properties SET location=? WHERE id=?').run((location || '').trim() || null, req.params.id);
   if (name !== undefined) db.prepare('UPDATE properties SET name=? WHERE id=?').run(name, req.params.id);
   if (access_code !== undefined) db.prepare('UPDATE properties SET access_code=? WHERE id=?').run(access_code, req.params.id);
   if (inactive_until !== undefined) db.prepare('UPDATE properties SET inactive_until=? WHERE id=?').run(inactive_until || null, req.params.id);
