@@ -359,6 +359,9 @@ app.use('/api/complaints', require('./routes/complaints'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/whatsapp', require('./routes/whatsapp'));
 
+// Training Hub (onboarding, competencies, plans, foundations, shadow period) — /api/hub/*
+require('./hub').mountHub(app, db, { uploadsDir: UPLOADS_DIR, requireAuth: require('./middleware/auth').requireAuth });
+
 // Serve built frontend
 const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendBuild));
