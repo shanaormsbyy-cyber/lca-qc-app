@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import LocationInput from '../components/LocationInput';
+import PropertyModal from '../components/PropertyModal';
 import useLiveSync from '../hooks/useLiveSync';
 
 export default function Settings() {
   const [properties, setProperties] = useState([]);
   const [managers, setManagers] = useState([]);
-  const [propForm, setPropForm] = useState({ name: '', location: '' });
   const [editingProp, setEditingProp] = useState(null);
   const [showPropModal, setShowPropModal] = useState(false);
   const [newMgr, setNewMgr] = useState({ username: '', password: '', name: '' });
@@ -52,15 +51,9 @@ export default function Settings() {
   useEffect(() => { load(); }, []);
   useLiveSync(load);
 
-  const openAddProp = () => { setEditingProp(null); setPropForm({ name: '', location: (() => { try { return localStorage.getItem('location_filter') || 'Hamilton'; } catch { return 'Hamilton'; } })() }); setShowPropModal(true); };
-  const openEditProp = p => { setEditingProp(p); setPropForm({ name: p.name, location: p.location || '' }); setShowPropModal(true); };
+  const openAddProp = () => { setEditingProp(null); setShowPropModal(true); };
+  const openEditProp = p => { setEditingProp(p); setShowPropModal(true); };
 
-  const saveProp = async () => {
-    if (!propForm.name) return;
-    if (editingProp) await api.put(`/properties/${editingProp.id}`, propForm);
-    else await api.post('/properties', propForm);
-    await load(); setShowPropModal(false);
-  };
 
   const delProp = async id => {
     if (!confirm('Delete this property?')) return;
@@ -441,20 +434,7 @@ export default function Settings() {
       </div>
 
       {showPropModal && (
-        <div className="modal-overlay" onClick={() => setShowPropModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editingProp ? 'Edit Property' : 'Add Property'}</div>
-            <div className="form-group">
-              <label className="form-label">Property Name</label>
-              <input className="form-input" value={propForm.name} onChange={e => setPropForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <LocationInput value={propForm.location} onChange={v => setPropForm(f => ({ ...f, location: v }))} />
-            <div className="flex gap-3">
-              <button className="btn btn-primary" onClick={saveProp}>Save</button>
-              <button className="btn btn-ghost" onClick={() => setShowPropModal(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
+        <PropertyModal property={editingProp} onClose={() => setShowPropModal(false)} onSaved={load} />
       )}
     </div>
   );
