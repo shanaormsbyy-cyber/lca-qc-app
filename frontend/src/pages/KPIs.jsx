@@ -12,7 +12,6 @@ export default function KPIs() {
   const [tab, setTab] = useState('managers');
   const [range, setRange] = useState('all');
   const [managers, setManagers] = useState([]);
-  const [trainees, setTrainees] = useState([]);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState('qc_checks_all');
@@ -22,10 +21,9 @@ export default function KPIs() {
     setLoading(true);
     Promise.all([
       api.get(`/kpis/managers?range=${r}`),
-      api.get(`/kpis/trainees?range=${r}`),
       api.get(`/kpis/properties?range=${r}`),
-    ]).then(([m, t, p]) => {
-      setManagers(m.data); setTrainees(t.data); setProperties(p.data);
+    ]).then(([m, p]) => {
+      setManagers(m.data); setProperties(p.data);
     }).finally(() => setLoading(false));
   };
 
@@ -55,7 +53,7 @@ export default function KPIs() {
       </div>
 
       <div className="tab-row">
-        {[['managers','🏆 Manager Leaderboard'],['trainees','👥 Trainee Performance'],['properties','🏠 Property Breakdown']].map(([v,l]) => (
+        {[['managers','🏆 Manager Leaderboard'],['properties','🏠 Property Breakdown']].map(([v,l]) => (
           <button key={v} className={`tab-btn${tab===v?' active':''}`} onClick={() => setTab(v)}>{l}</button>
         ))}
       </div>
@@ -71,9 +69,6 @@ export default function KPIs() {
                 <th className="sortable" onClick={() => sort('qc_checks_all')}>QC Checks (All){sortIcon('qc_checks_all')}</th>
                 <th className="sortable" onClick={() => sort('qc_checks_range')}>QC ({range}){sortIcon('qc_checks_range')}</th>
                 <th className="sortable" onClick={() => sort('avg_qc_score')}>Avg Score{sortIcon('avg_qc_score')}</th>
-                <th className="sortable" onClick={() => sort('training_all')}>Training (All){sortIcon('training_all')}</th>
-                <th className="sortable" onClick={() => sort('training_range')}>Training ({range}){sortIcon('training_range')}</th>
-                <th className="sortable" onClick={() => sort('trainees_signed_off')}>Signed Off{sortIcon('trainees_signed_off')}</th>
                 <th className="sortable" onClick={() => sort('pending_tasks')}>Pending{sortIcon('pending_tasks')}</th>
                 <th>Last Active</th>
                 <th></th>
@@ -90,9 +85,6 @@ export default function KPIs() {
                         <div style={{ width: 60 }}><ScoreBar score={m.avg_qc_score} /></div>
                       </div>
                     </td>
-                    <td>{m.training_all}</td>
-                    <td>{m.training_range}</td>
-                    <td>{m.trainees_signed_off}</td>
                     <td>
                       <span className={m.pending_tasks > 0 ? 'badge badge-amber' : 'badge badge-grey'}>{m.pending_tasks}</span>
                     </td>
@@ -104,29 +96,6 @@ export default function KPIs() {
             </table>
           </div>
         </>
-      )}
-
-      {!loading && tab === 'trainees' && (
-        <div className="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Staff Member</th><th>Role</th><th>Trained By</th><th>Checklist</th><th>Training Completed</th><th>Avg QC Score Since</th><th>Total QC Checks</th>
-            </tr></thead>
-            <tbody>
-              {trainees.map(t => (
-                <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>{t.name}</td>
-                  <td style={{ color: 'var(--t2)' }}>{t.role}</td>
-                  <td>{t.trainer_name || <span style={{ color: 'var(--t3)' }}>Not trained</span>}</td>
-                  <td style={{ color: 'var(--t2)', fontSize: 12 }}>{t.checklist_name || '—'}</td>
-                  <td style={{ color: 'var(--t2)' }}>{fmtDate(t.training_completed) || '—'}</td>
-                  <td><ScoreBadge score={t.avg_qc_score} /></td>
-                  <td>{t.total_qc_checks}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
 
       {!loading && tab === 'properties' && (

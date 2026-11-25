@@ -12,7 +12,6 @@ export default function StaffProfile() {
   const navigate = useNavigate();
   const [staff, setStaff] = useState(null);
   const [qcChecks, setQcChecks] = useState([]);
-  const [trainSessions, setTrainSessions] = useState([]);
   const [commonIssues, setCommonIssues] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [deductions, setDeductions] = useState({});
@@ -30,13 +29,11 @@ export default function StaffProfile() {
     Promise.all([
       api.get(`/staff/${id}`),
       api.get('/qc/checks'),
-      api.get('/training/sessions'),
-    ]).then(([s, q, t]) => {
+    ]).then(([s, q]) => {
       const found = s.data;
       setStaff(found);
       setSlackEmail(found?.slack_email || '');
       setQcChecks(q.data.filter(c => (c.staff_ids || [c.staff_id]).includes(parseInt(id)) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
-      setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});
     api.get(`/complaints?staff_id=${id}`).then(r => setComplaints(r.data)).catch(() => {});
@@ -119,7 +116,6 @@ export default function StaffProfile() {
           <div className="stat-value" style={{ color: avgScore >= 85 ? 'var(--ok)' : avgScore >= 70 ? 'var(--amber)' : 'var(--red)' }}>{fmtScore(avgScore)}</div>
           {breakdownText(checksAvgScore, complaintPoints) && <div className="stat-sub">{breakdownText(checksAvgScore, complaintPoints)}</div>}
         </div>
-        <div className="stat-card"><div className="stat-label">Training Sessions</div><div className="stat-value">{trainSessions.length}</div></div>
         {(() => {
           const recent = complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10));
           const serious = recent.filter(c => c.severity === 'serious').length;
@@ -242,8 +238,8 @@ export default function StaffProfile() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['qc', 'training', 'complaints'].map(tab => {
-          const labels = { qc: 'QC Checks', training: 'Training', complaints: 'Complaints' };
+        {['qc', 'complaints'].map(tab => {
+          const labels = { qc: 'QC Checks', complaints: 'Complaints' };
           const recentComplaints = tab === 'complaints' ? complaints.filter(c => c.date >= new Date(Date.now() - 90*24*60*60*1000).toISOString().slice(0,10)) : [];
           const hasRisk = tab === 'complaints' && (recentComplaints.filter(c=>c.severity==='serious').length >= 1 || recentComplaints.filter(c=>c.severity==='moderate').length >= 2);
           return (
@@ -278,30 +274,6 @@ export default function StaffProfile() {
                       <td style={{ color: 'var(--t2)' }}>{c.checklist_name}</td>
                       <td><ScoreBadge score={c.score_pct} /></td>
                       <td style={{ color: 'var(--t2)' }}>{c.signed_off_by}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'training' && (
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 16 }}>Training History</div>
-          {trainSessions.length === 0 ? <p style={{ color: 'var(--t3)' }}>No training sessions yet.</p> : (
-            <div className="table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>Checklist</th><th>Completion</th><th>Status</th><th>Signed off by</th></tr></thead>
-                <tbody>
-                  {trainSessions.map(t => (
-                    <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
-                      <td>{fmtDate(t.date)}</td>
-                      <td>{t.checklist_name}</td>
-                      <td>{Math.round(t.completion_pct)}%</td>
-                      <td><StatusBadge status={t.status} /></td>
-                      <td style={{ color: 'var(--t2)' }}>{t.signed_off_by || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -64,7 +64,7 @@ router.get('/managers', (req, res) => {
     const trainAll = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL}`).get(mgr.id);
     const trainRange = db.prepare(`SELECT COUNT(*) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL} ${dateFrom ? 'AND date >= ?' : ''} ${dateTo ? 'AND date <= ?' : ''}`).get(...[mgr.id, dateFrom, dateTo].filter(Boolean));
     const traineesSignedOff = db.prepare(`SELECT COUNT(DISTINCT trainee_id) as cnt FROM training_sessions WHERE assigned_to_id=? AND status='complete' AND completion_pct=100${trL}`).get(mgr.id);
-    const pendingTasks = db.prepare(`SELECT COUNT(*) as cnt FROM (SELECT id FROM qc_checks WHERE assigned_to_id=? AND status='pending'${qcL} UNION ALL SELECT id FROM training_sessions WHERE assigned_to_id=? AND status='pending'${trL})`).get(mgr.id, mgr.id);
+    const pendingTasks = db.prepare(`SELECT COUNT(*) as cnt FROM qc_checks WHERE assigned_to_id=? AND status='pending'${qcL}`).get(mgr.id);
     const lastQC = db.prepare(`SELECT MAX(date) as d FROM qc_checks WHERE assigned_to_id=? AND status='complete'${qcL}`).get(mgr.id);
     const lastTrain = db.prepare(`SELECT MAX(date) as d FROM training_sessions WHERE assigned_to_id=? AND status='complete'${trL}`).get(mgr.id);
     const lastActivity = [lastQC?.d, lastTrain?.d].filter(Boolean).sort().reverse()[0] || null;

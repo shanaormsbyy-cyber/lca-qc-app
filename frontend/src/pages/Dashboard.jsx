@@ -16,7 +16,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [due, setDue] = useState(null);
   const [myQC, setMyQC] = useState([]);
-  const [myTrain, setMyTrain] = useState([]);
   const [recentQC, setRecentQC] = useState([]);
   const [allQC, setAllQC] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,18 +48,15 @@ export default function Dashboard() {
     Promise.all([
       api.get('/scheduling/due'),
       api.get('/qc/checks'),
-      api.get('/training/sessions'),
       api.get('/qc/checklists'),
       api.get('/staff'),
       api.get('/properties'),
       api.get('/managers'),
-    ]).then(([dueR, qcR, trainR, clR, sR, pR, mR]) => {
+    ]).then(([dueR, qcR, clR, sR, pR, mR]) => {
       setDue(dueR.data);
       const qc = qcR.data;
-      const train = trainR.data;
       setAllQC(qc);
       setMyQC(qc.filter(q => q.assigned_to_id === manager.id && q.status === 'pending'));
-      setMyTrain(train.filter(t => t.assigned_to_id === manager.id && t.status === 'pending'));
       setRecentQC(qc.filter(q => q.status === 'complete').slice(0, 5));
       setChecklists(clR.data);
       setStaff(sR.data);
@@ -148,7 +144,7 @@ export default function Dashboard() {
   const dueSoonStaff  = due?.staff.filter(s => s.status === 'due_soon').length || 0;
   const overdueProps  = due?.properties.filter(p => p.status === 'overdue').length || 0;
   const dueSoonProps  = due?.properties.filter(p => p.status === 'due_soon').length || 0;
-  const totalPending  = myQC.length + myTrain.length;
+  const totalPending  = myQC.length;
 
   const completeQC = allQC.filter(q => q.status === 'complete');
 
@@ -214,7 +210,7 @@ export default function Dashboard() {
         <div className="stat-card" style={{ cursor: 'pointer' }}>
           <div className="stat-label">My Pending Tasks</div>
           <div className={`stat-value${totalPending > 0 ? ' cyan' : ''}`}>{totalPending}</div>
-          <div className="stat-sub">{myQC.length} QC · {myTrain.length} training</div>
+          <div className="stat-sub">QC checks assigned to you</div>
         </div>
         <div className={`stat-card${heatpumpsDue > 0 ? ' danger' : ''}`} onClick={() => navigate('/heatpump')} style={{ cursor: 'pointer' }}>
           <div className="stat-label">Heat Pumps Due (7 days)</div>
@@ -469,16 +465,6 @@ export default function Dashboard() {
                 <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); navigate(`/qc/checks/${q.id}`); }}>Start</button>
               </div>
             ))}
-            {myTrain.map(t => (
-              <div key={t.id} onClick={() => navigate(`/training/sessions/${t.id}`)}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--glass)', border: '1px solid var(--glass-border)', borderRadius: 12, cursor: 'pointer' }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Training — {t.trainee_name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>{t.checklist_name} · {fmtDate(t.date)}</div>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={e => { e.stopPropagation(); navigate(`/training/sessions/${t.id}`); }}>Start</button>
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -487,8 +473,6 @@ export default function Dashboard() {
       <div className="flex gap-3 mb-6" style={{ flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={() => openCreate('staff')}>👤 Start Team QC Check</button>
         <button className="btn btn-secondary" onClick={() => openCreate({}, 'property')}>🏠 Start Property Health Check</button>
-        <button className="btn btn-ghost" onClick={() => navigate('/training')}>+ New Training</button>
-        <button className="btn btn-ghost" onClick={() => navigate('/training/induction')}>📋 New Hire Induction</button>
       </div>
 
       {/* Overdue & Due Soon */}

@@ -7,15 +7,12 @@ import Staff from './pages/Staff';
 import StaffProfile from './pages/StaffProfile';
 import Properties from './pages/Properties';
 import PropertyProfile from './pages/PropertyProfile';
-import Training from './pages/Training';
-import TrainingSession from './pages/TrainingSession';
 import QCChecks from './pages/QCChecks';
 import QCCheckForm from './pages/QCCheckForm';
 import Checklists from './pages/Checklists';
 import KPIs from './pages/KPIs';
 import ManagerProfile from './pages/ManagerProfile';
 import Settings from './pages/Settings';
-import InductionTraining from './pages/InductionTraining';
 import HeatPumpTracker from './pages/HeatPumpTracker';
 import HeatPumpDetail from './pages/HeatPumpDetail';
 import StaffPortalLogin from './pages/StaffPortalLogin';
@@ -46,9 +43,7 @@ export default function App() {
         <Route path="team/:id" element={<StaffProfile />} />
         <Route path="properties" element={<Properties />} />
         <Route path="properties/:id" element={<PropertyProfile />} />
-        <Route path="training" element={<Training />} />
-        <Route path="training/sessions/:id" element={<TrainingSession />} />
-        <Route path="training/induction" element={<InductionTraining />} />
+        <Route path="training/*" element={<Navigate to="/training-hub" replace />} />
         <Route path="qc" element={<QCChecks />} />
         <Route path="qc/checks/:id" element={<QCCheckForm />} />
         <Route path="checklists" element={<Checklists />} />

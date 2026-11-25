@@ -39,7 +39,6 @@ export default function ManagerProfile() {
   };
 
   const qcChart = fillMonths(data.qcMonthly);
-  const trainChart = fillMonths(data.trainMonthly);
 
   return (
     <div className="page">
@@ -54,7 +53,7 @@ export default function ManagerProfile() {
       </div>
 
       {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 24 }}>
         <div className="card">
           <div className="card-title" style={{ marginBottom: 16 }}>QC Checks Completed (12 months)</div>
           <ResponsiveContainer width="100%" height={180}>
@@ -64,18 +63,6 @@ export default function ManagerProfile() {
               <YAxis allowDecimals={false} tick={{ fill: 'var(--t3)', fontSize: 10 }} />
               <Tooltip contentStyle={{ background: 'var(--navy2)', border: '1px solid var(--border)', borderRadius: 8 }} />
               <Bar dataKey="count" fill="var(--green)" radius={3} name="QC Checks" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 16 }}>Training Sessions Delivered (12 months)</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={trainChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="month" tick={{ fill: 'var(--t3)', fontSize: 10 }} />
-              <YAxis allowDecimals={false} tick={{ fill: 'var(--t3)', fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: 'var(--navy2)', border: '1px solid var(--border)', borderRadius: 8 }} />
-              <Bar dataKey="count" fill="#60a5fa" radius={3} name="Sessions" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -103,50 +90,6 @@ export default function ManagerProfile() {
         )}
       </div>
 
-      {/* Training sessions list */}
-      <div className="card mb-6">
-        <div className="card-title" style={{ marginBottom: 16 }}>Training Sessions Delivered ({data.trainSessions.length})</div>
-        {data.trainSessions.length === 0 ? <p style={{ color: 'var(--t3)' }}>No training sessions in this period.</p> : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Date</th><th>Trainee</th><th>Checklist</th><th>Completion</th></tr></thead>
-              <tbody>
-                {data.trainSessions.map(t => (
-                  <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/training/sessions/${t.id}`)}>
-                    <td>{fmtDate(t.date)}</td>
-                    <td style={{ fontWeight: 600 }}>{t.trainee_name}</td>
-                    <td style={{ color: 'var(--t2)' }}>{t.checklist_name}</td>
-                    <td>{Math.round(t.completion_pct)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Trainee performance */}
-      {data.traineePerf.length > 0 && (
-        <div className="card">
-          <div className="card-title" style={{ marginBottom: 4 }}>Trainee Performance</div>
-          <p style={{ color: 'var(--t2)', fontSize: 13, marginBottom: 16 }}>Staff trained by {data.mgr.name} and their average QC score since training</p>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Staff Member</th><th>Checklist</th><th>Training Completed</th><th>Avg QC Score Since</th></tr></thead>
-              <tbody>
-                {data.traineePerf.map(t => (
-                  <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/team/${t.id}`)}>
-                    <td style={{ fontWeight: 600 }}>{t.name}</td>
-                    <td style={{ color: 'var(--t2)' }}>{t.checklist_name}</td>
-                    <td style={{ color: 'var(--t2)' }}>{fmtDate(t.training_completed || t.trained_at?.slice(0, 10)) || '—'}</td>
-                    <td><ScoreBadge score={t.avg_score_since_training} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
