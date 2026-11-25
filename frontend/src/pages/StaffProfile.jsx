@@ -36,7 +36,7 @@ export default function StaffProfile() {
       const found = s.data.find(x => x.id === parseInt(id));
       setStaff(found);
       setSlackEmail(found?.slack_email || '');
-      setQcChecks(q.data.filter(c => c.staff_id === parseInt(id) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
+      setQcChecks(q.data.filter(c => (c.staff_ids || [c.staff_id]).includes(parseInt(id)) && c.status === 'complete' && (c.check_type === 'staff' || !c.check_type)));
       setTrainSessions(t.data.filter(x => x.trainee_id === parseInt(id)));
     }).finally(() => setLoading(false));
     api.get(`/kpis/staff/${id}/insights`).then(r => setInsights(r.data)).catch(() => {});

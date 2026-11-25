@@ -5,6 +5,10 @@ import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
 import { fetchDeductions, adjust, pointsFor, breakdownText } from '../lib/complaintScore';
+import ExtraStaffPicker from '../components/ExtraStaffPicker';
+
+// A check counts for everyone on it (staff_ids), not just the first team member.
+const onCheck = (c, id) => (c.staff_ids || [c.staff_id]).includes(id);
 
 export default function Staff() {
   const navigate = useNavigate();
@@ -53,7 +57,7 @@ export default function Staff() {
   const dueInfo = id => due?.staff.find(s => s.id === id);
   // QC average from checks, then minus complaint points from the last 90 days.
   const checksAvg = id => {
-    const c = checks.filter(c => c.staff_id === id && c.status === 'complete');
+    const c = checks.filter(c => onCheck(c, id) && c.status === 'complete');
     return c.length ? c.reduce((s, c) => s + c.score_pct, 0) / c.length : null;
   };
   const avgScore = id => adjust(checksAvg(id), pointsFor(deductions, id));
@@ -156,7 +160,7 @@ export default function Staff() {
               {staff.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.role.toLowerCase().includes(search.toLowerCase())).map(s => {
                 const d = dueInfo(s.id);
                 const avg = avgScore(s.id);
-                const total = checks.filter(c => c.staff_id === s.id && c.status === 'complete').length;
+                const total = checks.filter(c => onCheck(c, s.id) && c.status === 'complete').length;
                 const isInactive = s.inactive_until && s.inactive_until >= new Date().toISOString().slice(0, 10);
                 return (
                   <tr key={s.id} style={{ cursor: 'pointer', opacity: isInactive ? 0.5 : 1 }} onClick={() => navigate(`/staff/${s.id}`)}>
@@ -278,10 +282,11 @@ export default function Staff() {
             <div className="modal-title">New QC Check</div>
             <div className="form-group">
               <label className="form-label">Staff Member</label>
-              <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
+              <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value, staff_ids: (f.staff_ids || []).filter(x => x !== e.target.value) }))}>
                 <option value="">Select staff member…</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              <ExtraStaffPicker staff={staff} primaryId={checkForm.staff_id} value={checkForm.staff_ids || []} onChange={ids => setCheckForm(f => ({ ...f, staff_ids: ids }))} />
             </div>
             <div className="form-group">
               <label className="form-label">Property</label>

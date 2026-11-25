@@ -50,12 +50,23 @@ router.delete('/:id', (req, res) => {
   const id = req.params.id;
   db.exec('BEGIN');
   try {
-    // Delete QC check items for all QC checks belonging to this staff member
-    const qcChecks = db.prepare('SELECT id FROM qc_checks WHERE staff_id=?').all(id);
-    for (const c of qcChecks) {
-      db.prepare('DELETE FROM qc_check_items WHERE check_id=?').run(c.id);
+    // QC checks this person was on: shared checks stay for the other team members (this person is just
+    // taken off them); checks that were only theirs are deleted along with their items.
+    const theirChecks = db.prepare(`
+      SELECT check_id AS id FROM qc_check_staff WHERE staff_id=?
+      UNION SELECT id FROM qc_checks WHERE staff_id=?
+    `).all(id, id);
+    for (const c of theirChecks) {
+      const others = db.prepare('SELECT staff_id FROM qc_check_staff WHERE check_id=? AND staff_id<>? ORDER BY rowid').all(c.id, id);
+      if (others.length) {
+        db.prepare('DELETE FROM qc_check_staff WHERE check_id=? AND staff_id=?').run(c.id, id);
+        db.prepare('UPDATE qc_checks SET staff_id=? WHERE id=? AND staff_id=?').run(others[0].staff_id, c.id, id);
+      } else {
+        db.prepare('DELETE FROM qc_check_items WHERE check_id=?').run(c.id);
+        db.prepare('DELETE FROM qc_check_staff WHERE check_id=?').run(c.id);
+        db.prepare('DELETE FROM qc_checks WHERE id=?').run(c.id);
+      }
     }
-    db.prepare('DELETE FROM qc_checks WHERE staff_id=?').run(id);
 
     // Delete training session items for all training sessions belonging to this staff member
     const trainSessions = db.prepare('SELECT id FROM training_sessions WHERE trainee_id=?').all(id);

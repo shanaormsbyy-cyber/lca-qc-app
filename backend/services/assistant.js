@@ -17,9 +17,9 @@ function buildContext() {
       COUNT(q.id) as total_checks,
       ROUND(AVG(q.score_pct), 1) as avg_score,
       MAX(q.date) as last_check_date,
-      (SELECT score_pct FROM qc_checks WHERE staff_id=s.id AND status='complete' ORDER BY date DESC LIMIT 1) as latest_score
+      (SELECT score_pct FROM qc_checks WHERE id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND status='complete' ORDER BY date DESC LIMIT 1) as latest_score
     FROM staff s
-    LEFT JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
+    LEFT JOIN qc_checks q ON q.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND q.status = 'complete'
     WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
     ORDER BY s.name
@@ -52,7 +52,7 @@ function buildContext() {
   const watchlist = db.prepare(`
     SELECT s.id, s.name, ROUND(AVG(q.score_pct),1) as avg_score, COUNT(q.id) as checks
     FROM staff s
-    JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
+    JOIN qc_checks q ON q.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND q.status = 'complete'
       AND q.date >= date('now', '-90 days')
     WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
@@ -64,7 +64,7 @@ function buildContext() {
   const overdueStaff = db.prepare(`
     SELECT s.name, MAX(q.date) as last_check
     FROM staff s
-    LEFT JOIN qc_checks q ON q.staff_id = s.id AND q.status = 'complete'
+    LEFT JOIN qc_checks q ON q.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND q.status = 'complete'
     WHERE (s.inactive_until IS NULL OR s.inactive_until <= date('now')) AND (s.archived=0 OR s.archived IS NULL)
     GROUP BY s.id
     HAVING last_check IS NULL OR last_check < date('now', '-' || ? || ' days')

@@ -13,7 +13,7 @@ function cleanerScore(staffId) {
   const r = db.prepare(`
     SELECT COUNT(*) as cnt, AVG(score_pct) as avg
     FROM qc_checks
-    WHERE staff_id=? AND status='complete' AND (check_type='staff' OR check_type IS NULL)
+    WHERE id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND status='complete' AND (check_type='staff' OR check_type IS NULL)
   `).get(staffId);
   const ded = complaintDeduction(db, staffId);
   const checksAvg = r.avg == null ? null : round1(r.avg);
@@ -135,7 +135,7 @@ router.get('/managers/:id', (req, res) => {
       MAX(ts.signed_off_at) as trained_at,
       tc.name as checklist_name,
       (SELECT AVG(qc2.score_pct) FROM qc_checks qc2
-       WHERE qc2.staff_id=s.id AND qc2.status='complete'
+       WHERE qc2.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND qc2.status='complete'
          AND qc2.date >= date(MAX(ts.date))
       ) as avg_score_since_training
     FROM training_sessions ts
@@ -171,7 +171,7 @@ router.get('/trainees', (req, res) => {
   `).all();
 
   trainees.forEach(t => {
-    let where = `staff_id=${t.id} AND status='complete' AND (check_type='staff' OR check_type IS NULL)`;
+    let where = `id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ${Number(t.id)}) AND status='complete' AND (check_type='staff' OR check_type IS NULL)`;
     if (t.training_completed) where += ` AND date >= '${t.training_completed}'`;
     if (dateFrom) where += ` AND date >= '${dateFrom}'`;
     if (dateTo) where += ` AND date <= '${dateTo}'`;
@@ -255,7 +255,7 @@ router.get('/top-performers', (req, res) => {
         SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
         FROM qc_checks
         JOIN properties ON properties.id = qc_checks.property_id
-        WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+        WHERE qc_checks.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
         ORDER BY qc_checks.date DESC LIMIT 3
       `).all(s.id);
 
@@ -296,7 +296,7 @@ router.get('/watchlist', (req, res) => {
       SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
       FROM qc_checks
       JOIN properties ON properties.id = qc_checks.property_id
-      WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+      WHERE qc_checks.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
       ORDER BY qc_checks.date DESC LIMIT 3
     `).all(s.id);
     const complaints = db.prepare(`
@@ -330,7 +330,7 @@ router.get('/watchlist', (req, res) => {
         SELECT qc_checks.date, qc_checks.score_pct, properties.name as property_name
         FROM qc_checks
         JOIN properties ON properties.id = qc_checks.property_id
-        WHERE qc_checks.staff_id=? AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
+        WHERE qc_checks.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc_checks.status='complete' AND (qc_checks.check_type='staff' OR qc_checks.check_type IS NULL)
         ORDER BY qc_checks.date DESC LIMIT 3
       `).all(s.id);
 
@@ -512,7 +512,7 @@ router.get('/staff/:id/insights', (req, res) => {
   const checks = db.prepare(`
     SELECT qc.id, qc.date, qc.score_pct
     FROM qc_checks qc
-    WHERE qc.staff_id = ? AND qc.status = 'complete'
+    WHERE qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc.status = 'complete'
     ORDER BY qc.date ASC
   `).all(staffId);
 
@@ -529,7 +529,7 @@ router.get('/staff/:id/insights', (req, res) => {
     FROM qc_check_items qci
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
-    WHERE qc.staff_id = ? AND qc.status = 'complete'
+    WHERE qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc.status = 'complete'
       AND (qci.na IS NULL OR qci.na = 0)
       AND (
         (qi.score_type = 'pass_fail' AND qci.score = 0)
@@ -838,7 +838,8 @@ router.get('/reclean-time', (req, res) => {
            AVG(qc.reclean_minutes) as avg_minutes,
            SUM(qc.reclean_minutes) as total_minutes
     FROM qc_checks qc
-    JOIN staff s ON s.id = qc.staff_id
+    JOIN qc_check_staff cs ON cs.check_id = qc.id
+    JOIN staff s ON s.id = cs.staff_id
     WHERE qc.status='complete' AND qc.reclean_required=1 AND qc.reclean_minutes IS NOT NULL
       AND (qc.check_type='staff' OR qc.check_type IS NULL)
     GROUP BY s.id
@@ -912,7 +913,7 @@ router.get('/staff/:id/common-issues', (req, res) => {
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
     WHERE qc.status = 'complete'
-      AND qc.staff_id = ?
+      AND qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?)
       AND qc.date >= ?
       AND qc.date <= ?
       AND (

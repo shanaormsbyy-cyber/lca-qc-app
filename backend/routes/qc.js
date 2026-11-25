@@ -1,6 +1,14 @@
 const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { setCheckStaff } = require('../lib/checkStaff');
+
+// Turn the GROUP_CONCAT of team members into an array: staff_ids = everyone the check counts for.
+function withStaffIds(check) {
+  check.staff_ids = check.staff_ids_csv ? String(check.staff_ids_csv).split(',').map(Number) : (check.staff_id ? [check.staff_id] : []);
+  delete check.staff_ids_csv;
+  return check;
+}
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -143,6 +151,7 @@ router.get('/checks', (req, res) => {
     SELECT qc.*,
       p.name as property_name,
       s.name as staff_name,
+      (SELECT GROUP_CONCAT(cs.staff_id) FROM qc_check_staff cs WHERE cs.check_id = qc.id) as staff_ids_csv,
       cl.name as checklist_name,
       m1.name as scheduled_by_name,
       m2.name as assigned_to_name
@@ -154,7 +163,7 @@ router.get('/checks', (req, res) => {
     JOIN managers m2 ON m2.id = qc.assigned_to_id
     ORDER BY qc.date DESC
   `).all();
-  res.json(checks);
+  res.json(checks.map(withStaffIds));
 });
 
 router.get('/checks/:id', (req, res) => {
@@ -162,6 +171,7 @@ router.get('/checks/:id', (req, res) => {
     SELECT qc.*,
       p.name as property_name,
       s.name as staff_name,
+      (SELECT GROUP_CONCAT(cs.staff_id) FROM qc_check_staff cs WHERE cs.check_id = qc.id) as staff_ids_csv,
       cl.name as checklist_name,
       m1.name as scheduled_by_name,
       m2.name as assigned_to_name
@@ -174,6 +184,7 @@ router.get('/checks/:id', (req, res) => {
     WHERE qc.id = ?
   `).get(req.params.id);
   if (!check) return res.status(404).json({ error: 'Not found' });
+  withStaffIds(check);
 
   const items = db.prepare(`
     SELECT qci.id, qci.check_id, qci.item_id, qci.score, qci.notes, qci.na,
@@ -189,15 +200,18 @@ router.get('/checks/:id', (req, res) => {
 });
 
 router.post('/checks', (req, res) => {
-  const { property_id, staff_id, checklist_id, assigned_to_id, date, notes, check_type, room_counts } = req.body;
+  const { property_id, staff_id, staff_ids, checklist_id, assigned_to_id, date, notes, check_type, room_counts } = req.body;
+  // Everyone who cleaned the property: staff_ids (several) or staff_id (one). The check counts for all of them.
+  const teamIds = [...new Set([staff_id, ...(Array.isArray(staff_ids) ? staff_ids : [])].map(Number).filter(Boolean))];
   let checkId;
   db.exec('BEGIN');
   try {
     const result = db.prepare(`
       INSERT INTO qc_checks (property_id, staff_id, checklist_id, scheduled_by_id, assigned_to_id, date, notes, check_type)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(property_id, staff_id, checklist_id, req.manager.id, assigned_to_id, date, notes || '', check_type || 'staff');
+    `).run(property_id, teamIds[0] || null, checklist_id, req.manager.id, assigned_to_id, date, notes || '', check_type || 'staff');
     checkId = result.lastInsertRowid;
+    setCheckStaff(db, checkId, teamIds);
 
     const checklist = db.prepare('SELECT * FROM qc_checklists WHERE id=?').get(checklist_id);
     let repeatableSections = [];
@@ -311,6 +325,7 @@ router.put('/checks/:id', (req, res) => {
 });
 
 router.delete('/checks/:id', (req, res) => {
+  db.prepare('DELETE FROM qc_check_staff WHERE check_id=?').run(req.params.id);
   db.prepare('DELETE FROM qc_checks WHERE id=?').run(req.params.id);
   res.json({ ok: true });
 });

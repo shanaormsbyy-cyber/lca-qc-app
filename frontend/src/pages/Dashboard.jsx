@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { ScoreBadge, DueBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
 import { fetchDeductions, adjust, fmtScore, breakdownText } from '../lib/complaintScore';
+import ExtraStaffPicker from '../components/ExtraStaffPicker';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -164,7 +165,7 @@ export default function Dashboard() {
     ? staffChecks.reduce((sum, q) => sum + q.score_pct, 0) / staffChecks.length
     : null;
   // Complaints (last 90 days) lower the team score by the average complaint points per cleaner.
-  const cleanersWithChecks = [...new Set(staffChecks.map(q => q.staff_id))];
+  const cleanersWithChecks = [...new Set(staffChecks.flatMap(q => q.staff_ids || [q.staff_id]))];
   const teamComplaintPoints = cleanersWithChecks.length
     ? Math.round((cleanersWithChecks.reduce((sum, id) => sum + (deductions[id] ? deductions[id].points : 0), 0) / cleanersWithChecks.length) * 10) / 10
     : 0;
@@ -716,10 +717,11 @@ export default function Dashboard() {
             {createType !== 'property' && (
             <div className="form-group">
               <label className="form-label">Staff Member Being Assessed</label>
-              <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value }))}>
+              <select className="form-select" value={checkForm.staff_id} onChange={e => setCheckForm(f => ({ ...f, staff_id: e.target.value, staff_ids: (f.staff_ids || []).filter(x => x !== e.target.value) }))}>
                 <option value="">Select staff member…</option>
                 {staff.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              <ExtraStaffPicker staff={staff} primaryId={checkForm.staff_id} value={checkForm.staff_ids || []} onChange={ids => setCheckForm(f => ({ ...f, staff_ids: ids }))} />
             </div>
             )}
             <div className="form-group">

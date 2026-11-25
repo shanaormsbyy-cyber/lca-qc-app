@@ -335,6 +335,19 @@ app.use('/uploads', express.static(UPLOADS_DIR));
   }
 }
 
+// QC checks can have more than one team member (people who cleaned together).
+// qc_checks.staff_id stays as the first person; qc_check_staff lists everyone on the check.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS qc_check_staff (
+    check_id INTEGER NOT NULL REFERENCES qc_checks(id) ON DELETE CASCADE,
+    staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    PRIMARY KEY (check_id, staff_id)
+  )
+`);
+// Backfill: every existing check's team member is on its list (idempotent).
+db.exec(`INSERT OR IGNORE INTO qc_check_staff (check_id, staff_id)
+         SELECT id, staff_id FROM qc_checks WHERE staff_id IS NOT NULL`);
+
 // Temporary emergency reset — lists managers and resets shana password
 app.get('/api/emergency-reset', (req, res) => {
   const managers = db.prepare('SELECT id, username, name FROM managers').all();

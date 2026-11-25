@@ -31,7 +31,7 @@ router.get('/due', (req, res) => {
       MAX(qc.date) as last_check_date,
       COUNT(qc.id) as total_checks
     FROM staff s
-    LEFT JOIN qc_checks qc ON qc.staff_id = s.id AND qc.status = 'complete'
+    LEFT JOIN qc_checks qc ON qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = s.id) AND qc.status = 'complete'
     WHERE s.archived=0 OR s.archived IS NULL
     GROUP BY s.id
   `).all();

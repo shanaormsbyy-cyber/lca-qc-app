@@ -42,7 +42,7 @@ router.get('/my-checks', requireStaffAuth, (req, res) => {
     FROM qc_checks qc
     LEFT JOIN properties p ON p.id = qc.property_id
     LEFT JOIN qc_checklists cl ON cl.id = qc.checklist_id
-    WHERE qc.staff_id = ? AND qc.status = 'complete'
+    WHERE qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc.status = 'complete'
       AND (qc.check_type IS NULL OR qc.check_type = 'staff')
     ORDER BY qc.date DESC
   `).all(req.staffUser.id);
@@ -59,7 +59,7 @@ router.get('/my-checks/:id', requireStaffAuth, (req, res) => {
     LEFT JOIN properties p ON p.id = qc.property_id
     LEFT JOIN staff s ON s.id = qc.staff_id
     LEFT JOIN qc_checklists cl ON cl.id = qc.checklist_id
-    WHERE qc.id = ? AND qc.staff_id = ?
+    WHERE qc.id = ? AND qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?)
       AND (qc.check_type IS NULL OR qc.check_type = 'staff')
   `).get(req.params.id, req.staffUser.id);
   if (!check) return res.status(404).json({ error: 'Not found' });
@@ -87,7 +87,7 @@ router.get('/my-stats', requireStaffAuth, (req, res) => {
 
   const checks = db.prepare(`
     SELECT score_pct, date FROM qc_checks
-    WHERE staff_id = ? AND status = 'complete' AND score_pct IS NOT NULL
+    WHERE id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND status = 'complete' AND score_pct IS NOT NULL
       AND (check_type IS NULL OR check_type = 'staff')
     ORDER BY date ASC
   `).all(req.staffUser.id);
@@ -145,7 +145,7 @@ router.get('/my-flags', requireStaffAuth, (req, res) => {
     FROM qc_check_items qci
     JOIN qc_checklist_items qi ON qi.id = qci.item_id
     JOIN qc_checks qc ON qc.id = qci.check_id
-    WHERE qc.staff_id = ? AND qc.status = 'complete'
+    WHERE qc.id IN (SELECT check_id FROM qc_check_staff WHERE staff_id = ?) AND qc.status = 'complete'
       AND (qc.check_type IS NULL OR qc.check_type = 'staff')
       AND qc.date >= ? AND qc.date <= ?
       AND (qci.na IS NULL OR qci.na = 0)
