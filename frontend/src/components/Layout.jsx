@@ -38,8 +38,7 @@ export default function Layout() {
 
       <aside className={`sidebar${open ? ' sidebar-open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="brand">LCA</div>
-          <div className="sub">Cleaning Services</div>
+          <div className="brand brand-name">Team Operations</div>
         </div>
         <nav className="sidebar-nav">
           {NAV.map(n => (
@@ -67,7 +66,7 @@ export default function Layout() {
           <button className="hamburger" onClick={() => setOpen(o => !o)} aria-label="Menu">
             <span /><span /><span />
           </button>
-          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--cyan)' }}>LCA</div>
+          <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--cyan)' }}>Team Operations</div>
           <div style={{ width: 40 }} />
         </div>
         <Outlet />

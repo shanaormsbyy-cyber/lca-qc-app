@@ -26,7 +26,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ fontSize: 36, fontWeight: 900, color: 'var(--cyan)', marginBottom: 4 }}>LCA</div>
+          <div style={{ fontSize: 34, fontWeight: 900, color: 'var(--cyan)', marginBottom: 4 }}>Team Operations</div>
           <div style={{ color: 'var(--t2)', fontSize: 15 }}>QC & Training Management</div>
         </div>
         <div className="card">
@@ -60,9 +60,6 @@ export default function Login() {
             </button>
           </form>
         </div>
-        <p style={{ textAlign: 'center', marginTop: 16, color: 'var(--t3)', fontSize: 12 }}>
-          LCA Cleaning Services — Hamilton, NZ
-        </p>
       </div>
     </div>
   );

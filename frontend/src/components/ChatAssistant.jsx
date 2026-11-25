@@ -97,7 +97,7 @@ export default function ChatAssistant() {
             background: '#161620',
           }}>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--cyan)' }}>✦ LCA Assistant</div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--cyan)' }}>✦ Assistant</div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 1 }}>Ask me about your team, scores, complaints & more</div>
             </div>
             {messages.length > 0 && (
