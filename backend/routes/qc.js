@@ -442,15 +442,17 @@ router.post('/checks/:id/voice-analyse', async (req, res) => {
 
   const prompt = `You are a QC inspection assistant for a professional cleaning company. A manager recorded a voice note describing specific issues found during an inspection.
 
-Your job: match ONLY what the manager explicitly mentioned as a problem to checklist items. Do not infer, expand, or assume.
+Your job: match every problem the manager mentioned to the checklist item that covers that THING (the fixture, appliance, surface or area), even if the item's wording describes a different task for it.
 
 RULES — read carefully:
-1. ONLY fail an item if the manager directly described a problem with that specific thing. E.g. "the toilet was dirty" → fail the toilet item only. Do NOT fail shower, sink, or other bathroom items unless those were also mentioned.
-2. Do NOT fail an item just because it is in the same room or category as something mentioned.
-3. If the manager says something positive or neutral about an area, do not fail anything in it.
-4. Use "ambiguous" ONLY when the same issue could apply to multiple distinct rooms (e.g. "the bed wasn't made" when there are separate Bedroom 1 and Bedroom 2 items). Do not use it otherwise.
-5. Everything not explicitly mentioned as a problem is PASSED — do not include it in fails or ambiguous.
-6. Return ONLY valid JSON. No markdown, no explanation, nothing else.
+1. Match on the thing, not the exact task. If the manager describes any problem with something an item covers, fail that item. E.g. item "Dishwasher emptied" + manager says "dishwasher not wiped" → fail the dishwasher item. Item "Toilet clean inside and outside" + "toilet seat loose" → fail the toilet item.
+2. Only fail items about the thing that was mentioned. "The toilet was dirty" fails the toilet item only — NOT the shower, sink or other bathroom items unless those were mentioned too. Never fail an item just because it is in the same room.
+3. A broad item covers its examples: "Appliances clean (oven, microwave, kettle)" covers a dirty kettle; "All surfaces dust-free" covers dusty skirting boards or sills.
+4. If the manager says something positive or neutral about an area, do not fail anything in it.
+5. Use "ambiguous" ONLY when the same issue could apply to multiple distinct rooms (e.g. "the bed wasn't made" when there are separate Bedroom 1 and Bedroom 2 items).
+6. If a problem was mentioned but NO item covers that thing, put it in "unmatched" — never drop it silently.
+7. Everything not mentioned as a problem is PASSED — do not include it anywhere.
+8. Return ONLY valid JSON. No markdown, no explanation, nothing else.
 
 Checklist items (use the "id" field in your response):
 ${JSON.stringify(itemList, null, 2)}
@@ -466,6 +468,9 @@ Return this exact JSON format:
   ],
   "ambiguous": [
     { "item_id": 456, "reason": "what was mentioned", "note": "why the specific room is unclear" }
+  ],
+  "unmatched": [
+    { "issue": "close paraphrase of a problem the manager mentioned that no checklist item covers" }
   ]
 }`;
 
@@ -501,6 +506,7 @@ Return this exact JSON format:
       summary: parsed.summary || '',
       fails: parsed.fails || [],
       ambiguous: parsed.ambiguous || [],
+      unmatched: (parsed.unmatched || []).filter(u => u && u.issue).map(u => ({ issue: String(u.issue) })),
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

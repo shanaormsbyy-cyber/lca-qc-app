@@ -55,6 +55,7 @@ export default function QCCheckForm() {
   const [voiceError, setVoiceError] = useState('');
   const [voiceResult, setVoiceResult] = useState(null); // { summary, fails, ambiguous }
   const [ambiguousChoices, setAmbiguousChoices] = useState({}); // { item_id: 'fail' | 'pass' }
+  const [unmatchedChoices, setUnmatchedChoices] = useState({}); // { index: item_id to fail | '' (add to notes) }
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [voiceDefaultUnmentioned, setVoiceDefaultUnmentioned] = useState('pass');
   const speechRef = useRef(null);
@@ -292,10 +293,12 @@ export default function QCCheckForm() {
         summary: r.data.summary || '',
         fails: r.data.fails || [],
         ambiguous: r.data.ambiguous || [],
+        unmatched: r.data.unmatched || [],
       });
       const choices = {};
       (r.data.ambiguous || []).forEach(a => { choices[a.item_id] = 'pass'; });
       setAmbiguousChoices(choices);
+      setUnmatchedChoices({});
       setShowVoiceModal(true);
     } catch (err) {
       const msg = err?.response?.data?.error || err?.message || 'Analysis failed — please try again.';
@@ -308,10 +311,18 @@ export default function QCCheckForm() {
   };
 
   const applyVoiceScores = () => {
+    const unmatched = voiceResult.unmatched || [];
     const failIds = new Set([
       ...(voiceResult.fails || []).map(f => f.item_id),
       ...Object.entries(ambiguousChoices).filter(([, v]) => v === 'fail').map(([k]) => parseInt(k)),
+      // Comments not on the checklist that the manager assigned to an item
+      ...Object.values(unmatchedChoices).filter(Boolean).map(Number),
     ]);
+    // Comments left unassigned go into the check notes so nothing is lost.
+    const leftOver = unmatched.filter((_, i) => !unmatchedChoices[i]).map(u => `• ${u.issue}`);
+    if (leftOver.length) {
+      setCorrectiveActions(prev => `${prev ? `${prev}\n\n` : ''}Voice note — not on the checklist:\n${leftOver.join('\n')}`);
+    }
 
     setItems(prev => prev.map(item => {
       if (item.na) return item;
@@ -1048,7 +1059,31 @@ export default function QCCheckForm() {
               </div>
             )}
 
-            {voiceResult.fails.length === 0 && voiceResult.ambiguous.length === 0 && (
+            {(voiceResult.unmatched || []).length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--cyan)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  Not on the checklist ({voiceResult.unmatched.length})
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>
+                  Pick the item each one belongs to, or leave it — it'll be added to the check notes.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {voiceResult.unmatched.map((u, i) => (
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(58,181,217,0.3)', background: 'rgba(58,181,217,0.06)' }}>
+                      <div style={{ fontSize: 13, marginBottom: 6 }}>“{u.issue}”</div>
+                      <select className="form-select" value={unmatchedChoices[i] || ''} onChange={e => setUnmatchedChoices(c => ({ ...c, [i]: e.target.value }))}>
+                        <option value="">Add to check notes</option>
+                        {items.filter(it => !it.na).map(it => (
+                          <option key={it.id} value={it.id}>Fail: {(it.room_label || it.category) ? `${it.room_label || it.category} — ` : ''}{it.text}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {voiceResult.fails.length === 0 && voiceResult.ambiguous.length === 0 && (voiceResult.unmatched || []).length === 0 && (
               <p style={{ fontSize: 13, color: 'var(--green)', marginBottom: 20 }}>
                 ✓ No issues found in the transcript — all items will be marked as passed.
               </p>
