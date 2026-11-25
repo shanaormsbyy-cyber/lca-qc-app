@@ -119,7 +119,7 @@ export default function Properties() {
                 const isInactive = p.inactive_until && p.inactive_until >= new Date().toISOString().slice(0, 10);
                 return (
                   <tr key={p.id} style={{ cursor: 'pointer', opacity: isInactive ? 0.6 : 1 }} onClick={() => navigate(`/properties/${p.id}`)}>
-                    <td style={{ fontWeight: 700 }}>{p.name}</td>
+                    <td style={{ fontWeight: 700 }}>{p.name}{p.access_code && <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--t3)', marginTop: 2, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.access_code}>🔑 {p.access_code}</div>}</td>
                     <td>{d ? <DueBadge status={d.status} daysLeft={d.days_left} /> : <span style={{ color: 'var(--t3)' }}>—</span>}</td>
                     <td style={{ color: 'var(--t2)' }}>{d?.last_check_date || 'Never'}</td>
                     <td style={{ color: 'var(--t2)' }}>{isInactive ? `Until ${p.inactive_until}` : d?.next_due || '—'}</td>

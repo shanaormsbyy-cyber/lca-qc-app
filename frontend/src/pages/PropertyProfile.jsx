@@ -5,6 +5,7 @@ import api from '../api';
 import useLiveSync from '../hooks/useLiveSync';
 import { ScoreBadge, StatusBadge } from '../components/Badge';
 import { fmtDate } from '../utils';
+import PropertyModal from '../components/PropertyModal';
 
 export default function PropertyProfile() {
   const { id } = useParams();
@@ -13,6 +14,7 @@ export default function PropertyProfile() {
   const [checks, setChecks] = useState([]);
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
 
   const load = () => {
     Promise.all([
@@ -39,11 +41,14 @@ export default function PropertyProfile() {
   const lastCheck = checks.length ? [...checks].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
 
   const initials = property.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  let rooms = {};
+  try { rooms = JSON.parse(property.room_config || '{}') || {}; } catch { rooms = {}; }
 
   return (
     <div className="page">
       <div className="flex" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => navigate('/properties')}>← Back</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit property</button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28 }}>
@@ -52,7 +57,29 @@ export default function PropertyProfile() {
         </div>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>{property.name}</h1>
-          <p style={{ color: 'var(--t2)' }}>Property Health Profile</p>
+          <p style={{ color: 'var(--t2)' }}>Property Health Profile{property.location ? ` · ${property.location}` : ''}</p>
+        </div>
+      </div>
+
+      {/* Property details: access + rooms (edited via "Edit property") */}
+      <div className="card mb-6">
+        <div className="card-header">
+          <span className="card-title">Property Details</span>
+          <button className="btn btn-sm btn-ghost" onClick={() => setEditing(true)}>Edit</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
+          <div>
+            <div className="stat-label" style={{ marginBottom: 6 }}>Access Details</div>
+            {property.access_code
+              ? <div style={{ whiteSpace: 'pre-wrap', fontWeight: 600 }}>{property.access_code}</div>
+              : <div style={{ color: 'var(--t3)' }}>None added</div>}
+          </div>
+          <div>
+            <div className="stat-label" style={{ marginBottom: 6 }}>Rooms</div>
+            {Object.keys(rooms).length
+              ? <div style={{ fontWeight: 600 }}>{Object.entries(rooms).map(([k, v]) => `${v} ${k}${v === 1 ? '' : 's'}`).join(' · ')}</div>
+              : <div style={{ color: 'var(--t3)' }}>Not set</div>}
+          </div>
         </div>
       </div>
 
@@ -148,6 +175,7 @@ export default function PropertyProfile() {
           </div>
         )}
       </div>
+      {editing && <PropertyModal property={property} onClose={() => setEditing(false)} onSaved={load} />}
     </div>
   );
 }
