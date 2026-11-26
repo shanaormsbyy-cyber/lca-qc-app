@@ -4,10 +4,15 @@ const path = require('path');
 const { emit } = require('../emitter');
 const { makeUpload, handleUpload } = require('../middleware/upload');
 
+// Caddy items are grouped: Chemicals, then Tools, then Equipment.
+const CATEGORIES = ['chemicals', 'tools', 'equipment'];
+const catOf = c => (CATEGORIES.includes(c) ? c : 'chemicals');
+
 function caddyData(db) {
   const photo = db.prepare("SELECT value FROM settings WHERE key = 'caddy_photo'").get();
   return {
-    items: db.prepare('SELECT id, text FROM caddy_items ORDER BY sort_order, id').all(),
+    items: db.prepare(`SELECT id, text, COALESCE(category, 'chemicals') AS category FROM caddy_items
+      ORDER BY CASE COALESCE(category, 'chemicals') WHEN 'chemicals' THEN 0 WHEN 'tools' THEN 1 ELSE 2 END, sort_order, id`).all(),
     photo_url: photo && photo.value ? `/uploads/${photo.value}` : null,
   };
 }
@@ -23,9 +28,12 @@ module.exports = (db, { uploadsDir }) => {
     if (!Array.isArray(items)) return res.status(400).json({ error: 'items must be a list' });
     db.tx(() => {
       db.prepare('DELETE FROM caddy_items').run();
-      const ins = db.prepare('INSERT INTO caddy_items (text, sort_order) VALUES (?, ?)');
-      items.map(x => (typeof x === 'string' ? x : x && x.text)).filter(x => x && String(x).trim())
-        .forEach((text, i) => ins.run(String(text).trim(), i));
+      const ins = db.prepare('INSERT INTO caddy_items (text, sort_order, category) VALUES (?, ?, ?)');
+      items
+        .map(x => (typeof x === 'string' ? { text: x, category: 'chemicals' } : { text: x && x.text, category: catOf(x && x.category) }))
+        .filter(x => x.text && String(x.text).trim())
+        .sort((a, b) => CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category)) // stable: keeps order within a group
+        .forEach((x, i) => ins.run(String(x.text).trim(), i, x.category));
     });
     emit();
     res.json({ ok: true });

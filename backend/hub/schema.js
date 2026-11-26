@@ -262,6 +262,7 @@ function applySchema(db) {
     'ALTER TABLE checklist_template_groups ADD COLUMN source TEXT',          // 'caddy' = items come from the caddy list
     'ALTER TABLE checklist_template_items ADD COLUMN details TEXT',
     'ALTER TABLE onboarding_checklist_items ADD COLUMN details TEXT',
+    "ALTER TABLE caddy_items ADD COLUMN category TEXT DEFAULT 'chemicals'",  // chemicals | tools | equipment
   ]) {
     try { db.exec(sql); } catch (_) { /* already exists */ }
   }
