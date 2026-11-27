@@ -43,7 +43,7 @@ function ChecklistTemplateModal({ onClose }) {
                 <div key={j} className="editor-row" style={{ paddingLeft: 16 }}>
                   <div className="grow">
                     <input className="form-input" value={it.text} placeholder="Item" onChange={e => setItem(i, j, { text: e.target.value })} />
-                    <input className="form-input mt-4" value={it.details} placeholder="Details (optional) — e.g. what it's for, what to show them" onChange={e => setItem(i, j, { details: e.target.value })} />
+                    <textarea className="form-textarea mt-4" style={{ minHeight: 56 }} value={it.details} placeholder="Details (optional) — e.g. what it's for, what to show them" onChange={e => setItem(i, j, { details: e.target.value })} />
                   </div>
                   <button className="icon-btn danger" onClick={() => setGroup(i, { items: g.items.filter((_, k) => k !== j) })}><Trash2 size={14} /></button>
                 </div>

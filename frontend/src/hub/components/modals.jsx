@@ -206,7 +206,7 @@ export function AssessmentModal({ competency, onClose }) {
       )}
       {comp && last && (
         <div className="notice notice-cyan mb-4"><Icon name="history" />
-          <div>Last assessed {fmtDate(last.date)} ·<StatusPill status={last.level} />{last.notes ? <div className="small mt-4">{last.notes}</div> : null}</div>
+          <div>Last assessed {fmtDate(last.date)} ·<StatusPill status={last.level} />{last.notes ? <div className="small mt-4" style={{ whiteSpace: 'pre-wrap' }}>{last.notes}</div> : null}</div>
         </div>
       )}
       <div className="form-row">

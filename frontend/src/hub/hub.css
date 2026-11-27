@@ -231,7 +231,7 @@
 .hub-root .check-item-row:hover { background: rgba(255,255,255,0.02); }
 .hub-root .check-item-row input { width: 22px; height: 22px; accent-color: var(--green); flex-shrink: 0; margin-top: 1px; }
 .hub-root .check-item-title { font-weight: 600; font-size: 14px; }
-.hub-root .check-item-details { color: var(--t2); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+.hub-root .check-item-details { color: var(--t2); font-size: 12.5px; margin-top: 3px; line-height: 1.45; white-space: pre-wrap; }
 .hub-root .check-item-row.done .check-item-title { color: var(--t3); text-decoration: line-through; }
 @media (max-width: 768px) {
 .hub-root .checklist-grid { grid-template-columns: minmax(0, 1fr); }

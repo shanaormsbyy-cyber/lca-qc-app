@@ -66,7 +66,7 @@ export default function PlanDetail() {
           {p.modules.length === 0 ? <EmptyState text="No modules yet." action={<button className="btn btn-primary btn-sm" onClick={() => navigate(`/training-hub/plans/${id}/edit`)}>Add modules</button>} /> : p.modules.map(m => (
             <label key={m.id} className={`check-row${m.completed ? ' done' : ''}`} style={{ borderBottom: '1px solid var(--glass-border)', padding: '10px 0' }}>
               <input type="checkbox" checked={!!m.completed} onChange={() => api.put(`/plans/${id}/modules/${m.id}`, { completed: !m.completed })} />
-              <span className="grow">{m.title}{m.notes ? <span className="muted small" style={{ display: 'block', textDecoration: 'none' }}>{m.notes}</span> : null}</span>
+              <span className="grow">{m.title}{m.notes ? <span className="muted small" style={{ display: 'block', textDecoration: 'none', whiteSpace: 'pre-wrap' }}>{m.notes}</span> : null}</span>
               {m.completed_at && <span className="muted small">{fmtDate(m.completed_at)}</span>}
             </label>
           ))}
@@ -75,7 +75,7 @@ export default function PlanDetail() {
           {p.sessions.length === 0 ? <EmptyState icon="calendar-days" text="No sessions scheduled." /> : p.sessions.map(s => (
             <div key={s.id} className="session-row" style={{ borderLeftColor: s.delivered ? 'var(--green)' : 'var(--cyan)' }}>
               <div className="day-chip">{fmtShort(s.date).split(' ')[0]}<b>{fmtShort(s.date).split(' ').slice(1).join(' ')}</b></div>
-              <div className="grow"><div className="small strong">{fmtTime(s.time) || 'Any time'} · {s.trainer_name || p.trainer_name || '—'}</div>{s.notes && <div className="muted small">{s.notes}</div>}</div>
+              <div className="grow"><div className="small strong">{fmtTime(s.time) || 'Any time'} · {s.trainer_name || p.trainer_name || '—'}</div>{s.notes && <div className="muted small" style={{ whiteSpace: 'pre-wrap' }}>{s.notes}</div>}</div>
               <label className="check-row" style={{ padding: 0 }}><input type="checkbox" checked={!!s.delivered} onChange={() => api.put(`/plans/${id}/sessions/${s.id}`, { delivered: !s.delivered })} /><span className="small">Delivered</span></label>
             </div>
           ))}
