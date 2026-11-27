@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { MoreHorizontal, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, ChevronRight, Trash2 } from 'lucide-react';
+import deleteTeamMember from '../lib/deleteMember';
 import api from '../api';
 import useLoad from '../hooks/useLoad';
 import { Panel, ProgressBar, ProgressCell, StatusPill, Avatar, JourneyStrip, EmptyState, Loading, TypeTag } from '../components/ui';
@@ -69,6 +70,10 @@ export default function TraineeProfile() {
           </div>
           {!ob && <button className="btn btn-secondary" onClick={() => setTrained(true)}>Mark as already trained</button>}
           <button className="btn btn-secondary" onClick={() => navigate(`/training-hub/plans/new?staff_id=${d.staff.id}`)}>+ Training plan</button>
+          <button className="btn btn-ghost" style={{ color: 'var(--red)' }} title="Delete this team member"
+            onClick={async () => { if (await deleteTeamMember(d.staff.id, d.staff.name)) navigate('/training-hub/trainees'); }}>
+            <Trash2 size={14} /> Delete
+          </button>
         </div>
         {ob && (
           <div className="mt-16">

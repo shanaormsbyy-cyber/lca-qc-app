@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Trash2 } from 'lucide-react';
+import deleteTeamMember from '../lib/deleteMember';
 import api from '../api';
 import useLoad from '../hooks/useLoad';
 import { PageTitle, Panel, ProgressCell, StatusPill, Avatar, EmptyState, Loading, Modal, Icon } from '../components/ui';
@@ -9,7 +10,7 @@ import { NewHireSetupModal, AlreadyTrainedModal } from '../components/modals';
 export default function Trainees() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [rows] = useLoad(() => api.get('/trainees').then(r => r.data));
+  const [rows, reload] = useLoad(() => api.get('/trainees').then(r => r.data));
   const [q, setQ] = useState('');
   const [modal, setModal] = useState(params.get('add') ? 'choose' : null);
   const close = () => { setModal(null); if (params.get('add')) setParams({}); };
@@ -38,7 +39,13 @@ export default function Trainees() {
                     <td>{r.trainer_name || <span className="muted">—</span>}</td>
                     <td>{r.active_plans}</td>
                     <td><StatusPill status={r.status} /></td>
-                    <td><ChevronRight size={16} className="chev" /></td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button className="icon-btn danger" title={`Delete ${r.name}`}
+                        onClick={async e => { e.stopPropagation(); if (await deleteTeamMember(r.staff_id, r.name)) reload(); }}>
+                        <Trash2 size={14} />
+                      </button>
+                      <ChevronRight size={16} className="chev" style={{ marginLeft: 6, verticalAlign: 'middle' }} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
