@@ -86,7 +86,11 @@ module.exports = (db, { uploadsDir }) => {
       status: competencyStatus(c, today()),
       criteria: db.prepare('SELECT id, text FROM skill_criteria WHERE skill_id = ? ORDER BY sort_order, id').all(c.skill_id),
       default_modules: db.prepare('SELECT id, title, notes FROM skill_default_modules WHERE skill_id = ? ORDER BY sort_order, id').all(c.skill_id),
-      foundation_prompts: db.prepare('SELECT id, text, details FROM foundation_prompts WHERE skill_id = ? ORDER BY sort_order, id').all(c.skill_id),
+      // Foundations prompts from the room with the same name as this skill (if there is one).
+      foundation_prompts: db.prepare(`SELECT p.id, p.text, p.details FROM foundation_room_prompts p
+        JOIN foundation_rooms r ON r.id = p.room_id
+        WHERE LOWER(TRIM(r.name)) = (SELECT LOWER(TRIM(name)) FROM skills WHERE id = ?)
+        ORDER BY p.sort_order, p.id`).all(c.skill_id),
       assessments,
       onboarding_id: ob ? ob.id : null,
     });

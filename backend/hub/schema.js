@@ -266,6 +266,53 @@ function applySchema(db) {
   ]) {
     try { db.exec(sql); } catch (_) { /* already exists */ }
   }
+
+  // Foundations has its own room list (separate from competency skills).
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS foundation_rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT 'door-open',
+    sort_order INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS foundation_room_prompts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL REFERENCES foundation_rooms(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    details TEXT,
+    sort_order INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS foundation_room_progress (
+    staff_id INTEGER NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    room_id INTEGER NOT NULL REFERENCES foundation_rooms(id) ON DELETE CASCADE,
+    taught_at TEXT,
+    taught_by INTEGER,
+    PRIMARY KEY (staff_id, room_id)
+  );
+  `);
+  migrateFoundationRooms(db);
+}
+
+// One-time: skills that already had foundations prompts or progress become foundation rooms,
+// with their prompts and trainee progress copied across. Old tables are left untouched.
+function migrateFoundationRooms(db) {
+  const done = db.prepare("SELECT value FROM settings WHERE key = 'foundations_rooms_migrated'").get();
+  if (done) return;
+  db.tx(() => {
+    const skills = db.prepare(`SELECT s.id, s.name, s.icon FROM skills s
+      WHERE EXISTS (SELECT 1 FROM foundation_prompts p WHERE p.skill_id = s.id)
+         OR EXISTS (SELECT 1 FROM foundation_progress g WHERE g.skill_id = s.id)
+      ORDER BY s.sort_order, s.id`).all();
+    skills.forEach((s, i) => {
+      const roomId = Number(db.prepare('INSERT INTO foundation_rooms (name, icon, sort_order) VALUES (?, ?, ?)')
+        .run(s.name, s.icon || 'door-open', i).lastInsertRowid);
+      db.prepare(`INSERT INTO foundation_room_prompts (room_id, text, details, sort_order)
+        SELECT ?, text, details, sort_order FROM foundation_prompts WHERE skill_id = ?`).run(roomId, s.id);
+      db.prepare(`INSERT INTO foundation_room_progress (staff_id, room_id, taught_at, taught_by)
+        SELECT staff_id, ?, taught_at, taught_by FROM foundation_progress WHERE skill_id = ?`).run(roomId, s.id);
+    });
+    db.prepare("INSERT INTO settings (key, value) VALUES ('foundations_rooms_migrated', '1')").run();
+  });
 }
 
 module.exports = { applySchema };

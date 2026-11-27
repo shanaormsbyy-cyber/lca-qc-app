@@ -31,21 +31,66 @@ function ensurePlanFor(db, staffId, managerId) {
     .run(staffId, `Development — ${staff.name}`, managerId, today()).lastInsertRowid);
 }
 
+// Foundations rooms are their own list (set up on the Foundations page), separate from competency skills.
 function rooms(db) {
-  const prompts = db.prepare('SELECT id, text, details FROM foundation_prompts WHERE skill_id = ? ORDER BY sort_order, id');
-  return db.prepare('SELECT id, name, icon, category, required FROM skills WHERE archived = 0 ORDER BY sort_order, id').all()
-    .map(s => ({ ...s, prompts: prompts.all(s.id) }));
+  const prompts = db.prepare('SELECT id, text, details FROM foundation_room_prompts WHERE room_id = ? ORDER BY sort_order, id');
+  return db.prepare('SELECT id, name, icon FROM foundation_rooms ORDER BY sort_order, id').all()
+    .map(r => ({ ...r, icon: r.icon || 'door-open', prompts: prompts.all(r.id) }));
 }
+
+const cleanName = n => (n == null ? '' : String(n).trim());
 
 module.exports = (db) => {
   const router = express.Router();
 
   router.get('/', (req, res) => res.json(rooms(db)));
 
+  // ── Room list ──
+  router.post('/rooms', (req, res) => {
+    const name = cleanName(req.body && req.body.name);
+    if (!name) return res.status(400).json({ error: 'Enter a room name' });
+    const max = db.prepare('SELECT COALESCE(MAX(sort_order), -1) m FROM foundation_rooms').get().m;
+    const id = Number(db.prepare('INSERT INTO foundation_rooms (name, sort_order) VALUES (?, ?)').run(name, max + 1).lastInsertRowid);
+    emit();
+    res.json({ id });
+  });
+
+  router.put('/rooms/order', (req, res) => {
+    const ids = (req.body && req.body.ids) || [];
+    if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids must be a list' });
+    db.tx(() => {
+      const up = db.prepare('UPDATE foundation_rooms SET sort_order = ? WHERE id = ?');
+      ids.forEach((id, i) => up.run(i, Number(id)));
+    });
+    emit();
+    res.json({ ok: true });
+  });
+
+  router.put('/rooms/:id', (req, res) => {
+    const name = cleanName(req.body && req.body.name);
+    if (!name) return res.status(400).json({ error: 'Enter a room name' });
+    const r = db.prepare('UPDATE foundation_rooms SET name = ? WHERE id = ?').run(name, Number(req.params.id));
+    if (!r.changes) return res.status(404).json({ error: 'Room not found' });
+    emit();
+    res.json({ ok: true });
+  });
+
+  router.delete('/rooms/:id', (req, res) => {
+    const id = Number(req.params.id);
+    db.tx(() => {
+      db.prepare('DELETE FROM foundation_room_prompts WHERE room_id = ?').run(id);
+      db.prepare('DELETE FROM foundation_room_progress WHERE room_id = ?').run(id);
+      db.prepare('DELETE FROM foundation_rooms WHERE id = ?').run(id);
+    });
+    emit();
+    res.json({ ok: true });
+  });
+
+  // ── Trainee progress ──
   router.get('/trainee/:staffId', (req, res) => {
     const sid = Number(req.params.staffId);
     const plan = openPlanFor(db, sid);
-    const taught = db.prepare('SELECT * FROM foundation_progress WHERE staff_id = ? AND skill_id = ?');
+    const taught = db.prepare('SELECT * FROM foundation_room_progress WHERE staff_id = ? AND room_id = ?');
     const inPlan = db.prepare(`SELECT 1 FROM plan_modules pm JOIN plans p ON p.id = pm.plan_id
       WHERE p.staff_id = ? AND p.is_template = 0 AND p.status != 'archived' AND pm.title = ?`);
     const list = rooms(db).filter(r => r.prompts.length > 0).map(r => {
@@ -55,47 +100,48 @@ module.exports = (db) => {
     res.json({ plan_id: plan ? plan.id : null, rooms: list, taught: list.filter(r => r.taught).length, total: list.length });
   });
 
-  router.put('/trainee/:staffId/:skillId', (req, res) => {
+  router.put('/trainee/:staffId/:roomId', (req, res) => {
     const sid = Number(req.params.staffId);
-    const kid = Number(req.params.skillId);
+    const rid = Number(req.params.roomId);
     if (req.body && req.body.taught) {
-      db.prepare(`INSERT INTO foundation_progress (staff_id, skill_id, taught_at, taught_by) VALUES (?, ?, ?, ?)
-        ON CONFLICT(staff_id, skill_id) DO UPDATE SET taught_at = excluded.taught_at, taught_by = excluded.taught_by`).run(sid, kid, today(), req.manager.id);
+      db.prepare(`INSERT INTO foundation_room_progress (staff_id, room_id, taught_at, taught_by) VALUES (?, ?, ?, ?)
+        ON CONFLICT(staff_id, room_id) DO UPDATE SET taught_at = excluded.taught_at, taught_by = excluded.taught_by`).run(sid, rid, today(), req.manager.id);
     } else {
-      db.prepare('DELETE FROM foundation_progress WHERE staff_id = ? AND skill_id = ?').run(sid, kid);
+      db.prepare('DELETE FROM foundation_room_progress WHERE staff_id = ? AND room_id = ?').run(sid, rid);
     }
     emit();
     res.json({ ok: true });
   });
 
-  router.post('/trainee/:staffId/:skillId/add-to-plan', (req, res) => {
+  router.post('/trainee/:staffId/:roomId/add-to-plan', (req, res) => {
     const sid = Number(req.params.staffId);
-    const skill = db.prepare('SELECT * FROM skills WHERE id = ?').get(Number(req.params.skillId));
-    if (!skill) return res.status(404).json({ error: 'Room not found' });
+    const room = db.prepare('SELECT * FROM foundation_rooms WHERE id = ?').get(Number(req.params.roomId));
+    if (!room) return res.status(404).json({ error: 'Room not found' });
     const planId = ensurePlanFor(db, sid, req.manager.id);
     if (!planId) return res.status(404).json({ error: 'Trainee not found' });
-    const plan = { id: planId };
-    const title = moduleTitle(skill.name);
-    if (db.prepare('SELECT 1 FROM plan_modules WHERE plan_id = ? AND title = ?').get(plan.id, title)) {
+    const title = moduleTitle(room.name);
+    if (db.prepare('SELECT 1 FROM plan_modules WHERE plan_id = ? AND title = ?').get(planId, title)) {
       return res.status(409).json({ error: 'Already in their training plan' });
     }
-    const notes = db.prepare('SELECT text FROM foundation_prompts WHERE skill_id = ? ORDER BY sort_order, id').all(skill.id).map(p => `• ${p.text}`).join('\n');
-    const max = db.prepare('SELECT COALESCE(MAX(sort_order), -1) m FROM plan_modules WHERE plan_id = ?').get(plan.id).m;
-    db.prepare('INSERT INTO plan_modules (plan_id, title, notes, skill_id, sort_order) VALUES (?, ?, ?, ?, ?)').run(plan.id, title, notes || null, skill.id, max + 1);
+    const notes = db.prepare('SELECT text FROM foundation_room_prompts WHERE room_id = ? ORDER BY sort_order, id').all(room.id)
+      .map(p => `• ${p.text}`).join('\n');
+    const max = db.prepare('SELECT COALESCE(MAX(sort_order), -1) m FROM plan_modules WHERE plan_id = ?').get(planId).m;
+    db.prepare('INSERT INTO plan_modules (plan_id, title, notes, sort_order) VALUES (?, ?, ?, ?)').run(planId, title, notes || null, max + 1);
     emit();
-    res.json({ ok: true, plan_id: plan.id });
+    res.json({ ok: true, plan_id: planId });
   });
 
-  router.put('/:skillId', (req, res) => {
-    const kid = Number(req.params.skillId);
-    if (!db.prepare('SELECT id FROM skills WHERE id = ?').get(kid)) return res.status(404).json({ error: 'Room not found' });
+  // ── Prompts for one room ──
+  router.put('/:roomId', (req, res) => {
+    const rid = Number(req.params.roomId);
+    if (!db.prepare('SELECT id FROM foundation_rooms WHERE id = ?').get(rid)) return res.status(404).json({ error: 'Room not found' });
     const prompts = (req.body && req.body.prompts) || [];
     if (!Array.isArray(prompts)) return res.status(400).json({ error: 'prompts must be a list' });
     db.tx(() => {
-      db.prepare('DELETE FROM foundation_prompts WHERE skill_id = ?').run(kid);
-      const ins = db.prepare('INSERT INTO foundation_prompts (skill_id, text, details, sort_order) VALUES (?, ?, ?, ?)');
+      db.prepare('DELETE FROM foundation_room_prompts WHERE room_id = ?').run(rid);
+      const ins = db.prepare('INSERT INTO foundation_room_prompts (room_id, text, details, sort_order) VALUES (?, ?, ?, ?)');
       prompts.map(p => (typeof p === 'string' ? { text: p } : p || {})).filter(p => p.text && String(p.text).trim())
-        .forEach((p, i) => ins.run(kid, String(p.text).trim(), p.details && String(p.details).trim() ? String(p.details).trim() : null, i));
+        .forEach((p, i) => ins.run(rid, String(p.text).trim(), p.details && String(p.details).trim() ? String(p.details).trim() : null, i));
     });
     emit();
     res.json({ ok: true });

@@ -24,8 +24,8 @@ function addTx(db) {
 }
 
 function mountHub(app, db, { uploadsDir, requireAuth }) {
-  applySchema(db);
   addTx(db);
+  applySchema(db);
   seedSettings(db);
   for (const name of ROUTES) {
     app.use(`/api/hub/${name}`, requireAuth, require(`./routes/${name}`)(db, { uploadsDir }));

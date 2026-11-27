@@ -42,8 +42,8 @@ function onboardingParts(db, ob) {
   const cl = db.prepare('SELECT COUNT(*) total, COALESCE(SUM(done), 0) done FROM onboarding_checklist_items WHERE onboarding_id = ?').get(ob.id);
   // Stage 2 (Foundations): rooms that have teaching prompts vs rooms gone through with this trainee.
   const mods = db.prepare(`SELECT COUNT(*) total,
-      COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM foundation_progress fp WHERE fp.staff_id = ? AND fp.skill_id = s.id) THEN 1 ELSE 0 END), 0) done
-    FROM skills s WHERE s.archived = 0 AND EXISTS (SELECT 1 FROM foundation_prompts f WHERE f.skill_id = s.id)`).get(ob.staff_id);
+      COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM foundation_room_progress fp WHERE fp.staff_id = ? AND fp.room_id = r.id) THEN 1 ELSE 0 END), 0) done
+    FROM foundation_rooms r WHERE EXISTS (SELECT 1 FROM foundation_room_prompts f WHERE f.room_id = r.id)`).get(ob.staff_id);
   const req = db.prepare(`SELECT COUNT(*) total, COALESCE(SUM(CASE WHEN level = 'competent' AND reassess_flag = 0 THEN 1 ELSE 0 END), 0) done
     FROM competencies WHERE staff_id = ? AND required = 1`).get(ob.staff_id);
   const sp = linkedShadowPeriod(db, ob);
